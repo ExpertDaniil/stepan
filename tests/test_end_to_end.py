@@ -3,6 +3,7 @@ from pathlib import Path
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,12 +27,22 @@ class EndToEndTests(unittest.TestCase):
         return {**os.environ, "LLM_MODE": "mock", "TIME_BUDGET_SECONDS": "90", "MAX_RESEARCH_EXPERIMENTS": experiments,
                 "LOG_LEVEL": "ERROR", "MAX_WORKERS": "2", "TRAIN_MEMORY_MB": "10240", "EXPERIMENT_TIMEOUT_SECONDS": "30"}
 
-    def check_run(self, temp, kind, experiments="2", source=ROOT):
+    def check_run(self, temp, kind, experiments="2", source=ROOT, platform_copy=False):
         import pandas as pd
         task = make_demo(Path(temp) / kind, kind)
         runs = Path(temp) / "runs"
-        result = subprocess.run([sys.executable, str(source / "solution.py"), str(task), "--llm-mode", "mock", "--work-dir", str(runs)],
-                                env=self.env(experiments), cwd=temp, text=True, capture_output=True, timeout=70)
+        env = self.env(experiments)
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+        cwd = temp
+        command = [sys.executable, str(source / "solution.py"), str(task)]
+        if platform_copy:
+            for name in ("solution.py", "requirements.txt"):
+                shutil.copy2(source / name, task.parent / name)
+            command = [sys.executable, "solution.py", "task.md"]
+            cwd = task.parent
+        result = subprocess.run(command + ["--llm-mode", "mock", "--work-dir", str(runs)],
+                                env=env, cwd=cwd, text=True, capture_output=True, timeout=70)
         self.assertEqual(result.returncode, 0, result.stderr[-6000:])
         output = pd.read_csv(task.parent / "submission.csv", dtype=str, keep_default_na=False)
         test = pd.read_csv(task.parent / "test.csv", dtype=str, keep_default_na=False)
@@ -100,15 +111,33 @@ class EndToEndTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertTrue((task.parent / "submission.csv").is_file())
 
-    def test_extracted_platform_zip_runs_without_repository_path(self):
+    def test_flat_platform_copy_runs_research_without_repository_path(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             archive = root / "solution.zip"
             build(archive)
             unpacked = root / "unpacked"
             with zipfile.ZipFile(archive) as z:
-                self.assertIn("solution.py", z.namelist())
-                self.assertFalse(any(name.startswith(("tests/", "docs/", "runs/")) for name in z.namelist()))
-                self.assertFalse(any(Path(name).name == ".env" for name in z.namelist()))
+                self.assertEqual(z.namelist(), ["solution.py", "requirements.txt"])
+                self.assertEqual(z.read("requirements.txt"), (ROOT / "requirements.organizers.txt").read_bytes())
                 z.extractall(unpacked)
-            self.check_run(temp, "classification", "0", source=unpacked)
+            _, _, events = self.check_run(temp, "classification", "2", source=unpacked, platform_copy=True)
+            self.assertGreaterEqual(sum(e["event"] == "submission.published" for e in events), 2)
+
+    def test_daily_budget_after_baseline_retains_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = make_demo(Path(temp) / "task")
+            original = MockTransport.complete
+            def exhaust_budget(transport, request, timeout, context):
+                if context["metadata"]["schema_id"] == "ResearchProposal-v1":
+                    exc = RuntimeError("Budget has been exceeded")
+                    exc.status_code = 429
+                    raise exc
+                return original(transport, request, timeout, context)
+            with patch.dict(os.environ, self.env()), patch.object(MockTransport, "complete", exhaust_budget), redirect_stderr(io.StringIO()):
+                code = main([str(task), "--llm-mode", "mock", "--work-dir", str(Path(temp) / "runs")])
+            self.assertEqual(code, 0)
+            self.assertTrue((task.parent / "submission.csv").is_file())
+            run = next((Path(temp) / "runs").glob("run-*"))
+            self.assertIn("State: degraded", (run / "summary.md").read_text())
+            self.assertIn("llm.daily_budget_exhausted", (run / "events.jsonl").read_text())

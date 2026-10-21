@@ -4,12 +4,13 @@ import json
 import os
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from agent.budget import Budget
 from agent.context import output_schemas
 from agent.errors import AgentError
-from agent.llm.gateway import Gateway, OpenAITransport, parse_json
+from agent.llm.gateway import DEFAULT_MODEL, Gateway, OpenAITransport, parse_json, request_model
 from tests.helpers import Harness
 
 
@@ -82,6 +83,49 @@ class GatewayTests(unittest.TestCase):
             with self.assertRaises(AgentError) as caught:
                 OpenAITransport()
         self.assertEqual(caught.exception.code, "INVALID_CONFIG")
+        self.assertEqual(caught.exception.details["missing"], ["OPENAI_API_KEY", "OPENAI_BASE_URL"])
+
+    def test_temporary_rate_limit_can_retry(self):
+        exc = RuntimeError("temporary rate limit")
+        exc.status_code = 429
+        transport = FakeTransport([exc, {"choices": [{"message": {"content": json.dumps(self.final_payload())}}]}])
+        gateway = Gateway(self.h.config, Budget(self.h.config, time.monotonic(), self.h.log), self.h.artifacts, self.h.bus, self.h.log, output_schemas(self.h.bus), transport)
+        with patch("agent.llm.gateway.time.sleep"):
+            self.assertEqual(gateway.complete(self.args())["attempts_used"], 2)
+        self.assertFalse(gateway.daily_budget_exhausted.is_set())
+
+    def test_model_is_optional_and_platform_override_wins(self):
+        with patch.dict(os.environ, {"OPENAI_MODEL": ""}):
+            self.assertEqual(request_model("live"), DEFAULT_MODEL)
+            self.assertEqual(request_model("mock"), "mock-only")
+        with patch.dict(os.environ, {"OPENAI_MODEL": "platform-selected-model"}):
+            self.assertEqual(request_model("live"), "platform-selected-model")
+
+    def test_live_transport_needs_no_model_and_uses_only_env_endpoint(self):
+        calls = []
+        fake = SimpleNamespace(OpenAI=lambda **kwargs: calls.append(kwargs) or SimpleNamespace(close=lambda: None))
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-placeholder", "OPENAI_BASE_URL": "https://provided.invalid/v1", "OPENAI_MODEL": ""}), patch.dict("sys.modules", {"openai": fake}):
+            transport = OpenAITransport()
+            transport.close()
+        self.assertEqual(calls, [{"api_key": "test-placeholder", "base_url": "https://provided.invalid/v1", "max_retries": 0}])
+
+    def test_daily_key_budget_stops_retry_and_followup_calls(self):
+        for status, body_in_exception in [(429, False), (403, True)]:
+            with self.subTest(status=status):
+                exc = RuntimeError("quota error" if body_in_exception else "Budget has been exceeded")
+                exc.status_code = status
+                if body_in_exception:
+                    exc.body = {"error": {"message": "Budget has been exceeded"}}
+                transport = FakeTransport([exc])
+                gateway = Gateway(self.h.config, Budget(self.h.config, time.monotonic(), self.h.log), self.h.artifacts, self.h.bus, self.h.log, output_schemas(self.h.bus), transport)
+                args = self.args()
+                for _ in range(2):
+                    with self.assertRaises(AgentError) as caught:
+                        gateway.complete(args)
+                    self.assertEqual(caught.exception.code, "LLM_BUDGET_EXHAUSTED")
+                    self.assertFalse(caught.exception.retryable)
+                    self.assertEqual(caught.exception.details["reset_time_msk"], "03:00")
+                self.assertEqual(len(transport.requests), 1)
 
     def test_strict_json_rejects_duplicate_keys_and_nan(self):
         for text in ['{"x":1,"x":2}', '{"x":NaN}', 'prefix {"x":1}']:

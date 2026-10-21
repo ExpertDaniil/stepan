@@ -13,7 +13,7 @@ from agent.errors import AgentError
 from tools.code import validate_code, write_code
 from tools.data import read_table
 from tools.data import profile_data
-from tools.files import resolve_inputs
+from tools.files import find_task_files, resolve_inputs
 from tests.helpers import Harness
 
 
@@ -28,6 +28,52 @@ class ToolsBudgetTests(unittest.TestCase):
             with self.assertRaises(AgentError) as caught:
                 resolve_inputs(root / "task.md")
             self.assertEqual(caught.exception.code, "AMBIGUOUS_PATH")
+            self.assertIn("scripts/list_tasks.py", str(caught.exception))
+
+    def test_adjacent_task_ignores_foreign_sample_submissions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "task.md").write_text("Read train.csv, test.csv. Write submission.csv.")
+            for filename in ("train.csv", "test.csv"):
+                (root / filename).write_text("x,y\n1,2\n")
+            for folder in ("other-a", "other-b"):
+                (root / folder).mkdir()
+                for filename in ("train.csv", "test.csv", "sample_submission.csv", "data_dictionary.csv"):
+                    (root / folder / filename).write_text("x,y\n1,2\n")
+            _, paths = resolve_inputs(root / "task.md")
+            self.assertEqual(set(paths), {"train", "test"})
+            self.assertEqual(paths["train"], str(root / "train.csv"))
+
+    def test_optional_files_follow_selected_dataset(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "task.md").write_text("Read `selected/train.csv` and `selected/test.csv`.")
+            for folder in ("selected", "foreign"):
+                directory = root / folder
+                directory.mkdir()
+                for filename in ("train.csv", "test.csv", "sample_submission.csv"):
+                    (directory / filename).write_text("x,y\n1,2\n")
+            _, paths = resolve_inputs(root / "task.md")
+            self.assertEqual(paths["sample_submission"], str(root / "selected/sample_submission.csv"))
+
+    def test_explicit_optional_path_is_respected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "task.md").write_text("Read `train.csv`, `test.csv`, `templates/sample_submission.csv`.")
+            (root / "templates").mkdir()
+            for filename in ("train.csv", "test.csv", "sample_submission.csv", "templates/sample_submission.csv"):
+                (root / filename).write_text("x,y\n1,2\n")
+            _, paths = resolve_inputs(root / "task.md")
+            self.assertEqual(paths["sample_submission"], str(root / "templates/sample_submission.csv"))
+
+    def test_discovery_skips_generated_runs_and_virtualenv(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for folder in ("Регрессия", "Многоклассовая классификация", "runs/old/task", ".venv/example"):
+                directory = root / folder
+                directory.mkdir(parents=True)
+                (directory / "task.md").write_text("Condition")
+            self.assertEqual(len(find_task_files(root)), 2)
 
     def test_archive_style_wrong_paths_fall_back_only_when_unique(self):
         h = Harness()

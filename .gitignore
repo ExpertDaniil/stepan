@@ -12,6 +12,9 @@ runs/
 demo_tasks/
 data/
 datasets/
+data_for_participants/
+/task.md
+/MANIFEST.sha256
 dist/
 build/
 *.egg-info/

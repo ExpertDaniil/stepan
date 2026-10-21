@@ -18,6 +18,16 @@
       "installed": "2.2.3",
       "matches": true
     },
+    "polars": {
+      "expected": "1.26.0",
+      "installed": null,
+      "matches": false
+    },
+    "pyarrow": {
+      "expected": "19.0.1",
+      "installed": null,
+      "matches": false
+    },
     "joblib": {
       "expected": "1.4.2",
       "installed": "1.5.3",
@@ -38,6 +48,61 @@
       "installed": null,
       "matches": false
     },
+    "lightgbm": {
+      "expected": "4.6.0",
+      "installed": null,
+      "matches": false
+    },
+    "xgboost": {
+      "expected": "2.1.4",
+      "installed": null,
+      "matches": false
+    },
+    "imbalanced-learn": {
+      "expected": "0.12.4",
+      "installed": null,
+      "matches": false
+    },
+    "category-encoders": {
+      "expected": "2.6.4",
+      "installed": null,
+      "matches": false
+    },
+    "feature-engine": {
+      "expected": "1.8.3",
+      "installed": null,
+      "matches": false
+    },
+    "statsmodels": {
+      "expected": "0.14.0",
+      "installed": null,
+      "matches": false
+    },
+    "optuna": {
+      "expected": "4.2.1",
+      "installed": null,
+      "matches": false
+    },
+    "torch": {
+      "expected": "2.5.1",
+      "installed": null,
+      "matches": false
+    },
+    "autogluon.tabular[lightgbm,catboost,xgboost]": {
+      "expected": "1.3.1",
+      "installed": null,
+      "matches": false
+    },
+    "lightautoml": {
+      "expected": "0.4.2",
+      "installed": null,
+      "matches": false
+    },
+    "flaml[automl]": {
+      "expected": "2.3.6",
+      "installed": null,
+      "matches": false
+    },
     "openai": {
       "expected": "1.68.2",
       "installed": null,
@@ -48,9 +113,79 @@
       "installed": null,
       "matches": false
     },
+    "tenacity": {
+      "expected": "9.0.0",
+      "installed": null,
+      "matches": false
+    },
+    "langchain": {
+      "expected": "0.3.27",
+      "installed": null,
+      "matches": false
+    },
+    "langchain-openai": {
+      "expected": "0.3.23",
+      "installed": null,
+      "matches": false
+    },
+    "langgraph": {
+      "expected": "0.6.7",
+      "installed": null,
+      "matches": false
+    },
+    "pydantic": {
+      "expected": "2.10.6",
+      "installed": "2.14.0",
+      "matches": false
+    },
+    "python-dotenv": {
+      "expected": "1.0.1",
+      "installed": null,
+      "matches": false
+    },
+    "PyYAML": {
+      "expected": "6.0.2",
+      "installed": "6.0.3",
+      "matches": false
+    },
+    "orjson": {
+      "expected": "3.10.15",
+      "installed": null,
+      "matches": false
+    },
+    "jsonschema": {
+      "expected": "4.23.0",
+      "installed": null,
+      "matches": false
+    },
+    "matplotlib": {
+      "expected": "3.9.4",
+      "installed": "3.10.8",
+      "matches": false
+    },
+    "seaborn": {
+      "expected": "0.13.2",
+      "installed": "0.13.2",
+      "matches": true
+    },
+    "tqdm": {
+      "expected": "4.67.1",
+      "installed": null,
+      "matches": false
+    },
     "psutil": {
       "expected": "6.1.1",
       "installed": null,
+      "matches": false
+    },
+    "cloudpickle": {
+      "expected": "3.1.1",
+      "installed": null,
+      "matches": false
+    },
+    "setuptools": {
+      "expected": "80.9.0",
+      "installed": "84.0.0",
       "matches": false
     }
   },
@@ -58,5 +193,10 @@
     "OPENAI_API_KEY": false,
     "OPENAI_MODEL": false,
     "OPENAI_BASE_URL": false
-  }
+  },
+  "required_live_api_env": [
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL"
+  ],
+  "openai_model_optional": true
 }

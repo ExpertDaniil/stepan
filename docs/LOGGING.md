@@ -8,6 +8,7 @@
 
 - `contract.started/completed/failed/replayed`
 - `llm.call_started/completed/failed`, `llm.output_rejected`
+- `llm.daily_budget_exhausted` — сервер сообщил об исчерпании общего бюджета; reset_time_msk=03:00, повторов нет
 - `context.built`, `research.hypothesis_proposed`
 - `artifact.registered`, `experiment.reserved/evaluated/duplicate_skipped`
 - `job.started/finished`, C13 renew/release, C24 cancellation
@@ -23,3 +24,5 @@
 stdout/stderr дренируются во время работы процесса и сохраняются раздельно, до 8 MiB на поток. После лимита поток продолжает читаться, чтобы pipe не заблокировал worker. Важные JSONL-события сразу flush-ятся. Контексты, raw ответы и код могут содержать сведения задачи: `runs/` исключён из Git и создаётся приватным каталогом.
 
 На платформе обязательно оценивается итоговый CSV. Сохранение дополнительных файлов после завершения зависит от её интерфейса; поэтому важные статусы также пишутся в stderr. Локально полный run workspace остаётся у команды.
+
+`AMBIGUOUS_PATH` перечисляет спорные пути в message/details и подсказывает выбрать `task.md` одной задачи. Это ошибка разрешения входов C01, до создания Gateway и до API-вызовов. Для проверки структуры без обучения используйте `python3 scripts/list_tasks.py <каталог>`.

@@ -9,6 +9,12 @@ import uuid
 from agent.errors import AgentError
 from tools.code import write_code
 
+DEFAULT_MODEL = "qwen/qwen3.8-27b"  # Permitted by the updated organizers' instructions.
+
+
+def request_model(mode):
+    return os.environ.get("OPENAI_MODEL", "").strip() or (DEFAULT_MODEL if mode == "live" else "mock-only")
+
 
 def parse_json(text):
     text = (text or "").strip()
@@ -30,7 +36,7 @@ def parse_json(text):
 
 class OpenAITransport:
     def __init__(self):
-        missing = [k for k in ("OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL") if not os.environ.get(k)]
+        missing = [k for k in ("OPENAI_API_KEY", "OPENAI_BASE_URL") if not os.environ.get(k, "").strip()]
         if missing:
             raise AgentError("INVALID_CONFIG", "Missing live API environment variables", details={"missing": missing})
         if not os.environ["OPENAI_BASE_URL"].startswith(("http://", "https://")):
@@ -86,6 +92,12 @@ class Gateway:
         self.output_schemas = output_schemas
         self.transport = transport or (MockTransport() if config.llm_mode == "mock" else OpenAITransport())
         self.semaphore = threading.BoundedSemaphore(config.max_workers)
+        self.daily_budget_exhausted = threading.Event()
+
+    def check_daily_budget(self):
+        if self.daily_budget_exhausted.is_set():
+            raise AgentError("LLM_BUDGET_EXHAUSTED", "The shared provider key budget is exhausted; reset is at 03:00 MSK",
+                             details={"reset_time_msk": "03:00", "daily_key_limit_rub": 600})
 
     def complete(self, payload):
         context = self.artifacts.read_json(payload["context_artifact_id"])
@@ -110,17 +122,19 @@ class Gateway:
         last_art = None
         completion_id = "completion-" + uuid.uuid4().hex[:12]
         for attempt in range(1, payload["attempt_limit"] + 1):
+            self.check_daily_budget()
             left = deadline - time.monotonic()
             if left <= 0:
                 raise AgentError("LLM_UNAVAILABLE", "LLM operation deadline reached")
             if not self.semaphore.acquire(timeout=left):
                 raise AgentError("LLM_UNAVAILABLE", "Timed out waiting for LLM concurrency slot")
             try:
+                self.check_daily_budget()
                 left = deadline - time.monotonic()
                 if left <= 0:
                     raise AgentError("BUDGET_EXHAUSTED", "Deadline reached while waiting for API slot")
                 call_no = self.budget.llm_call()
-                request = {"model": os.environ.get("OPENAI_MODEL", "mock-only"), "messages": messages,
+                request = {"model": request_model(self.config.llm_mode), "messages": messages,
                            "max_tokens": payload["max_output_tokens"]}
                 if tools:
                     request.update(tools=tools, parallel_tool_calls=False)
@@ -143,9 +157,19 @@ class Gateway:
                 raise
             except Exception as exc:
                 status = getattr(exc, "status_code", None)
+                body = str(exc) + " " + json.dumps(getattr(exc, "body", None), default=str)
+                if "budget has been exceeded" in body.casefold():
+                    self.daily_budget_exhausted.set()
+                    self.log.event("llm.call_failed", level="WARNING", code="LLM_BUDGET_EXHAUSTED",
+                                   message="The shared provider daily key budget is exhausted", attempt=attempt,
+                                   status_code=status, retryable=False)
+                    self.log.event("llm.daily_budget_exhausted", level="WARNING", status_code=status,
+                                   reset_time_msk="03:00", daily_key_limit_rub=600)
+                    self.check_daily_budget()
                 retryable = status == 429 or status is None or (isinstance(status, int) and status >= 500)
                 last_error = AgentError("LLM_RATE_LIMIT" if status == 429 else "LLM_UNAVAILABLE", str(exc), retryable=retryable)
-                self.log.event("llm.call_failed", level="WARNING", code=last_error.code, message=str(exc), attempt=attempt)
+                self.log.event("llm.call_failed", level="WARNING", code=last_error.code, message=str(exc),
+                               attempt=attempt, status_code=status, retryable=retryable)
                 if not retryable or attempt == payload["attempt_limit"]:
                     raise last_error from exc
                 delay = min(2 ** (attempt - 1), max(0, deadline - time.monotonic() - 0.1))

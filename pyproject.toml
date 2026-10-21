@@ -1,6 +1,6 @@
 [project]
 name = "alfa-automl-agent-skeleton"
-version = "0.1.0"
+version = "0.2.0"
 description = "Contract-driven ML research agent skeleton for the Alfa hackathon"
 requires-python = ">=3.12,<3.13"
 
@@ -9,4 +9,4 @@ target-version = "py312"
 line-length = 120
 
 # The platform does not pip-install this project. solution.py imports local packages.
-# Dependency pins are in requirements.txt; no editable install is required.
+# Official platform pins: requirements.txt. Local runtime subset: requirements.runtime.txt.

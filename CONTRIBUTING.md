@@ -2,24 +2,28 @@
 
 Начните с `README.md`, `docs/IMPLEMENTATION.md` и согласованных контрактов C00–C24.
 
-## Первый Git
+## Работа в main
 
 ```bash
-git init -b main
-git add .
-git status
-git commit -m "Initialize contract-driven AutoML agent skeleton"
+git switch main
+git pull --ff-only origin main
+python scripts/check.py
+python scripts/package_solution.py
+git add <изменённые-файлы>
+git diff --cached --stat
+git commit -m "Describe the concrete change"
+git push origin main
 ```
 
-Перед commit просмотрите список добавленных файлов. `.env`, данные, модели, `runs/`, `dist/` и кэши исключены. Удалённый репозиторий и права доступа команда настраивает отдельно.
+По договорённости команды изменения пишутся прямо в `main`. Перед commit просмотрите список добавленных файлов. `.env`, реальные условия/данные, модели, `runs/`, `dist/` и кэши исключены. `dist/solution.zip` каждый участник собирает локально; архив репозитория не загружается на платформу. Если `main` уже изменился, сначала согласуйте изменения с новой вершиной. `push --force` не используется.
 
-## Ветки и владельцы
+## Области ответственности
 
-- A: `feature/runner`, `feature/budget`, `feature/store`, `feature/observability`.
-- B: `feature/llm-gateway`, `feature/context`, `feature/researcher`, `feature/task-interpreter`.
-- C: `feature/recipes`, `feature/evaluator`, `feature/submission`, `feature/data-tools`.
+- A: runner, budget, store, observability.
+- B: llm-gateway, context, researcher, task-interpreter.
+- C: recipes, evaluator, submission, data-tools.
 
-Ветка соответствует небольшому изменению. После принятия общий `main` остаётся запускаемым. Для GitHub Actions/GitLab CI используйте один provider-neutral шаг `python scripts/check.py`; сервис CI здесь не предполагается.
+Коммит соответствует небольшому проверенному изменению; общий `main` остаётся запускаемым. Для GitHub Actions/GitLab CI используйте один provider-neutral шаг `python scripts/check.py`; сервис CI здесь не предполагается.
 
 ## Границы модулей
 

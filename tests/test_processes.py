@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from agent.budget import Budget
 from agent.orchestrator import Orchestrator
-from agent.runner import Job, Runner, group_processes
+from agent.runner import Job, Runner, group_processes, resident_mb
 from agent.catalog import Catalog
 from tests.helpers import Harness
 
@@ -35,21 +35,77 @@ class ProcessTests(unittest.TestCase):
                 proc.stdout.close()
         self.h.close()
 
-    def make_job(self, timeout=30, child=False):
-        ident = self.h.store.reserve(self.h.plan(), self.h.code["sha256"])["experiment_id"]
+    def make_job(self, timeout=30, child=False, completed=None, exit_code=0):
+        ident = self.h.store.reserve(self.h.plan(model={"family": "linear", "hyperparameters": {"C": len(self.processes) + 1}}), self.h.code["sha256"])["experiment_id"]
         req = {"cpu_threads": 1, "memory_limit_mb": 512, "timeout_seconds": timeout}
         lease = self.budget.lease({"operation": "acquire", "owner_id": ident, "phase": "train", "requested": req, "lease_id": None, "fencing_token": None})["lease"]
         attempt = self.h.store.start(ident, lease)
+        job_id = "job-test-" + str(len(self.processes) + 1)
+        directory = self.h.run / job_id
+        directory.mkdir(exist_ok=True)
         code = "import time; time.sleep(30)"
         if child:
             code = "import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); print(p.pid,flush=True); time.sleep(30)"
+        if completed is not None:
+            result = {"success": completed, "error": "synthetic worker error"}
+            write_result = "" if completed == "missing" else f"Path({str(directory / 'result.json')!r}).write_text(json.dumps({result!r})); "
+            code = ("import subprocess,sys,json; from pathlib import Path; "
+                    "p=subprocess.Popen([sys.executable,'-u','-c',"
+                    "'import os,time; print(os.getpid(),flush=True); time.sleep(30)'],stdout=subprocess.PIPE,text=True); "
+                    "p.stdout.readline(); print(p.pid,flush=True); "
+                    f"{write_result}"
+                    f"sys.exit({exit_code})")
         proc = subprocess.Popen([sys.executable, "-u", "-c", code], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         self.processes.append(proc)
-        directory = self.h.run / "job"
-        directory.mkdir(exist_ok=True)
-        job = Job("job-test", ident, attempt, "train", lease, proc, directory, time.monotonic(), last_heartbeat=time.monotonic())
+        job = Job(job_id, ident, attempt, "train", lease, proc, directory, time.monotonic(), last_heartbeat=time.monotonic())
         self.runner.jobs[job.job_id] = job
         return job
+
+    def controller(self):
+        controller = Orchestrator.__new__(Orchestrator)
+        for key, value in {"config": self.h.config, "bus": self.h.bus, "budget": self.budget,
+                           "runner": self.runner, "store": self.h.store, "log": self.h.log}.items():
+            setattr(controller, key, value)
+        return controller
+
+    def test_completed_worker_with_live_helper_keeps_success_and_releases_resources(self):
+        job = self.make_job(completed=True)
+        child_pid = int(job.process.stdout.readline().strip())
+        job.process.wait(timeout=3)
+        self.assertIn(child_pid, group_processes(job.process.pid))
+        self.assertGreater(resident_mb(job.process.pid), 0)
+        result = self.controller().wait_jobs([job])[job.job_id]
+        self.assertEqual(result["state"], "succeeded")
+        self.assertIsNone(result["error"])
+        self.assertEqual(self.h.store.get(job.experiment_id)["state"], "trained")
+        self.assertFalse(group_processes(job.process.pid))
+        self.assertFalse(self.budget.leases)
+        events = [json.loads(line) for line in (self.h.run / "events.jsonl").read_text().splitlines()]
+        self.assertFalse(any(e.get("contract_id") == "C24" for e in events))
+
+    def test_completed_worker_cleanup_does_not_hide_failure_or_missing_result(self):
+        for completed, exit_code in [(False, 1), ("missing", 0), (True, 1)]:
+            with self.subTest(completed=completed, exit_code=exit_code):
+                job = self.make_job(completed=completed, exit_code=exit_code)
+                job.process.stdout.readline()
+                job.process.wait(timeout=3)
+                result = self.controller().wait_jobs([job])[job.job_id]
+                self.assertEqual(result["state"], "failed")
+                self.assertEqual(result["error"]["code"], "WORKER_FAILED")
+                self.assertFalse(group_processes(job.process.pid))
+                self.assertFalse(self.budget.leases)
+
+    def test_cleanup_failure_keeps_lease_and_does_not_report_completion(self):
+        from agent.errors import AgentError
+        job = self.make_job(completed=True)
+        job.process.stdout.readline()
+        job.process.wait(timeout=3)
+        with patch.object(self.runner, "_stop_process_tree", side_effect=AgentError("PROCESS_STOP_FAILED", "synthetic cleanup failure")):
+            with self.assertRaisesRegex(AgentError, "synthetic cleanup failure"):
+                self.controller().wait_jobs([job])
+        self.assertIn(job.lease["lease_id"], self.budget.leases)
+        self.assertFalse(job.reported)
+        self.assertIsNone(job.event)
 
     def test_cancel_stops_parent_and_grandchild_before_release(self):
         job = self.make_job(child=True)

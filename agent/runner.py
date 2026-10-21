@@ -15,33 +15,51 @@ from agent.errors import AgentError
 from agent.contracts import canonical
 
 
+def _linux_group_members(pgid):
+    """Return namespace-local PIDs with their actual procfs paths, excluding zombies."""
+    result = []
+    status = Path("/proc/self/status").read_text()
+    ns_ids = next((line.split()[1:] for line in status.splitlines() if line.startswith("NSpid:")), [str(os.getpid())])
+    depth = len(ns_ids) - 1
+    namespace = os.readlink("/proc/self/ns/pid") if depth else None
+    for path in Path("/proc").iterdir():
+        if not path.name.isdigit():
+            continue
+        try:
+            stat = (path / "stat").read_text()
+            tail = stat[stat.rindex(")") + 2:].split()
+            if tail[0] == "Z":
+                continue
+            pid = int(path.name)
+            if depth:
+                # Host-mounted procfs can expose IDs outside our PID namespace.
+                # Check namespace identity before mapping; sibling PIDs can collide.
+                if os.readlink(path / "ns/pid") != namespace:
+                    continue
+                status = (path / "status").read_text()
+                ids = next(line.split()[1:] for line in status.splitlines() if line.startswith("NSpid:"))
+                pid = int(ids[depth])
+            if os.getpgid(pid) == pgid:
+                result.append((pid, path))
+        except (OSError, ValueError, IndexError, StopIteration):
+            continue
+    # A restricted procfs may omit our directly supervised worker.
+    if pgid not in {pid for pid, _ in result}:
+        try:
+            if os.getpgid(pgid) == pgid:
+                path = Path(f"/proc/{pgid}")
+                stat = (path / "stat").read_text() if path.is_dir() else ""
+                state = stat[stat.rindex(")") + 2:].split()[0] if stat else None
+                if state != "Z":
+                    result.append((pgid, path))
+        except (OSError, ValueError, IndexError):
+            pass
+    return result
+
+
 def group_processes(pgid):
     if sys.platform.startswith("linux"):
-        result = []
-        for path in Path("/proc").iterdir():
-            if not path.name.isdigit():
-                continue
-            try:
-                stat = (path / "stat").read_text()
-                tail = stat[stat.rindex(")") + 2:].split()
-                # getpgid is authoritative across PID namespaces / procfs views.
-                # Some managed executors expose host IDs inside stat fields.
-                if os.getpgid(int(path.name)) == pgid and tail[0] != "Z":
-                    result.append(int(path.name))
-            except (OSError, ValueError, IndexError):
-                continue
-        # A restricted procfs may omit our child from directory enumeration.
-        if pgid not in result:
-            try:
-                if os.getpgid(pgid) == pgid:
-                    state_path = Path(f"/proc/{pgid}/stat")
-                    stat = state_path.read_text() if state_path.is_file() else ""
-                    state = stat[stat.rindex(")") + 2:].split()[0] if stat else None
-                    if state != "Z":
-                        result.append(pgid)
-            except (OSError, ValueError, IndexError):
-                pass
-        return result
+        return [pid for pid, _ in _linux_group_members(pgid)]
     try:
         import psutil
         proc = psutil.Process(pgid)
@@ -53,18 +71,17 @@ def group_processes(pgid):
 
 
 def resident_mb(pgid):
-    pids = group_processes(pgid)
     if sys.platform.startswith("linux"):
         total = 0
-        for pid in pids:
+        for _, path in _linux_group_members(pgid):
             try:
-                total += int(Path(f"/proc/{pid}/statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+                total += int((path / "statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE")
             except (OSError, ValueError, IndexError):
                 pass
         return total / (1024 * 1024)
     import psutil
     total = 0
-    for pid in pids:
+    for pid in group_processes(pgid):
         try:
             total += psutil.Process(pid).memory_info().rss
         except psutil.Error:
@@ -185,12 +202,8 @@ class Runner:
         job = self._start(payload, spec, experiment, "refit")
         return {"job_id": job.job_id, "state": "accepted", "completion_contract": "C15"}
 
-    def cancel(self, payload):
-        job = self.jobs.get(payload["job_id"])
-        if not job or job.experiment_id != payload["experiment_id"]:
-            raise AgentError("UNKNOWN_JOB", payload["job_id"])
-        if job.attempt_no != payload["attempt_no"] or job.lease["fencing_token"] != payload["fencing_token"]:
-            raise AgentError("STALE_LEASE", "Cannot cancel another attempt")
+    def _stop_process_tree(self, job, grace_seconds):
+        """Stop descendants without deciding whether completed computation succeeded."""
         pids = group_processes(job.process.pid)
         if job.process.poll() is None and job.process.pid not in pids:
             pids.append(job.process.pid)  # Never claim a live Popen child is stopped.
@@ -203,7 +216,7 @@ class Runner:
                     pass
             else:
                 job.process.terminate()
-            until = time.monotonic() + min(payload["grace_seconds"], max(0, self.budget.remaining() - 1))
+            until = time.monotonic() + min(grace_seconds, max(0, self.budget.remaining() - 1))
             while group_processes(job.process.pid) and time.monotonic() < until:
                 time.sleep(0.05)
             if group_processes(job.process.pid) or job.process.poll() is None:
@@ -223,6 +236,16 @@ class Runner:
                 time.sleep(0.05)
             if group_processes(job.process.pid):
                 raise AgentError("PROCESS_STOP_FAILED", "Child processes remain alive")
+        return disposition
+
+    def cancel(self, payload):
+        job = self.jobs.get(payload["job_id"])
+        if not job or job.experiment_id != payload["experiment_id"]:
+            raise AgentError("UNKNOWN_JOB", payload["job_id"])
+        if job.attempt_no != payload["attempt_no"] or job.lease["fencing_token"] != payload["fencing_token"]:
+            raise AgentError("STALE_LEASE", "Cannot cancel another attempt")
+        disposition = self._stop_process_tree(job, payload["grace_seconds"])
+        if disposition == "stopped":
             job.forced_state = payload["terminal_state"]
             job.forced_error = AgentError("JOB_CANCELLED" if job.forced_state == "cancelled" else "JOB_TIMEOUT", payload["reason"]).as_dict()
         terminal = job.forced_state or ("succeeded" if job.process.poll() == 0 else "failed")
@@ -232,8 +255,18 @@ class Runner:
 
     def poll(self, job):
         job.peak_memory_mb = max(job.peak_memory_mb, resident_mb(job.process.pid))
-        if job.process.poll() is None or group_processes(job.process.pid):
+        if job.process.poll() is None:
             return None
+        descendants = group_processes(job.process.pid)
+        if descendants:
+            # Libraries may leave helper processes after worker exit. Reap those
+            # before releasing the lease; preserve exit code + result.json as the
+            # authority for success rather than turning housekeeping into cancel.
+            self.log.event("job.descendants_cleanup_started", job_id=job.job_id, experiment_id=job.experiment_id,
+                           phase=job.phase, exit_code=job.process.returncode, remaining_processes=len(descendants))
+            self._stop_process_tree(job, 0.2)
+            self.log.event("job.descendants_cleanup_completed", job_id=job.job_id, experiment_id=job.experiment_id,
+                           phase=job.phase, exit_code=job.process.returncode, process_tree_stopped=True, remaining_processes=0)
         if job.event:
             return job.event
         for thread in job.threads:

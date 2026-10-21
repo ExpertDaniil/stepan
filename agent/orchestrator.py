@@ -53,7 +53,8 @@ class Orchestrator:
     def _heartbeat_and_limits(self, job):
         now = time.monotonic()
         if job.process.poll() is not None:
-            self.cancel_job(job, "Main process exited but child processes remain")
+            # The worker can exit between poll() and this check. Runner.poll()
+            # owns descendant cleanup and validates the completed result next.
             return
         elapsed = now - job.started
         lease_state = self.budget.leases.get(job.lease["lease_id"])

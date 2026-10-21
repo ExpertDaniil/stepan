@@ -87,7 +87,17 @@ class EndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             task = make_demo(Path(temp) / "task", "regression")
             settings = {**self.env("6"), "CATALOG_WARMUP_EXPERIMENTS": "4"}
-            with patch.dict(os.environ, settings), redirect_stderr(io.StringIO()):
+            spawn = subprocess.Popen
+            def spawn_with_refit_helper(command, **kwargs):
+                if "agent.worker" in command and json.loads(Path(command[-1]).read_text())["phase"] == "refit":
+                    wrapper = ("import runpy,subprocess,sys; "
+                               "p=subprocess.Popen([sys.executable,'-u','-c',"
+                               "'import time; print(\"ready\",flush=True); time.sleep(60)'],stdout=subprocess.PIPE,text=True); "
+                               "p.stdout.readline(); sys.argv=['agent.worker',sys.argv[1]]; "
+                               "runpy.run_module('agent.worker',run_name='__main__')")
+                    command = [command[0], "-u", "-c", wrapper, command[-1]]
+                return spawn(command, **kwargs)
+            with patch.dict(os.environ, settings), patch("agent.runner.subprocess.Popen", side_effect=spawn_with_refit_helper), redirect_stderr(io.StringIO()):
                 code = main([str(task), "--llm-mode", "mock", "--work-dir", str(Path(temp)/"runs")])
             self.assertEqual(code, 0)
             events = [json.loads(line) for line in next((Path(temp)/"runs").glob("run-*/events.jsonl")).read_text().splitlines()]
@@ -98,6 +108,13 @@ class EndToEndTests(unittest.TestCase):
             self.assertLessEqual(sum(e["event"] == "job.started" and e.get("phase") == "train" for e in events), 7)
             choices = [json.loads(p.read_text())["payload"] for p in next((Path(temp)/"runs").glob("run-*")).glob("messages/*.request.json")]
             self.assertTrue(any(p.get("response_schema_id") == "ResearchChoice-v1" and p["tool_schema_ids"] == [] for p in choices))
+            cleanups = [e for e in events if e["event"] == "job.descendants_cleanup_completed"]
+            self.assertTrue(cleanups)
+            self.assertTrue(any(e["phase"] == "refit" for e in cleanups))
+            self.assertTrue(all(e["process_tree_stopped"] and e["remaining_processes"] == 0 for e in cleanups))
+            self.assertTrue(all(e["state"] == "succeeded" for e in events if e["event"] == "job.finished" and e["phase"] == "refit"))
+            self.assertGreaterEqual(sum(e["event"] == "submission.published" for e in events), 2)
+            self.assertEqual(events[-1]["state"], "completed")
 
     def test_llm_failure_after_baseline_retains_output(self):
         with tempfile.TemporaryDirectory() as temp:

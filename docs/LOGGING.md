@@ -47,3 +47,8 @@ worker.constructing/fit_started/prediction_completed, job.progress, оценка
 к baseline. job.finished с failed/timed_out становится ERROR и содержит error/exit_code/stderr_log_path.
 search.finished сообщает точную причину остановки: experiment_limit, time_reserve, no_valid_proposals,
 round_failed или round_limit. Увеличение TIME_BUDGET_SECONDS само по себе не меняет лимит экспериментов.
+
+v0.3.1 добавляет job.descendants_cleanup_started/completed: job/experiment/phase, exit_code,
+число оставшихся процессов и подтверждение остановки группы. Это внутренняя уборка после выхода
+worker, до C15/C13 release. Она не устанавливает cancelled. Фактический результат обучения
+отдельно сообщает job.finished после проверки exit code/result.json; C20 всё ещё проверяет CSV.

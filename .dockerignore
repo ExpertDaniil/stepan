@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+**/__pycache__
+runs
+demo_tasks
+data
+datasets
+dist
+.env
+.env.*
+!.env.example
+docs
+tests

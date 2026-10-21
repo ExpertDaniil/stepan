@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c13",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c13",
+  "payload": {
+    "operation": "acquire",
+    "owner_id": "exp-001",
+    "phase": "train",
+    "requested": {
+      "cpu_threads": 3,
+      "memory_limit_mb": 10240,
+      "timeout_seconds": 600
+    },
+    "lease_id": null,
+    "fencing_token": null
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c07",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "snapshot_id": "snapshot-001",
+    "store_revision": 7,
+    "best_evaluated_experiment_id": "exp-baseline",
+    "published_champion_experiment_id": "exp-baseline",
+    "recent_experiment_ids": [
+      "exp-baseline"
+    ],
+    "reserved_fingerprints": [],
+    "summary_artifact_id": "art-research-summary"
+  },
+  "error": null
+}

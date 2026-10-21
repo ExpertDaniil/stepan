@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c19",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c19",
+  "payload": {
+    "submission_job_id": "subjob-001",
+    "experiment_id": "exp-001",
+    "task_spec_id": "task-v1",
+    "code_artifact_id": "art-code-001",
+    "lease": {
+      "lease_id": "lease-refit-001",
+      "fencing_token": 1,
+      "cpu_threads": 3,
+      "memory_limit_mb": 10240,
+      "timeout_seconds": 900,
+      "heartbeat_interval_seconds": 10,
+      "expires_at": "2026-10-21T12:20:00Z"
+    },
+    "fit_scope": "all_train",
+    "predict_artifact_id": "art-test",
+    "output_relative_path": "submissions/subjob-001/candidate.csv"
+  }
+}

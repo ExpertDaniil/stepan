@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c14",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c14",
+  "payload": {
+    "experiment_id": "exp-001",
+    "attempt_no": 1,
+    "plan": {
+      "plan_id": "plan-001",
+      "researcher_id": "researcher-1",
+      "parent_ids": [
+        "exp-baseline"
+      ],
+      "hypothesis": "Сравнить альтернативную регуляризацию с базовым рецептом.",
+      "expected_effect": "Улучшение основной метрики при той же валидации.",
+      "recipe_id": "catboost-classifier-v1",
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "validation_id": "validation-v1",
+      "seed": 42,
+      "fidelity": "full",
+      "model": {
+        "family": "catboost",
+        "hyperparameters": {
+          "iterations": 300,
+          "depth": 6,
+          "learning_rate": 0.05
+        }
+      },
+      "feature_steps": [
+        {
+          "operation": "impute_numeric",
+          "strategy": "median"
+        }
+      ],
+      "code_artifact_id": "art-code-001",
+      "resources": {
+        "cpu_threads": 3,
+        "memory_limit_mb": 10240,
+        "timeout_seconds": 600
+      }
+    },
+    "lease": {
+      "lease_id": "lease-001",
+      "fencing_token": 1,
+      "cpu_threads": 3,
+      "memory_limit_mb": 10240,
+      "timeout_seconds": 600,
+      "heartbeat_interval_seconds": 10,
+      "expires_at": "2026-10-21T12:20:00Z"
+    },
+    "train_rows_artifact_id": "art-split-train",
+    "valid_rows_artifact_id": "art-split-valid",
+    "output_kinds": [
+      "validation_predictions",
+      "fitted_pipeline",
+      "execution_log"
+    ]
+  }
+}

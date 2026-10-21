@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c01",
+  "run_id": "run-demo-001",
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "TASK_NOT_FOUND",
+    "message": "Task not found.",
+    "retryable": false,
+    "retry_after_seconds": null,
+    "details": {}
+  }
+}

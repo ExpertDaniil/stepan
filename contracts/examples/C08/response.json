@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c08",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "context_id": "context-001",
+    "context_version": 1,
+    "messages_artifact_id": "art-context-001",
+    "estimated_input_tokens": 5300,
+    "omitted_experiment_count": 0,
+    "provider_prefix_cache_required": false
+  },
+  "error": null
+}

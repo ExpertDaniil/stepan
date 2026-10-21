@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c00",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "state": "initializing",
+    "task_path": "/task/task.md",
+    "work_dir": "/work/run-demo-001",
+    "time_budget_seconds": 10800
+  },
+  "error": null
+}

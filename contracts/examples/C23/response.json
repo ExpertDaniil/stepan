@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c23",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "state": "completed",
+    "exit_code": 0,
+    "output_path": "/task/submission.csv",
+    "champion_experiment_id": "exp-001",
+    "summary_artifact_id": "art-run-summary"
+  },
+  "error": null
+}

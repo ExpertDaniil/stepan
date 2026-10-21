@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c06",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "catalog_version": "recipes-v1",
+    "recipe_ids": [
+      "dummy-classifier-v1",
+      "catboost-classifier-v1",
+      "linear-classifier-v1"
+    ],
+    "tools_catalog_version": "tools-v1",
+    "tools_markdown_artifact_id": "art-tools-md",
+    "tools": [
+      {
+        "name": "write_code",
+        "description": "Записать Python-код эксперимента в отдельный артефакт.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "researcher_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "filename": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            },
+            "declared_entrypoint": {
+              "enum": [
+                "make_pipeline"
+              ]
+            }
+          },
+          "required": [
+            "researcher_id",
+            "filename",
+            "content",
+            "declared_entrypoint"
+          ],
+          "additionalProperties": false
+        },
+        "timeout_seconds": 10,
+        "side_effect": "artifact_write"
+      }
+    ]
+  },
+  "error": null
+}

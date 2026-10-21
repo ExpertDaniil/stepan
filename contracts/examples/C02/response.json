@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c02",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "draft": {
+      "task_kind": "multiclass_classification",
+      "target_column": "label",
+      "metric": {
+        "metric_id": "f1_macro",
+        "direction": "maximize",
+        "prediction_kind": "labels",
+        "parameters": {
+          "labels": [
+            "A",
+            "B",
+            "C"
+          ],
+          "zero_division": 0
+        }
+      },
+      "output": {
+        "path": "/task/submission.csv",
+        "columns": [
+          "id",
+          "label"
+        ],
+        "id_columns": [
+          "id"
+        ],
+        "prediction_columns": [
+          "label"
+        ],
+        "row_order": "test",
+        "encoding": "utf-8",
+        "separator": ",",
+        "write_index": false
+      }
+    },
+    "evidence": [
+      "Тип задачи и метрика указаны в условии."
+    ],
+    "unresolved_fields": []
+  },
+  "error": null
+}

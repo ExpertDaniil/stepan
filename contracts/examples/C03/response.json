@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c03",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "dataset_id": "dataset-demo-v1",
+    "profile_artifact_id": "art-profile",
+    "train_artifact_id": "art-train",
+    "test_artifact_id": "art-test",
+    "dictionary_artifact_id": "art-dictionary",
+    "sample_submission_artifact_id": "art-sample",
+    "summary": {
+      "train_rows": 1000,
+      "test_rows": 200,
+      "train_columns": [
+        "id",
+        "x_numeric",
+        "x_category",
+        "label"
+      ],
+      "test_columns": [
+        "id",
+        "x_numeric",
+        "x_category"
+      ]
+    }
+  },
+  "error": null
+}

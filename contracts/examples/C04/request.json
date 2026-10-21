@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c04",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c04",
+  "payload": {
+    "interpretation_request_id": "req-c02",
+    "profile_artifact_id": "art-profile",
+    "dataset_id": "dataset-demo-v1"
+  }
+}

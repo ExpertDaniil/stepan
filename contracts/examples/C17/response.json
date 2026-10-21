@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c17",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "experiment_state": "evaluated",
+    "best_evaluated_experiment_id": "exp-001",
+    "published_champion_experiment_id": "exp-baseline",
+    "should_prepare_submission": true,
+    "store_revision": 11
+  },
+  "error": null
+}

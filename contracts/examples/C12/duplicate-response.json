@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c12",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "experiment_id": "exp-001",
+    "fingerprint": "fe0070161cc652a36ed0b8e9ab1fd0f85279638bc1ff291c4667c37105d0c94d",
+    "disposition": "duplicate",
+    "state": "queued",
+    "existing_experiment_id": "exp-001"
+  },
+  "error": null
+}

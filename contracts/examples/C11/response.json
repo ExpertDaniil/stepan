@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c11",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "artifact": {
+      "artifact_id": "art-code-001",
+      "run_id": "run-demo-001",
+      "kind": "python_source",
+      "relative_path": "experiments/plan-001/experiment.py",
+      "sha256": "fe1b98a2038e60db754a844569a56ffeade70fed57fc70881fc2839f330413b7",
+      "size_bytes": 153,
+      "media_type": "text/x-python"
+    },
+    "syntax_valid": true,
+    "entrypoint": "make_pipeline"
+  },
+  "error": null
+}

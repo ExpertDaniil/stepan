@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c16",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c16",
+  "payload": {
+    "experiment_id": "exp-001",
+    "task_spec_id": "task-v1",
+    "dataset_id": "dataset-demo-v1",
+    "validation_id": "validation-v1",
+    "predictions_artifact_id": "art-valid-predictions-001",
+    "fidelity": "full"
+  }
+}

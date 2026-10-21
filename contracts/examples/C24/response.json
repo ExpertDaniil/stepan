@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c24",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "job_id": "job-train-001",
+    "disposition": "stopped",
+    "terminal_state": "cancelled",
+    "process_tree_stopped": true,
+    "remaining_processes": 0,
+    "completion_event_id": "evt-job-train-001-cancelled"
+  },
+  "error": null
+}

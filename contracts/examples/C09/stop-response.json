@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c09",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "proposal_id": "proposal-001",
+    "researcher_id": "researcher-1",
+    "plan": null,
+    "decision": "stop",
+    "stop_reason": "Нет допустимой гипотезы в оставшемся бюджете."
+  },
+  "error": null
+}

@@ -1,0 +1,283 @@
+[
+  {
+    "id": "dummy-classifier-v1",
+    "task_kind": "classification",
+    "family": "dummy",
+    "parameters": {
+      "strategy": {
+        "default": "most_frequent",
+        "enum": [
+          "most_frequent",
+          "prior"
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "linear-classifier-v1",
+    "task_kind": "classification",
+    "family": "linear",
+    "parameters": {
+      "C": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0.01,
+        "max": 100
+      },
+      "class_weight": {
+        "default": null,
+        "enum": [
+          null,
+          "balanced"
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "hist-gradient-classifier-v1",
+    "task_kind": "classification",
+    "family": "hist_gradient",
+    "parameters": {
+      "max_iter": {
+        "type": "int",
+        "default": 80,
+        "min": 20,
+        "max": 400
+      },
+      "max_leaf_nodes": {
+        "type": "int",
+        "default": 15,
+        "min": 3,
+        "max": 63
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.1,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_regularization": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0,
+        "max": 20
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 10,
+        "min": 1,
+        "max": 100
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "random-forest-classifier-v1",
+    "task_kind": "classification",
+    "family": "random_forest",
+    "parameters": {
+      "n_estimators": {
+        "type": "int",
+        "default": 100,
+        "min": 20,
+        "max": 300
+      },
+      "max_depth": {
+        "default": 16,
+        "enum": [
+          null,
+          4,
+          8,
+          16,
+          24
+        ]
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 2,
+        "min": 1,
+        "max": 50
+      },
+      "max_features": {
+        "default": "sqrt",
+        "enum": [
+          "sqrt",
+          0.5,
+          1.0
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "catboost-classifier-v1",
+    "task_kind": "classification",
+    "family": "catboost",
+    "parameters": {
+      "iterations": {
+        "type": "int",
+        "default": 250,
+        "min": 50,
+        "max": 800
+      },
+      "depth": {
+        "type": "int",
+        "default": 6,
+        "min": 3,
+        "max": 10
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.08,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_leaf_reg": {
+        "type": "float",
+        "default": 3.0,
+        "min": 1,
+        "max": 30
+      }
+    },
+    "requires": "catboost"
+  },
+  {
+    "id": "dummy-regressor-v1",
+    "task_kind": "regression",
+    "family": "dummy",
+    "parameters": {
+      "strategy": {
+        "default": "mean",
+        "enum": [
+          "mean",
+          "median"
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "linear-regressor-v1",
+    "task_kind": "regression",
+    "family": "linear",
+    "parameters": {
+      "alpha": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0.01,
+        "max": 10000
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "hist-gradient-regressor-v1",
+    "task_kind": "regression",
+    "family": "hist_gradient",
+    "parameters": {
+      "max_iter": {
+        "type": "int",
+        "default": 80,
+        "min": 20,
+        "max": 400
+      },
+      "max_leaf_nodes": {
+        "type": "int",
+        "default": 15,
+        "min": 3,
+        "max": 63
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.1,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_regularization": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0,
+        "max": 20
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 10,
+        "min": 1,
+        "max": 100
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "random-forest-regressor-v1",
+    "task_kind": "regression",
+    "family": "random_forest",
+    "parameters": {
+      "n_estimators": {
+        "type": "int",
+        "default": 100,
+        "min": 20,
+        "max": 300
+      },
+      "max_depth": {
+        "default": 16,
+        "enum": [
+          null,
+          4,
+          8,
+          16,
+          24
+        ]
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 2,
+        "min": 1,
+        "max": 50
+      },
+      "max_features": {
+        "default": "sqrt",
+        "enum": [
+          "sqrt",
+          0.5,
+          1.0
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "catboost-regressor-v1",
+    "task_kind": "regression",
+    "family": "catboost",
+    "parameters": {
+      "iterations": {
+        "type": "int",
+        "default": 250,
+        "min": 50,
+        "max": 800
+      },
+      "depth": {
+        "type": "int",
+        "default": 6,
+        "min": 3,
+        "max": 10
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.08,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_leaf_reg": {
+        "type": "float",
+        "default": 3.0,
+        "min": 1,
+        "max": 30
+      }
+    },
+    "requires": "catboost"
+  }
+]

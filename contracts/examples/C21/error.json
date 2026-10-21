@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c21",
+  "run_id": "run-demo-001",
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "VERSION_CONFLICT",
+    "message": "Версия опубликованного чемпиона изменилась.",
+    "retryable": true,
+    "retry_after_seconds": 2,
+    "details": {}
+  }
+}

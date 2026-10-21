@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c07",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "task_spec_id": "task-v1",
+    "validation_id": "validation-v1",
+    "limit_recent": 6,
+    "limit_best": 3
+  }
+}

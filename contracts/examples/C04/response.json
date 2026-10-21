@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c04",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "task_spec": {
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "task_kind": "multiclass_classification",
+      "target_column": "label",
+      "train_artifact_id": "art-train",
+      "test_artifact_id": "art-test",
+      "dictionary_artifact_id": "art-dictionary",
+      "sample_submission_artifact_id": "art-sample",
+      "metric": {
+        "metric_id": "f1_macro",
+        "direction": "maximize",
+        "prediction_kind": "labels",
+        "parameters": {
+          "labels": [
+            "A",
+            "B",
+            "C"
+          ],
+          "zero_division": 0
+        }
+      },
+      "allowed_labels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "output": {
+        "path": "/task/submission.csv",
+        "columns": [
+          "id",
+          "label"
+        ],
+        "id_columns": [
+          "id"
+        ],
+        "prediction_columns": [
+          "label"
+        ],
+        "row_order": "test",
+        "encoding": "utf-8",
+        "separator": ",",
+        "write_index": false
+      },
+      "excluded_features": [
+        "id"
+      ]
+    },
+    "adapter_id": "multiclass-v1",
+    "metric_implementation_id": "sklearn-f1-macro-v1"
+  },
+  "error": null
+}

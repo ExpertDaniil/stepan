@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c22",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "run_state": "finalizing",
+    "new_experiments_allowed": false,
+    "published_champion_present": true,
+    "active_job_ids": [
+      "job-refit-001"
+    ]
+  },
+  "error": null
+}

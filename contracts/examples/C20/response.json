@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c20",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "validation_report_id": "outcheck-001",
+    "valid": true,
+    "rows": 200,
+    "columns": [
+      "id",
+      "label"
+    ],
+    "id_order_matches": true,
+    "finite_predictions": true,
+    "allowed_labels_only": true,
+    "candidate_sha256": "e0decf976d8b07013e498ed23ab8279286c75708f527e8ad8f582a04d0f95368"
+  },
+  "error": null
+}

@@ -1,0 +1,28 @@
+{
+  "id": "completion-demo-001",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call-001",
+            "type": "function",
+            "function": {
+              "name": "write_code",
+              "arguments": "{\"researcher_id\": \"researcher-1\", \"filename\": \"experiment.py\", \"content\": \"def make_pipeline(task_spec, params):\\n    from catboost import CatBoostClassifier\\n    return CatBoostClassifier(**params, thread_count=3, verbose=False)\\n\", \"declared_entrypoint\": \"make_pipeline\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 5300,
+    "completion_tokens": 1200,
+    "total_tokens": 6500
+  }
+}

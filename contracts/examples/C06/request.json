@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c06",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "task_spec_id": "task-v1",
+    "adapter_id": "multiclass-v1",
+    "cpu_only": true
+  }
+}

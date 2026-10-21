@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c08",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "task_spec_id": "task-v1",
+    "snapshot_id": "snapshot-001",
+    "tools_catalog_version": "tools-v1",
+    "researcher_id": "researcher-1",
+    "assignment": "exploit_incumbent",
+    "max_input_tokens": 8000
+  }
+}

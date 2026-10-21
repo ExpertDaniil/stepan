@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c10",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c10",
+  "payload": {
+    "purpose": "research_proposal",
+    "context_artifact_id": "art-context-001",
+    "response_schema_id": "ExperimentPlan",
+    "tool_schema_ids": [
+      "write_code"
+    ],
+    "max_output_tokens": 3000,
+    "deadline_seconds": 90,
+    "attempt_limit": 2
+  }
+}

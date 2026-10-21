@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c15",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c15",
+  "payload": {
+    "event": {
+      "event_id": "evt-job-train-001-done",
+      "job_id": "job-train-001",
+      "experiment_id": "exp-001",
+      "attempt_no": 1,
+      "lease_id": "lease-001",
+      "fencing_token": 1,
+      "state": "succeeded",
+      "output_artifact_ids": [
+        "art-valid-predictions-001",
+        "art-fitted-pipeline-001",
+        "art-log-001"
+      ],
+      "duration_seconds": 84.2,
+      "peak_memory_mb": 2300,
+      "error": null
+    }
+  }
+}

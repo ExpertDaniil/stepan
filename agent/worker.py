@@ -1,0 +1,121 @@
+"""One process per job. Receives a JSON job file, never an API key."""
+from pathlib import Path
+import argparse
+import importlib.util
+import json
+import os
+import sys
+import time
+import traceback
+import threading
+
+
+def self_peak_mb():
+    try:
+        import resource
+        value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return value / (1024 * 1024) if sys.platform == "darwin" else value / 1024
+    except ImportError:
+        return 0.0
+
+
+def watch_job(job, done):
+    """Worker-side peak-RSS guard also works with restricted parent procfs views."""
+    started = time.monotonic()
+    while not done.is_set():
+        memory = self_peak_mb()
+        code = "JOB_MEMORY_LIMIT" if memory > job["memory_limit_mb"] else "JOB_TIMEOUT" if time.monotonic() - started >= job["timeout_seconds"] else None
+        if code:
+            result = {"success": False, "error_type": code, "error": "Worker resource limit reached", "peak_memory_mb": memory}
+            target = Path(job["result_path"])
+            temp = target.with_suffix(".watchdog.tmp")
+            temp.write_text(json.dumps(result), encoding="utf-8")
+            os.replace(temp, target)
+            print(code, file=sys.stderr, flush=True)
+            os._exit(137 if code == "JOB_MEMORY_LIMIT" else 124)
+        done.wait(0.1)
+
+
+def execute(job):
+    import numpy as np
+    import pandas as pd
+    import joblib
+    from threadpoolctl import threadpool_limits
+    from agent.ml import enforce_threads
+    from tools.data import read_table
+    task = job["task_spec"]
+    train = read_table(job["train_path"])
+    features = [c for c in train if c not in task["excluded_features"] and c != task["target_column"]]
+    target = train[task["target_column"]]
+    target = pd.to_numeric(target, errors="raise") if task["task_kind"] == "regression" else target.astype(str)
+    params = dict(job["hyperparameters"])
+    params.update(_cpu_threads=job["cpu_threads"], _seed=job["seed"])
+    module_name = "generated_" + job["job_id"].replace("-", "_")
+    module_spec = importlib.util.spec_from_file_location(module_name, job["code_path"])
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_name] = module
+    module_spec.loader.exec_module(module)
+    model = enforce_threads(module.make_pipeline(task, params), job["cpu_threads"])
+    if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
+        raise TypeError("make_pipeline must return an object implementing fit and predict")
+    started = time.monotonic()
+    with threadpool_limits(limits=job["cpu_threads"]):
+        if job["phase"] == "train":
+            fit_indices = json.loads(Path(job["train_indices_path"]).read_text(encoding="utf-8"))
+            valid_indices = json.loads(Path(job["valid_indices_path"]).read_text(encoding="utf-8"))
+            model.fit(train.iloc[fit_indices][features], target.iloc[fit_indices])
+            fit_seconds = time.monotonic() - started
+            prediction = np.asarray(model.predict(train.iloc[valid_indices][features])).reshape(-1)
+            frame = pd.DataFrame({"__row_index": valid_indices, "prediction": prediction})
+        else:
+            test = read_table(job["test_path"])
+            model.fit(train[features], target)
+            fit_seconds = time.monotonic() - started
+            prediction = np.asarray(model.predict(test[features])).reshape(-1)
+            if len(prediction) != len(test):
+                raise ValueError("Model changed prediction row count")
+            ids = pd.read_csv(job["test_path"], dtype=str, keep_default_na=False, encoding="utf-8")
+            frame = ids[task["output"]["id_columns"]].copy()
+            frame[task["output"]["prediction_columns"][0]] = prediction
+            frame = frame[task["output"]["columns"]]
+    output = Path(job["prediction_path"])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False, encoding="utf-8")
+    model_path = Path(job["model_path"])
+    try:
+        joblib.dump(model, model_path)
+    except Exception as exc:
+        print(f"Model snapshot could not be saved: {exc}", file=sys.stderr, flush=True)
+    return {"success": True, "fit_seconds": fit_seconds, "total_seconds": time.monotonic() - started,
+            "rows": len(frame), "prediction_path": str(output),
+            "model_path": str(model_path) if model_path.is_file() else None}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("job_file", type=Path)
+    args = parser.parse_args()
+    job = json.loads(args.job_file.read_text(encoding="utf-8"))
+    result_path = Path(job["result_path"])
+    done = threading.Event()
+    watchdog = threading.Thread(target=watch_job, args=(job, done), daemon=True)
+    watchdog.start()
+    try:
+        result = execute(job)
+        result["peak_memory_mb"] = self_peak_mb()
+        exit_code = 0
+    except BaseException as exc:
+        traceback.print_exc()
+        result = {"success": False, "error": str(exc), "error_type": type(exc).__name__}
+        exit_code = 1
+    finally:
+        done.set()
+        watchdog.join(timeout=1)
+    temp = result_path.with_suffix(".tmp")
+    temp.write_text(json.dumps(result, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    os.replace(temp, result_path)
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

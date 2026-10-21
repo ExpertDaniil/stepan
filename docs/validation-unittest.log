@@ -1,0 +1,52 @@
+test_all_original_contract_examples (test_contracts.ContractTests.test_all_original_contract_examples) ... ok
+test_concurrent_idempotent_call_executes_once (test_contracts.ContractTests.test_concurrent_idempotent_call_executes_once) ... ok
+test_nonfinite_and_extra_fields_rejected (test_contracts.ContractTests.test_nonfinite_and_extra_fields_rejected) ... ok
+test_reused_key_with_different_payload_fails (test_contracts.ContractTests.test_reused_key_with_different_payload_fails) ... 2026-10-21T14:34:56.315+00:00 ERROR contract.failed contract_id=C00 code=IDEMPOTENCY_CONFLICT message=Idempotency key reused with a different payload duration_ms=0.6
+ok
+test_binary_task (test_end_to_end.EndToEndTests.test_binary_task) ... ok
+test_classification_full_research_loop (test_end_to_end.EndToEndTests.test_classification_full_research_loop) ... ok
+test_extracted_platform_zip_runs_without_repository_path (test_end_to_end.EndToEndTests.test_extracted_platform_zip_runs_without_repository_path) ... ok
+test_llm_failure_after_baseline_retains_output (test_end_to_end.EndToEndTests.test_llm_failure_after_baseline_retains_output) ... ok
+test_regression_full_research_loop (test_end_to_end.EndToEndTests.test_regression_full_research_loop) ... ok
+test_search_deadline_keeps_published_baseline (test_end_to_end.EndToEndTests.test_search_deadline_keeps_published_baseline) ... ok
+test_http_auth_error_is_not_retried (test_gateway_logging.GatewayTests.test_http_auth_error_is_not_retried) ... ok
+test_invalid_output_has_bounded_repair (test_gateway_logging.GatewayTests.test_invalid_output_has_bounded_repair) ... ok
+test_live_mode_requires_organizers_env (test_gateway_logging.GatewayTests.test_live_mode_requires_organizers_env) ... ok
+test_native_tool_call_then_structured_plan (test_gateway_logging.GatewayTests.test_native_tool_call_then_structured_plan) ... ok
+test_secrets_redacted_in_events_and_snapshots (test_gateway_logging.GatewayTests.test_secrets_redacted_in_events_and_snapshots) ... ok
+test_strict_json_rejects_duplicate_keys_and_nan (test_gateway_logging.GatewayTests.test_strict_json_rejects_duplicate_keys_and_nan) ... ok
+test_cancel_stops_parent_and_grandchild_before_release (test_processes.ProcessTests.test_cancel_stops_parent_and_grandchild_before_release) ... ok
+test_failed_spawn_releases_unstarted_lease (test_processes.ProcessTests.test_failed_spawn_releases_unstarted_lease) ... 2026-10-21T14:35:43.188+00:00 ERROR contract.failed contract_id=C14 code=INTERNAL_ERROR message=simulated spawn failure duration_ms=2.1
+ok
+test_timeout_routes_through_cancel_event_and_resource_release (test_processes.ProcessTests.test_timeout_routes_through_cancel_event_and_resource_release) ... ok
+test_training_environment_does_not_receive_api_credentials (test_processes.ProcessTests.test_training_environment_does_not_receive_api_credentials) ... ok
+test_worker_has_its_own_memory_watchdog (test_processes.ProcessTests.test_worker_has_its_own_memory_watchdog) ... ok
+test_comparison_rejects_different_protocol (test_store.StoreTests.test_comparison_rejects_different_protocol) ... ok
+test_duplicate_and_stale_job_events (test_store.StoreTests.test_duplicate_and_stale_job_events) ... ok
+test_duplicate_plan_ignores_researcher_and_plan_id (test_store.StoreTests.test_duplicate_plan_ignores_researcher_and_plan_id) ... ok
+test_maximize_selection_does_not_regress (test_store.StoreTests.test_maximize_selection_does_not_regress) ... ok
+test_minimize_and_tie_policy (test_store.StoreTests.test_minimize_and_tie_policy) ... ok
+test_missing_parent_rejected (test_store.StoreTests.test_missing_parent_rejected) ... ok
+test_new_seed_is_distinct (test_store.StoreTests.test_new_seed_is_distinct) ... ok
+test_better_candidate_with_identical_test_predictions_updates_metadata (test_submission.SubmissionTests.test_better_candidate_with_identical_test_predictions_updates_metadata) ... ok
+test_changed_candidate_cannot_be_published (test_submission.SubmissionTests.test_changed_candidate_cannot_be_published) ... ok
+test_journal_recovers_replace_before_database_commit (test_submission.SubmissionTests.test_journal_recovers_replace_before_database_commit) ... ok
+test_leading_zero_ids_and_valid_output (test_submission.SubmissionTests.test_leading_zero_ids_and_valid_output) ... ok
+test_output_order_is_checked (test_submission.SubmissionTests.test_output_order_is_checked) ... ok
+test_version_conflict (test_submission.SubmissionTests.test_version_conflict) ... ok
+test_weaker_late_candidate_does_not_replace_file (test_submission.SubmissionTests.test_weaker_late_candidate_does_not_replace_file) ... ok
+test_archive_style_wrong_paths_fall_back_only_when_unique (test_tools_budget.ToolsBudgetTests.test_archive_style_wrong_paths_fall_back_only_when_unique) ... ok
+test_budget_caps_and_fencing (test_tools_budget.ToolsBudgetTests.test_budget_caps_and_fencing) ... ok
+test_expired_budget_cannot_start_training (test_tools_budget.ToolsBudgetTests.test_expired_budget_cannot_start_training) ... ok
+test_generated_code_policy_and_path (test_tools_budget.ToolsBudgetTests.test_generated_code_policy_and_path) ... ok
+test_invalid_config_is_not_silently_clipped (test_tools_budget.ToolsBudgetTests.test_invalid_config_is_not_silently_clipped) ... ok
+test_llm_profile_is_bounded_and_full_report_is_retained (test_tools_budget.ToolsBudgetTests.test_llm_profile_is_bounded_and_full_report_is_retained) ... ok
+test_na_is_a_category_and_duplicate_header_fails (test_tools_budget.ToolsBudgetTests.test_na_is_a_category_and_duplicate_header_fails) ... ok
+test_no_guessing_ambiguous_dataset_paths (test_tools_budget.ToolsBudgetTests.test_no_guessing_ambiguous_dataset_paths) ... ok
+test_group_holdout_keeps_groups_disjoint (test_validation.ValidationTests.test_group_holdout_keeps_groups_disjoint) ... ok
+test_temporal_holdout_preserves_complete_periods (test_validation.ValidationTests.test_temporal_holdout_preserves_complete_periods) ... ok
+
+----------------------------------------------------------------------
+Ran 45 tests in 49.883s
+
+OK

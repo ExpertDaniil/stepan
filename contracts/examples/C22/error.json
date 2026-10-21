@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c22",
+  "run_id": "run-demo-001",
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "UNKNOWN_JOB",
+    "message": "Unknown job.",
+    "retryable": false,
+    "retry_after_seconds": null,
+    "details": {}
+  }
+}

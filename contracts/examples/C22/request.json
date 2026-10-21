@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c22",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c22",
+  "payload": {
+    "action": "stop_search",
+    "reason": "finalization_reserve_reached",
+    "wall_seconds_remaining": 1200,
+    "cancel_job_ids": []
+  }
+}

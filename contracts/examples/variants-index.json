@@ -1,0 +1,32 @@
+[
+  {
+    "contract_id": "C12",
+    "file": "examples/C12/duplicate-response.json",
+    "schema": "C12_Response"
+  },
+  {
+    "contract_id": "C09",
+    "file": "examples/C09/stop-response.json",
+    "schema": "C09_Response"
+  },
+  {
+    "contract_id": "C15",
+    "file": "examples/C15/refit-request.json",
+    "schema": "C15_Request"
+  },
+  {
+    "contract_id": "C15",
+    "file": "examples/C15/refit-response.json",
+    "schema": "C15_Response"
+  },
+  {
+    "contract_id": "C13",
+    "file": "examples/C13/renew-request.json",
+    "schema": "C13_Request"
+  },
+  {
+    "contract_id": "C21",
+    "file": "examples/C21/skipped-response.json",
+    "schema": "C21_Response"
+  }
+]

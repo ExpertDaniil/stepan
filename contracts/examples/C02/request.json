@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c02",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "task_text_artifact_id": "art-task-md",
+    "candidate_paths": {
+      "train": "/task/train.csv",
+      "test": "/task/test.csv"
+    },
+    "tools_catalog_version": "tools-v1"
+  }
+}

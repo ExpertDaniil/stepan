@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c11",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c11",
+  "payload": {
+    "researcher_id": "researcher-1",
+    "filename": "experiment.py",
+    "content": "def make_pipeline(task_spec, params):\n    from catboost import CatBoostClassifier\n    return CatBoostClassifier(**params, thread_count=3, verbose=False)\n",
+    "declared_entrypoint": "make_pipeline"
+  }
+}

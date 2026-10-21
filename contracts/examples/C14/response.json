@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c14",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "job_id": "job-train-001",
+    "state": "accepted",
+    "event_target": "orchestrator.on_job_event",
+    "heartbeat_seconds": 10
+  },
+  "error": null
+}

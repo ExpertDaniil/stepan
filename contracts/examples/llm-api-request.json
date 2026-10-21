@@ -1,0 +1,52 @@
+{
+  "model": "$OPENAI_MODEL",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Ты DS-агент. Работай через объявленные инструменты; итоговые гипотезы возвращай по согласованной схеме."
+    },
+    {
+      "role": "user",
+      "content": "Синтетический контекст задачи и проверенная сводка экспериментов."
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "write_code",
+        "description": "Записать Python-код эксперимента в отдельный артефакт.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "researcher_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "filename": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            },
+            "declared_entrypoint": {
+              "enum": [
+                "make_pipeline"
+              ]
+            }
+          },
+          "required": [
+            "researcher_id",
+            "filename",
+            "content",
+            "declared_entrypoint"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "parallel_tool_calls": false
+}

@@ -1,0 +1,5391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:alfa-hack:automl:contracts:0.1.0",
+  "title": "AutoML internal message contracts v0.1.0",
+  "$defs": {
+    "ArtifactRef": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_id",
+        "run_id",
+        "kind",
+        "relative_path",
+        "sha256",
+        "size_bytes",
+        "media_type"
+      ],
+      "additionalProperties": false
+    },
+    "MetricSpec": {
+      "type": "object",
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize"
+          ]
+        },
+        "prediction_kind": {
+          "enum": [
+            "values",
+            "labels",
+            "probabilities"
+          ]
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "metric_id",
+        "direction",
+        "prediction_kind",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "OutputSpec": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "id_columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "prediction_columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "row_order": {
+          "enum": [
+            "test"
+          ]
+        },
+        "encoding": {
+          "enum": [
+            "utf-8"
+          ]
+        },
+        "separator": {
+          "enum": [
+            ","
+          ]
+        },
+        "write_index": {
+          "enum": [
+            false
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "columns",
+        "id_columns",
+        "prediction_columns",
+        "row_order",
+        "encoding",
+        "separator",
+        "write_index"
+      ],
+      "additionalProperties": false
+    },
+    "TaskSpec": {
+      "type": "object",
+      "properties": {
+        "task_spec_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_kind": {
+          "enum": [
+            "regression",
+            "binary_classification",
+            "multiclass_classification"
+          ]
+        },
+        "target_column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "train_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dictionary_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_submission_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metric": {
+          "$ref": "#/$defs/MetricSpec"
+        },
+        "allowed_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "output": {
+          "$ref": "#/$defs/OutputSpec"
+        },
+        "excluded_features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "task_spec_id",
+        "dataset_id",
+        "task_kind",
+        "target_column",
+        "train_artifact_id",
+        "test_artifact_id",
+        "dictionary_artifact_id",
+        "sample_submission_artifact_id",
+        "metric",
+        "allowed_labels",
+        "output",
+        "excluded_features"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceRequest": {
+      "type": "object",
+      "properties": {
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memory_limit_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "cpu_threads",
+        "memory_limit_mb",
+        "timeout_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "BudgetSnapshot": {
+      "type": "object",
+      "properties": {
+        "wall_seconds_remaining": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finalization_reserve_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpu_threads_available": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "memory_mb_available": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "llm_calls_remaining": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "search_allowed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "wall_seconds_remaining",
+        "finalization_reserve_seconds",
+        "cpu_threads_available",
+        "memory_mb_available",
+        "llm_calls_remaining",
+        "search_allowed"
+      ],
+      "additionalProperties": false
+    },
+    "Lease": {
+      "type": "object",
+      "properties": {
+        "lease_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memory_limit_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "heartbeat_interval_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "lease_id",
+        "fencing_token",
+        "cpu_threads",
+        "memory_limit_mb",
+        "timeout_seconds",
+        "heartbeat_interval_seconds",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "ExperimentPlan": {
+      "type": "object",
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "researcher_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recipe_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_spec_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fidelity": {
+          "enum": [
+            "screening",
+            "full"
+          ]
+        },
+        "model": {
+          "type": "object",
+          "properties": {
+            "family": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hyperparameters": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "family",
+            "hyperparameters"
+          ],
+          "additionalProperties": false
+        },
+        "feature_steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "minItems": 0
+        },
+        "code_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceRequest"
+        }
+      },
+      "required": [
+        "plan_id",
+        "researcher_id",
+        "parent_ids",
+        "hypothesis",
+        "expected_effect",
+        "recipe_id",
+        "task_spec_id",
+        "dataset_id",
+        "validation_id",
+        "seed",
+        "fidelity",
+        "model",
+        "feature_steps",
+        "code_artifact_id",
+        "resources"
+      ],
+      "additionalProperties": false
+    },
+    "MetricValue": {
+      "type": "object",
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "validation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fidelity": {
+          "enum": [
+            "screening",
+            "full"
+          ]
+        }
+      },
+      "required": [
+        "metric_id",
+        "direction",
+        "value",
+        "validation_id",
+        "dataset_id",
+        "fidelity"
+      ],
+      "additionalProperties": false
+    },
+    "Evaluation": {
+      "type": "object",
+      "properties": {
+        "evaluation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "valid": {
+          "enum": [
+            true
+          ]
+        },
+        "primary_metric": {
+          "$ref": "#/$defs/MetricValue"
+        },
+        "diagnostics_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "evaluation_id",
+        "experiment_id",
+        "valid",
+        "primary_metric",
+        "diagnostics_artifact_id",
+        "violations"
+      ],
+      "additionalProperties": false
+    },
+    "Champion": {
+      "type": "object",
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_metric": {
+          "$ref": "#/$defs/MetricValue"
+        },
+        "submission_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "champion_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "experiment_id",
+        "evaluation_id",
+        "primary_metric",
+        "submission_artifact_id",
+        "output_sha256",
+        "champion_version"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "retry_after_seconds",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "WorkerEvent": {
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt_no": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lease_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fencing_token": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "running",
+            "succeeded",
+            "failed",
+            "timed_out",
+            "cancelled"
+          ]
+        },
+        "output_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "duration_seconds": {
+          "type": "number"
+        },
+        "peak_memory_mb": {
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "event_id",
+        "job_id",
+        "experiment_id",
+        "attempt_no",
+        "lease_id",
+        "fencing_token",
+        "state",
+        "output_artifact_ids",
+        "duration_seconds",
+        "peak_memory_mb",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "ToolDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "side_effect": {
+          "enum": [
+            "none",
+            "artifact_write",
+            "process_start"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "input_schema",
+        "timeout_seconds",
+        "side_effect"
+      ],
+      "additionalProperties": false
+    },
+    "C00_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "work_dir": {
+              "type": "string",
+              "minLength": 1
+            },
+            "time_budget_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_workers": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "task_path",
+            "work_dir",
+            "time_budget_seconds",
+            "max_workers"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C00_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "enum": [
+                    "initializing"
+                  ]
+                },
+                "task_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "work_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "time_budget_seconds": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "state",
+                "task_path",
+                "work_dir",
+                "time_budget_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C01_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "task_path"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C01_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "task_text_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_root": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "candidate_paths": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "required": [
+                "task_text_artifact_id",
+                "task_text",
+                "task_root",
+                "candidate_paths"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C02_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_text_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_paths": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "tools_catalog_version": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "task_text_artifact_id",
+            "candidate_paths",
+            "tools_catalog_version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C02_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "draft": {
+                  "type": "object",
+                  "properties": {
+                    "task_kind": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "target_column": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "metric": {
+                      "$ref": "#/$defs/MetricSpec"
+                    },
+                    "output": {
+                      "$ref": "#/$defs/OutputSpec"
+                    }
+                  },
+                  "required": [
+                    "task_kind",
+                    "target_column",
+                    "metric",
+                    "output"
+                  ],
+                  "additionalProperties": false
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "unresolved_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "draft",
+                "evidence",
+                "unresolved_fields"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C03_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "candidate_paths": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "max_report_bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "candidate_paths",
+            "max_report_bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C03_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "dataset_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "profile_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "train_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "test_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "dictionary_artifact_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sample_submission_artifact_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "summary": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "required": [
+                "dataset_id",
+                "profile_artifact_id",
+                "train_artifact_id",
+                "test_artifact_id",
+                "dictionary_artifact_id",
+                "sample_submission_artifact_id",
+                "summary"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C04_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "interpretation_request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dataset_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "interpretation_request_id",
+            "profile_artifact_id",
+            "dataset_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C04_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "task_spec": {
+                  "$ref": "#/$defs/TaskSpec"
+                },
+                "adapter_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "metric_implementation_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "task_spec",
+                "adapter_id",
+                "metric_implementation_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C05_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dataset_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "proposal": {
+              "type": "object",
+              "properties": {
+                "strategy": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "strategy",
+                "parameters",
+                "seed",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "task_spec_id",
+            "dataset_id",
+            "proposal"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C05_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "validation_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "train_rows_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "valid_rows_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labels_visibility": {
+                  "enum": [
+                    "evaluator_only"
+                  ]
+                },
+                "metric": {
+                  "$ref": "#/$defs/MetricSpec"
+                },
+                "protocol_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "validation_id",
+                "train_rows_artifact_id",
+                "valid_rows_artifact_id",
+                "labels_visibility",
+                "metric",
+                "protocol_sha256"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C06_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "adapter_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cpu_only": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "task_spec_id",
+            "adapter_id",
+            "cpu_only"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C06_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "catalog_version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "recipe_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "tools_catalog_version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tools_markdown_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ToolDefinition"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "catalog_version",
+                "recipe_ids",
+                "tools_catalog_version",
+                "tools_markdown_artifact_id",
+                "tools"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C07_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "validation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "limit_recent": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "limit_best": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "task_spec_id",
+            "validation_id",
+            "limit_recent",
+            "limit_best"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C07_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "snapshot_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "store_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "best_evaluated_experiment_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "published_champion_experiment_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "recent_experiment_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "reserved_fingerprints": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "summary_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "snapshot_id",
+                "store_revision",
+                "best_evaluated_experiment_id",
+                "published_champion_experiment_id",
+                "recent_experiment_ids",
+                "reserved_fingerprints",
+                "summary_artifact_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C08_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "snapshot_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tools_catalog_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "researcher_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "assignment": {
+              "enum": [
+                "baseline",
+                "exploit_incumbent",
+                "explore_alternative"
+              ]
+            },
+            "max_input_tokens": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "task_spec_id",
+            "snapshot_id",
+            "tools_catalog_version",
+            "researcher_id",
+            "assignment",
+            "max_input_tokens"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C08_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "context_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "context_version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "messages_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "estimated_input_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "omitted_experiment_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "provider_prefix_cache_required": {
+                  "enum": [
+                    false
+                  ]
+                }
+              },
+              "required": [
+                "context_id",
+                "context_version",
+                "messages_artifact_id",
+                "estimated_input_tokens",
+                "omitted_experiment_count",
+                "provider_prefix_cache_required"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C09_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "researcher_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "assignment": {
+              "enum": [
+                "baseline",
+                "exploit_incumbent",
+                "explore_alternative"
+              ]
+            },
+            "base_experiment_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "forbidden_fingerprints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "budget": {
+              "$ref": "#/$defs/BudgetSnapshot"
+            },
+            "proposal_limit": {
+              "enum": [
+                1
+              ]
+            }
+          },
+          "required": [
+            "researcher_id",
+            "context_id",
+            "assignment",
+            "base_experiment_ids",
+            "forbidden_fingerprints",
+            "budget",
+            "proposal_limit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C09_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "proposal_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "researcher_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "plan": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ExperimentPlan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "decision": {
+                  "enum": [
+                    "propose",
+                    "stop"
+                  ]
+                },
+                "stop_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "proposal_id",
+                "researcher_id",
+                "plan",
+                "decision",
+                "stop_reason"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C10_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "enum": [
+                "task_interpretation",
+                "research_proposal",
+                "result_analysis"
+              ]
+            },
+            "context_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "response_schema_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tool_schema_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "deadline_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "attempt_limit": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "purpose",
+            "context_artifact_id",
+            "response_schema_id",
+            "tool_schema_ids",
+            "max_output_tokens",
+            "deadline_seconds",
+            "attempt_limit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C10_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "completion_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "parsed_payload": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "minItems": 0
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "input_tokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "output_tokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "input_tokens",
+                    "output_tokens"
+                  ],
+                  "additionalProperties": false
+                },
+                "attempts_used": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "completion_id",
+                "output_artifact_id",
+                "parsed_payload",
+                "tool_calls",
+                "usage",
+                "attempts_used"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C11_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "researcher_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "filename": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            },
+            "declared_entrypoint": {
+              "enum": [
+                "make_pipeline"
+              ]
+            }
+          },
+          "required": [
+            "researcher_id",
+            "filename",
+            "content",
+            "declared_entrypoint"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C11_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "artifact": {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                "syntax_valid": {
+                  "type": "boolean"
+                },
+                "entrypoint": {
+                  "enum": [
+                    "make_pipeline"
+                  ]
+                }
+              },
+              "required": [
+                "artifact",
+                "syntax_valid",
+                "entrypoint"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C12_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "plan": {
+              "$ref": "#/$defs/ExperimentPlan"
+            }
+          },
+          "required": [
+            "plan"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C12_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "experiment_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "disposition": {
+                  "enum": [
+                    "created",
+                    "duplicate"
+                  ]
+                },
+                "state": {
+                  "enum": [
+                    "queued",
+                    "running",
+                    "trained",
+                    "evaluated",
+                    "invalid",
+                    "failed",
+                    "timed_out",
+                    "cancelled"
+                  ]
+                },
+                "existing_experiment_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "experiment_id",
+                "fingerprint",
+                "disposition",
+                "state",
+                "existing_experiment_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C13_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "acquire",
+                "renew",
+                "release"
+              ]
+            },
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "phase": {
+              "enum": [
+                "train",
+                "refit"
+              ]
+            },
+            "requested": {
+              "$ref": "#/$defs/ResourceRequest"
+            },
+            "lease_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fencing_token": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "owner_id",
+            "phase",
+            "requested",
+            "lease_id",
+            "fencing_token"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C13_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "granted": {
+                  "type": "boolean"
+                },
+                "lease": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Lease"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "retry_after_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "budget": {
+                  "$ref": "#/$defs/BudgetSnapshot"
+                }
+              },
+              "required": [
+                "granted",
+                "lease",
+                "retry_after_seconds",
+                "budget"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C14_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attempt_no": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "plan": {
+              "$ref": "#/$defs/ExperimentPlan"
+            },
+            "lease": {
+              "$ref": "#/$defs/Lease"
+            },
+            "train_rows_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "valid_rows_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "output_kinds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "experiment_id",
+            "attempt_no",
+            "plan",
+            "lease",
+            "train_rows_artifact_id",
+            "valid_rows_artifact_id",
+            "output_kinds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C14_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "state": {
+                  "enum": [
+                    "accepted"
+                  ]
+                },
+                "event_target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "heartbeat_seconds": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "job_id",
+                "state",
+                "event_target",
+                "heartbeat_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C15_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "$ref": "#/$defs/WorkerEvent"
+            }
+          },
+          "required": [
+            "event"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C15_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "event_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "disposition": {
+                  "enum": [
+                    "applied",
+                    "already_applied"
+                  ]
+                },
+                "job_state": {
+                  "enum": [
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "timed_out",
+                    "cancelled"
+                  ]
+                },
+                "experiment_state": {
+                  "enum": [
+                    "running",
+                    "trained",
+                    "evaluated",
+                    "failed",
+                    "timed_out",
+                    "cancelled"
+                  ]
+                },
+                "submission_state": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "refitting",
+                        "validating",
+                        "failed",
+                        "timed_out",
+                        "cancelled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "event_id",
+                "disposition",
+                "job_state",
+                "experiment_state",
+                "submission_state"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C16_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dataset_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "validation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "predictions_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fidelity": {
+              "enum": [
+                "screening",
+                "full"
+              ]
+            }
+          },
+          "required": [
+            "experiment_id",
+            "task_spec_id",
+            "dataset_id",
+            "validation_id",
+            "predictions_artifact_id",
+            "fidelity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C16_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "evaluation": {
+                  "$ref": "#/$defs/Evaluation"
+                }
+              },
+              "required": [
+                "evaluation"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C17_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "evaluation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selection_policy_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "evaluation_id",
+            "experiment_id",
+            "selection_policy_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C17_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "experiment_state": {
+                  "enum": [
+                    "evaluated"
+                  ]
+                },
+                "best_evaluated_experiment_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "published_champion_experiment_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "should_prepare_submission": {
+                  "type": "boolean"
+                },
+                "store_revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "experiment_state",
+                "best_evaluated_experiment_id",
+                "published_champion_experiment_id",
+                "should_prepare_submission",
+                "store_revision"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C18_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evaluation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mode": {
+              "enum": [
+                "refit_full_train"
+              ]
+            },
+            "expected_champion_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "experiment_id",
+            "evaluation_id",
+            "task_spec_id",
+            "mode",
+            "expected_champion_version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C18_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "submission_job_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "state": {
+                  "enum": [
+                    "preparing"
+                  ]
+                },
+                "published_champion_experiment_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "output_path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "submission_job_id",
+                "state",
+                "published_champion_experiment_id",
+                "output_path"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C19_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "submission_job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "code_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lease": {
+              "$ref": "#/$defs/Lease"
+            },
+            "fit_scope": {
+              "enum": [
+                "all_train"
+              ]
+            },
+            "predict_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "output_relative_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "submission_job_id",
+            "experiment_id",
+            "task_spec_id",
+            "code_artifact_id",
+            "lease",
+            "fit_scope",
+            "predict_artifact_id",
+            "output_relative_path"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C19_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "state": {
+                  "enum": [
+                    "accepted"
+                  ]
+                },
+                "completion_contract": {
+                  "enum": [
+                    "C15"
+                  ]
+                }
+              },
+              "required": [
+                "job_id",
+                "state",
+                "completion_contract"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C20_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "submission_job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_spec_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_test_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "submission_job_id",
+            "task_spec_id",
+            "candidate_artifact_id",
+            "reference_test_artifact_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C20_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "validation_report_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "valid": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "rows": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "id_order_matches": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "finite_predictions": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "allowed_labels_only": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "candidate_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "validation_report_id",
+                "valid",
+                "rows",
+                "columns",
+                "id_order_matches",
+                "finite_predictions",
+                "allowed_labels_only",
+                "candidate_sha256"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C21_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evaluation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "validation_report_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "expected_champion_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "experiment_id",
+            "evaluation_id",
+            "candidate_artifact_id",
+            "validation_report_id",
+            "candidate_sha256",
+            "expected_champion_version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C21_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "disposition": {
+                  "enum": [
+                    "published",
+                    "already_published",
+                    "skipped_not_better"
+                  ]
+                },
+                "champion": {
+                  "$ref": "#/$defs/Champion"
+                },
+                "output_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "publication_event_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "disposition",
+                "champion",
+                "output_path",
+                "publication_event_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C22_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "enum": [
+                "stop_search",
+                "cancel_jobs",
+                "finish"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "wall_seconds_remaining": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cancel_job_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "action",
+            "reason",
+            "wall_seconds_remaining",
+            "cancel_job_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C22_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "run_state": {
+                  "enum": [
+                    "baseline",
+                    "searching",
+                    "finalizing",
+                    "completed",
+                    "degraded",
+                    "failed"
+                  ]
+                },
+                "new_experiments_allowed": {
+                  "type": "boolean"
+                },
+                "published_champion_present": {
+                  "type": "boolean"
+                },
+                "active_job_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "run_state",
+                "new_experiments_allowed",
+                "published_champion_present",
+                "active_job_ids"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C23_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "require_valid_output": {
+              "enum": [
+                true
+              ]
+            }
+          },
+          "required": [
+            "reason",
+            "require_valid_output"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C23_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "enum": [
+                    "completed",
+                    "degraded"
+                  ]
+                },
+                "exit_code": {
+                  "enum": [
+                    0
+                  ]
+                },
+                "output_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "champion_experiment_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "summary_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "state",
+                "exit_code",
+                "output_path",
+                "champion_experiment_id",
+                "summary_artifact_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "C24_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attempt_no": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "fencing_token": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "terminal_state": {
+              "enum": [
+                "cancelled",
+                "timed_out"
+              ]
+            },
+            "grace_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "job_id",
+            "experiment_id",
+            "attempt_no",
+            "fencing_token",
+            "reason",
+            "terminal_state",
+            "grace_seconds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "C24_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "disposition": {
+                  "enum": [
+                    "stopped",
+                    "already_stopped"
+                  ]
+                },
+                "terminal_state": {
+                  "enum": [
+                    "cancelled",
+                    "timed_out",
+                    "succeeded",
+                    "failed"
+                  ]
+                },
+                "process_tree_stopped": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "remaining_processes": {
+                  "enum": [
+                    0
+                  ]
+                },
+                "completion_event_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "job_id",
+                "disposition",
+                "terminal_state",
+                "process_tree_stopped",
+                "remaining_processes",
+                "completion_event_id"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "description": "Use $ref #/$defs/Cxx_Request or #/$defs/Cxx_Response for a specific endpoint. Endpoint routing is external to JSON Schema."
+}

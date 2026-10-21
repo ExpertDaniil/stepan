@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c20",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c20",
+  "payload": {
+    "submission_job_id": "subjob-001",
+    "task_spec_id": "task-v1",
+    "candidate_artifact_id": "art-submission-001",
+    "reference_test_artifact_id": "art-test"
+  }
+}

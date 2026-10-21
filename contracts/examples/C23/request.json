@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c23",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c23",
+  "payload": {
+    "reason": "search_budget_finished",
+    "require_valid_output": true
+  }
+}

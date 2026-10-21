@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c18",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "submission_job_id": "subjob-001",
+    "state": "preparing",
+    "published_champion_experiment_id": "exp-baseline",
+    "output_path": "/task/submission.csv"
+  },
+  "error": null
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c24",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-c24",
+  "payload": {
+    "job_id": "job-train-001",
+    "experiment_id": "exp-001",
+    "attempt_no": 1,
+    "fencing_token": 1,
+    "reason": "search_deadline_reached",
+    "terminal_state": "cancelled",
+    "grace_seconds": 5
+  }
+}

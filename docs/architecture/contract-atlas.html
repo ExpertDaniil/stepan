@@ -1,0 +1,1014 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AutoML · атлас JSON-контрактов</title><style>*{box-sizing:border-box}body{margin:0;background:#f6f8fc;color:#1d2a42;font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1320px;margin:auto;padding:48px 32px 80px}h1{font-size:34px;line-height:1.15;letter-spacing:-.025em;font-weight:500}h2{font-size:24px;font-weight:500;margin:0}h3{font-size:16px;font-weight:500}a{color:inherit;text-underline-offset:3px}.eyebrow{font-size:12px;letter-spacing:.14em;color:#60708a;text-transform:uppercase}.index{display:flex;flex-wrap:wrap;gap:8px;margin:32px 0}.index a{text-decoration:none;background:#e8edf6;padding:7px 12px;border-radius:5px}.contract{background:white;border:1px solid #dae1ec;border-radius:14px;margin:26px 0;padding:28px;break-before:page}.meta{display:flex;flex-wrap:wrap;gap:12px;color:#576984;font-size:13px;margin:10px 0 22px}.transition{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);align-items:center;gap:18px;margin:24px 0}.block{padding:18px;background:#eef2f8;border-radius:8px;font-weight:500;overflow-wrap:anywhere}.arrow{text-align:center;font-family:Consolas,monospace;font-size:13px;overflow-wrap:anywhere;border-bottom:1px solid #aab8cd;padding:10px 0}.body-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}.body-grid>div{min-width:0}pre{margin:0;background:#f3f5fa;padding:18px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:12px/1.55 Consolas,"SFMono-Regular",monospace}code{font-family:Consolas,monospace}.rules{margin-top:24px}li{margin:9px 0}.note{color:#5c6c84;max-width:95ch}.route-list{font:13px/1.6 Consolas,monospace}.top-link{float:right;font-size:13px;font-weight:400}.phase{margin-top:44px;color:#526987;font-size:12px;letter-spacing:.1em;text-transform:uppercase}@media(max-width:850px){main{padding:28px 16px}.body-grid{grid-template-columns:1fr}.transition{grid-template-columns:1fr}.arrow{padding:6px}.contract{padding:20px}h1{font-size:28px}}@media print{body{background:white}main{padding:0}.index,.top-link{display:none}.contract{border:0;margin:0;padding:16px 0}.body-grid{grid-template-columns:1fr 1fr}pre{font-size:9px}.transition{grid-template-columns:1fr 2fr 1fr}}</style></head><body><main id="top"><div class="eyebrow">Альфа Хак / v0.1.0 / 21.10.2026</div><h1>Каждый переход: endpoint, запрос и ответ</h1><p class="note">25 предлагаемых внутренних контракта. Это границы модулей Python и локальной очереди; HTTP-сервер для MVP не требуется. Примеры синтетические. Для полноты на каждом переходе показан envelope. Семантика состояний и распределение команды — в PROTOCOL.md.</p><p><a href="automl-architecture.html">Интерактивная карта</a> · <a href="architecture.svg">Большая схема</a> · <a href="contracts.schema.json">JSON Schema</a></p><nav class="index" aria-label="Контракты"><a href="#C00">C00</a><a href="#C01">C01</a><a href="#C02">C02</a><a href="#C03">C03</a><a href="#C04">C04</a><a href="#C05">C05</a><a href="#C06">C06</a><a href="#C07">C07</a><a href="#C08">C08</a><a href="#C09">C09</a><a href="#C10">C10</a><a href="#C11">C11</a><a href="#C12">C12</a><a href="#C13">C13</a><a href="#C14">C14</a><a href="#C15">C15</a><a href="#C16">C16</a><a href="#C17">C17</a><a href="#C18">C18</a><a href="#C19">C19</a><a href="#C20">C20</a><a href="#C21">C21</a><a href="#C22">C22</a><a href="#C23">C23</a><a href="#C24">C24</a></nav><section class="contract" id="C00"><a class="top-link" href="#top">К списку</a><h2>C00 · Создать запуск</h2><div class="meta"><span>Владелец A</span><code>runtime.start</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">CLI</div><div class="arrow">POST /v1/runs →</div><div class="block">Runtime</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c00&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c00&quot;,
+  &quot;payload&quot;: {
+    &quot;task_path&quot;: &quot;/task/task.md&quot;,
+    &quot;work_dir&quot;: &quot;/work/run-demo-001&quot;,
+    &quot;time_budget_seconds&quot;: 10800,
+    &quot;max_workers&quot;: 2
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c00&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;state&quot;: &quot;initializing&quot;,
+    &quot;task_path&quot;: &quot;/task/task.md&quot;,
+    &quot;work_dir&quot;: &quot;/work/run-demo-001&quot;,
+    &quot;time_budget_seconds&quot;: 10800
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Внешний интерфейс платформы — argv и env. Этот JSON создаёт CLI-адаптер внутри решения.</li><li>Дедлайн отсчитывается от самого начала solution.py через монотонные часы, включая импорты и LLM.</li><li>Каждый запуск имеет новый run_id и отдельное рабочее пространство.</li></ul><p class="route-list">Идемпотентность: run_id<br>Ошибки: TASK_NOT_FOUND, INVALID_CONFIG<br>Схемы: #/$defs/C00_Request · #/$defs/C00_Response</p></div></section><section class="contract" id="C01"><a class="top-link" href="#top">К списку</a><h2>C01 · Прочитать условие и пути</h2><div class="meta"><span>Владелец B</span><code>task_reader.read</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Runtime</div><div class="arrow">POST /v1/tasks/read →</div><div class="block">TaskReader</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c01&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;task_path&quot;: &quot;/task/task.md&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c01&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;task_text_artifact_id&quot;: &quot;art-task-md&quot;,
+    &quot;task_text&quot;: &quot;Иллюстративная задача: предсказать label; основная метрика Macro F1.&quot;,
+    &quot;task_root&quot;: &quot;/task&quot;,
+    &quot;candidate_paths&quot;: {
+      &quot;train&quot;: &quot;/task/train.csv&quot;,
+      &quot;test&quot;: &quot;/task/test.csv&quot;,
+      &quot;dictionary&quot;: &quot;/task/data_dictionary.csv&quot;,
+      &quot;sample_submission&quot;: &quot;/task/sample_submission.csv&quot;
+    }
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>UTF-8; относительные пути разрешаются от каталога task.md.</li><li>Если путь из условия не существует, допускается только однозначное разрешение файла внутри каталога задачи с записью решения в лог. Неоднозначность возвращает ошибку.</li><li>Исходный текст сохраняется без переписывания LLM.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: TASK_NOT_FOUND, AMBIGUOUS_PATH<br>Схемы: #/$defs/C01_Request · #/$defs/C01_Response</p></div></section><section class="contract" id="C02"><a class="top-link" href="#top">К списку</a><h2>C02 · Извлечь смысл задачи</h2><div class="meta"><span>Владелец B</span><code>task_interpreter.interpret</code><span>Ответ ≤ 90 с</span></div><div class="transition"><div class="block">Runtime</div><div class="arrow">POST /v1/tasks/interpret →</div><div class="block">TaskInterpreter</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c02&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;task_text_artifact_id&quot;: &quot;art-task-md&quot;,
+    &quot;candidate_paths&quot;: {
+      &quot;train&quot;: &quot;/task/train.csv&quot;,
+      &quot;test&quot;: &quot;/task/test.csv&quot;
+    },
+    &quot;tools_catalog_version&quot;: &quot;tools-v1&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c02&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;draft&quot;: {
+      &quot;task_kind&quot;: &quot;multiclass_classification&quot;,
+      &quot;target_column&quot;: &quot;label&quot;,
+      &quot;metric&quot;: {
+        &quot;metric_id&quot;: &quot;f1_macro&quot;,
+        &quot;direction&quot;: &quot;maximize&quot;,
+        &quot;prediction_kind&quot;: &quot;labels&quot;,
+        &quot;parameters&quot;: {
+          &quot;labels&quot;: [
+            &quot;A&quot;,
+            &quot;B&quot;,
+            &quot;C&quot;
+          ],
+          &quot;zero_division&quot;: 0
+        }
+      },
+      &quot;output&quot;: {
+        &quot;path&quot;: &quot;/task/submission.csv&quot;,
+        &quot;columns&quot;: [
+          &quot;id&quot;,
+          &quot;label&quot;
+        ],
+        &quot;id_columns&quot;: [
+          &quot;id&quot;
+        ],
+        &quot;prediction_columns&quot;: [
+          &quot;label&quot;
+        ],
+        &quot;row_order&quot;: &quot;test&quot;,
+        &quot;encoding&quot;: &quot;utf-8&quot;,
+        &quot;separator&quot;: &quot;,&quot;,
+        &quot;write_index&quot;: false
+      }
+    },
+    &quot;evidence&quot;: [
+      &quot;Тип задачи и метрика указаны в условии.&quot;
+    ],
+    &quot;unresolved_fields&quot;: []
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>LLM вызывается через C10 с purpose=task_interpretation.</li><li>Структурированный ответ проверяется локально; ограниченное исправление JSON расходует общий бюджет.</li><li>Схема не разрешает молча заменить неизвестную метрику привычной.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: LLM_UNAVAILABLE, INVALID_LLM_OUTPUT, UNSUPPORTED_METRIC<br>Схемы: #/$defs/C02_Request · #/$defs/C02_Response</p></div></section><section class="contract" id="C03"><a class="top-link" href="#top">К списку</a><h2>C03 · Получить технический профиль</h2><div class="meta"><span>Владелец C</span><code>tools.profile_data</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Runtime</div><div class="arrow">POST /v1/data/profile →</div><div class="block">DataProfiler</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c03&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;candidate_paths&quot;: {
+      &quot;train&quot;: &quot;/task/train.csv&quot;,
+      &quot;test&quot;: &quot;/task/test.csv&quot;
+    },
+    &quot;max_report_bytes&quot;: 24000
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c03&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+    &quot;profile_artifact_id&quot;: &quot;art-profile&quot;,
+    &quot;train_artifact_id&quot;: &quot;art-train&quot;,
+    &quot;test_artifact_id&quot;: &quot;art-test&quot;,
+    &quot;dictionary_artifact_id&quot;: &quot;art-dictionary&quot;,
+    &quot;sample_submission_artifact_id&quot;: &quot;art-sample&quot;,
+    &quot;summary&quot;: {
+      &quot;train_rows&quot;: 1000,
+      &quot;test_rows&quot;: 200,
+      &quot;train_columns&quot;: [
+        &quot;id&quot;,
+        &quot;x_numeric&quot;,
+        &quot;x_category&quot;,
+        &quot;label&quot;
+      ],
+      &quot;test_columns&quot;: [
+        &quot;id&quot;,
+        &quot;x_numeric&quot;,
+        &quot;x_category&quot;
+      ]
+    }
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Все размеры, названия и значения в этом пакете синтетические; приложенные CSV при подготовке схемы не читались.</li><li>Большие таблицы и отчёты сохраняются артефактами, в контекст передаётся ограниченная сводка.</li><li>dataset_id привязан к содержимому и схеме файлов; повторное изменение данных создаёт новую версию.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: DATA_NOT_FOUND, INVALID_TABLE<br>Схемы: #/$defs/C03_Request · #/$defs/C03_Response</p></div></section><section class="contract" id="C04"><a class="top-link" href="#top">К списку</a><h2>C04 · Зафиксировать контракт задачи</h2><div class="meta"><span>Владелец C</span><code>task_registry.resolve</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Runtime</div><div class="arrow">POST /v1/tasks/resolve →</div><div class="block">TaskRegistry</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c04&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c04&quot;,
+  &quot;payload&quot;: {
+    &quot;interpretation_request_id&quot;: &quot;req-c02&quot;,
+    &quot;profile_artifact_id&quot;: &quot;art-profile&quot;,
+    &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c04&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;task_spec&quot;: {
+      &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+      &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+      &quot;task_kind&quot;: &quot;multiclass_classification&quot;,
+      &quot;target_column&quot;: &quot;label&quot;,
+      &quot;train_artifact_id&quot;: &quot;art-train&quot;,
+      &quot;test_artifact_id&quot;: &quot;art-test&quot;,
+      &quot;dictionary_artifact_id&quot;: &quot;art-dictionary&quot;,
+      &quot;sample_submission_artifact_id&quot;: &quot;art-sample&quot;,
+      &quot;metric&quot;: {
+        &quot;metric_id&quot;: &quot;f1_macro&quot;,
+        &quot;direction&quot;: &quot;maximize&quot;,
+        &quot;prediction_kind&quot;: &quot;labels&quot;,
+        &quot;parameters&quot;: {
+          &quot;labels&quot;: [
+            &quot;A&quot;,
+            &quot;B&quot;,
+            &quot;C&quot;
+          ],
+          &quot;zero_division&quot;: 0
+        }
+      },
+      &quot;allowed_labels&quot;: [
+        &quot;A&quot;,
+        &quot;B&quot;,
+        &quot;C&quot;
+      ],
+      &quot;output&quot;: {
+        &quot;path&quot;: &quot;/task/submission.csv&quot;,
+        &quot;columns&quot;: [
+          &quot;id&quot;,
+          &quot;label&quot;
+        ],
+        &quot;id_columns&quot;: [
+          &quot;id&quot;
+        ],
+        &quot;prediction_columns&quot;: [
+          &quot;label&quot;
+        ],
+        &quot;row_order&quot;: &quot;test&quot;,
+        &quot;encoding&quot;: &quot;utf-8&quot;,
+        &quot;separator&quot;: &quot;,&quot;,
+        &quot;write_index&quot;: false
+      },
+      &quot;excluded_features&quot;: [
+        &quot;id&quot;
+      ]
+    },
+    &quot;adapter_id&quot;: &quot;multiclass-v1&quot;,
+    &quot;metric_implementation_id&quot;: &quot;sklearn-f1-macro-v1&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>TaskSpec проверяет код: наличие таргета, входных файлов, направления метрики и формата вывода.</li><li>Первый MVP поддерживает регрессию, бинарную и многоклассовую классификацию; список расширяется адаптерами.</li><li>Неизвестный тип или метрика возвращает явную ошибку. Приватные задачи не обещаны организаторами как только эти типы.</li></ul><p class="route-list">Идемпотентность: dataset_id + normalized TaskSpec<br>Ошибки: TASK_SPEC_CONFLICT, UNSUPPORTED_TASK_KIND, UNSUPPORTED_METRIC<br>Схемы: #/$defs/C04_Request · #/$defs/C04_Response</p></div></section><section class="contract" id="C05"><a class="top-link" href="#top">К списку</a><h2>C05 · Создать общую валидацию</h2><div class="meta"><span>Владелец C</span><code>evaluation.create_protocol</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/validations →</div><div class="block">Evaluator</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c05&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c05&quot;,
+  &quot;payload&quot;: {
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+    &quot;proposal&quot;: {
+      &quot;strategy&quot;: &quot;stratified_holdout&quot;,
+      &quot;parameters&quot;: {
+        &quot;valid_fraction&quot;: 0.2
+      },
+      &quot;seed&quot;: 42,
+      &quot;reason&quot;: &quot;Иллюстративный протокол; реальный выбирается после анализа текущей задачи.&quot;
+    }
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c05&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;validation_id&quot;: &quot;validation-v1&quot;,
+    &quot;train_rows_artifact_id&quot;: &quot;art-split-train&quot;,
+    &quot;valid_rows_artifact_id&quot;: &quot;art-split-valid&quot;,
+    &quot;labels_visibility&quot;: &quot;evaluator_only&quot;,
+    &quot;metric&quot;: {
+      &quot;metric_id&quot;: &quot;f1_macro&quot;,
+      &quot;direction&quot;: &quot;maximize&quot;,
+      &quot;prediction_kind&quot;: &quot;labels&quot;,
+      &quot;parameters&quot;: {
+        &quot;labels&quot;: [
+          &quot;A&quot;,
+          &quot;B&quot;,
+          &quot;C&quot;
+        ],
+        &quot;zero_division&quot;: 0
+      }
+    },
+    &quot;protocol_sha256&quot;: &quot;d370c5d2d3c183bd576fb9d064a281ea31a14fdc08bce428f15ce4919612dbcb&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Стратегия в примере не является общим требованием; протокол может быть временным, групповым или иным.</li><li>Индексы, seed, метрика и правила предобработки версионируются.</li><li>При смене validation_id кандидаты переоцениваются; метрики разных протоколов не сравниваются. Разделение labels_visibility описывает контракт, а не гарантирует OS-изоляцию произвольного Python.</li></ul><p class="route-list">Идемпотентность: dataset_id + proposal + metric<br>Ошибки: INVALID_SPLIT, LEAKAGE_POLICY_VIOLATION<br>Схемы: #/$defs/C05_Request · #/$defs/C05_Response</p></div></section><section class="contract" id="C06"><a class="top-link" href="#top">К списку</a><h2>C06 · Получить рецепты и инструменты</h2><div class="meta"><span>Владелец B</span><code>catalog.select</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/catalog/select →</div><div class="block">Catalog</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c06&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;adapter_id&quot;: &quot;multiclass-v1&quot;,
+    &quot;cpu_only&quot;: true
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c06&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;catalog_version&quot;: &quot;recipes-v1&quot;,
+    &quot;recipe_ids&quot;: [
+      &quot;dummy-classifier-v1&quot;,
+      &quot;catboost-classifier-v1&quot;,
+      &quot;linear-classifier-v1&quot;
+    ],
+    &quot;tools_catalog_version&quot;: &quot;tools-v1&quot;,
+    &quot;tools_markdown_artifact_id&quot;: &quot;art-tools-md&quot;,
+    &quot;tools&quot;: [
+      {
+        &quot;name&quot;: &quot;write_code&quot;,
+        &quot;description&quot;: &quot;Записать Python-код эксперимента в отдельный артефакт.&quot;,
+        &quot;input_schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;properties&quot;: {
+            &quot;researcher_id&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1
+            },
+            &quot;filename&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1
+            },
+            &quot;content&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1
+            },
+            &quot;declared_entrypoint&quot;: {
+              &quot;enum&quot;: [
+                &quot;make_pipeline&quot;
+              ]
+            }
+          },
+          &quot;required&quot;: [
+            &quot;researcher_id&quot;,
+            &quot;filename&quot;,
+            &quot;content&quot;,
+            &quot;declared_entrypoint&quot;
+          ],
+          &quot;additionalProperties&quot;: false
+        },
+        &quot;timeout_seconds&quot;: 10,
+        &quot;side_effect&quot;: &quot;artifact_write&quot;
+      }
+    ]
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Каталог содержит применимость, параметры, ограничения и точки изменения кода.</li><li>Markdown и JSON-схемы инструментов генерируются из одного описания.</li><li>Dummy-рецепт обеспечивает ранний технически корректный ответ; он не считается внешним бейзлайном организаторов.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: общие ошибки envelope<br>Схемы: #/$defs/C06_Request · #/$defs/C06_Response</p></div></section><section class="contract" id="C07"><a class="top-link" href="#top">К списку</a><h2>C07 · Прочитать память исследования</h2><div class="meta"><span>Владелец A</span><code>store.snapshot</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/state/snapshot →</div><div class="block">ExperimentStore</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c07&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;validation_id&quot;: &quot;validation-v1&quot;,
+    &quot;limit_recent&quot;: 6,
+    &quot;limit_best&quot;: 3
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c07&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;snapshot_id&quot;: &quot;snapshot-001&quot;,
+    &quot;store_revision&quot;: 7,
+    &quot;best_evaluated_experiment_id&quot;: &quot;exp-baseline&quot;,
+    &quot;published_champion_experiment_id&quot;: &quot;exp-baseline&quot;,
+    &quot;recent_experiment_ids&quot;: [
+      &quot;exp-baseline&quot;
+    ],
+    &quot;reserved_fingerprints&quot;: [],
+    &quot;summary_artifact_id&quot;: &quot;art-research-summary&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Единый писатель — диспетчер; читатели получают согласованный снимок.</li><li>Snapshot содержит факты и ссылки, а не полную историю stdout.</li><li>best_evaluated и published_champion могут различаться, пока идёт финальное обучение.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: общие ошибки envelope<br>Схемы: #/$defs/C07_Request · #/$defs/C07_Response</p></div></section><section class="contract" id="C08"><a class="top-link" href="#top">К списку</a><h2>C08 · Собрать компактный контекст</h2><div class="meta"><span>Владелец B</span><code>context.build</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/contexts →</div><div class="block">ContextBuilder</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c08&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: null,
+  &quot;payload&quot;: {
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;snapshot_id&quot;: &quot;snapshot-001&quot;,
+    &quot;tools_catalog_version&quot;: &quot;tools-v1&quot;,
+    &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+    &quot;assignment&quot;: &quot;exploit_incumbent&quot;,
+    &quot;max_input_tokens&quot;: 8000
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c08&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;context_id&quot;: &quot;context-001&quot;,
+    &quot;context_version&quot;: 1,
+    &quot;messages_artifact_id&quot;: &quot;art-context-001&quot;,
+    &quot;estimated_input_tokens&quot;: 5300,
+    &quot;omitted_experiment_count&quot;: 0,
+    &quot;provider_prefix_cache_required&quot;: false
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Постоянный префикс: условие, правила, инструменты; динамическая часть: сводка и поручение.</li><li>Оценка токенов приблизительная, использование API берётся из ответа провайдера, когда оно доступно.</li><li>Локальная память и серверный prefix cache — разные механизмы; поддержка второго не предполагается.</li></ul><p class="route-list">Идемпотентность: read<br>Ошибки: CONTEXT_TOO_LARGE<br>Схемы: #/$defs/C08_Request · #/$defs/C08_Response</p></div></section><section class="contract" id="C09"><a class="top-link" href="#top">К списку</a><h2>C09 · Выдать исследовательское поручение</h2><div class="meta"><span>Владелец B</span><code>researcher.propose</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/research/propose →</div><div class="block">Researcher</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c09&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c09&quot;,
+  &quot;payload&quot;: {
+    &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+    &quot;context_id&quot;: &quot;context-001&quot;,
+    &quot;assignment&quot;: &quot;exploit_incumbent&quot;,
+    &quot;base_experiment_ids&quot;: [
+      &quot;exp-baseline&quot;
+    ],
+    &quot;forbidden_fingerprints&quot;: [],
+    &quot;budget&quot;: {
+      &quot;wall_seconds_remaining&quot;: 9200,
+      &quot;finalization_reserve_seconds&quot;: 1200,
+      &quot;cpu_threads_available&quot;: 6,
+      &quot;memory_mb_available&quot;: 20480,
+      &quot;llm_calls_remaining&quot;: 30,
+      &quot;search_allowed&quot;: true
+    },
+    &quot;proposal_limit&quot;: 1
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c09&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;proposal_id&quot;: &quot;proposal-001&quot;,
+    &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+    &quot;plan&quot;: {
+      &quot;plan_id&quot;: &quot;plan-001&quot;,
+      &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+      &quot;parent_ids&quot;: [
+        &quot;exp-baseline&quot;
+      ],
+      &quot;hypothesis&quot;: &quot;Сравнить альтернативную регуляризацию с базовым рецептом.&quot;,
+      &quot;expected_effect&quot;: &quot;Улучшение основной метрики при той же валидации.&quot;,
+      &quot;recipe_id&quot;: &quot;catboost-classifier-v1&quot;,
+      &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+      &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+      &quot;validation_id&quot;: &quot;validation-v1&quot;,
+      &quot;seed&quot;: 42,
+      &quot;fidelity&quot;: &quot;full&quot;,
+      &quot;model&quot;: {
+        &quot;family&quot;: &quot;catboost&quot;,
+        &quot;hyperparameters&quot;: {
+          &quot;iterations&quot;: 300,
+          &quot;depth&quot;: 6,
+          &quot;learning_rate&quot;: 0.05
+        }
+      },
+      &quot;feature_steps&quot;: [
+        {
+          &quot;operation&quot;: &quot;impute_numeric&quot;,
+          &quot;strategy&quot;: &quot;median&quot;
+        }
+      ],
+      &quot;code_artifact_id&quot;: &quot;art-code-001&quot;,
+      &quot;resources&quot;: {
+        &quot;cpu_threads&quot;: 3,
+        &quot;memory_limit_mb&quot;: 10240,
+        &quot;timeout_seconds&quot;: 600
+      }
+    },
+    &quot;decision&quot;: &quot;propose&quot;,
+    &quot;stop_reason&quot;: null
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Researcher-1 и Researcher-2 используют одну предоставленную модель с разными контекстами.</li><li>Роль формулирует гипотезу и готовит код через C10/C11; обучение планирует диспетчер.</li><li>decision=propose требует plan; decision=stop требует stop_reason и plan=null. При baseline выбирается быстрый рецепт.</li></ul><p class="route-list">Идемпотентность: context_id + researcher_id<br>Ошибки: LLM_UNAVAILABLE, INVALID_LLM_OUTPUT<br>Схемы: #/$defs/C09_Request · #/$defs/C09_Response</p></div></section><section class="contract" id="C10"><a class="top-link" href="#top">К списку</a><h2>C10 · Вызвать предоставленную LLM</h2><div class="meta"><span>Владелец B</span><code>llm_gateway.complete</code><span>Ответ ≤ 90 с</span></div><div class="transition"><div class="block">TaskInterpreter / Researcher</div><div class="arrow">POST /v1/llm/complete →</div><div class="block">LLMGateway</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c10&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c10&quot;,
+  &quot;payload&quot;: {
+    &quot;purpose&quot;: &quot;research_proposal&quot;,
+    &quot;context_artifact_id&quot;: &quot;art-context-001&quot;,
+    &quot;response_schema_id&quot;: &quot;ExperimentPlan&quot;,
+    &quot;tool_schema_ids&quot;: [
+      &quot;write_code&quot;
+    ],
+    &quot;max_output_tokens&quot;: 3000,
+    &quot;deadline_seconds&quot;: 90,
+    &quot;attempt_limit&quot;: 2
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c10&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;completion_id&quot;: &quot;completion-001&quot;,
+    &quot;output_artifact_id&quot;: &quot;art-llm-output-001&quot;,
+    &quot;parsed_payload&quot;: {
+      &quot;plan_id&quot;: &quot;plan-001&quot;,
+      &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+      &quot;parent_ids&quot;: [
+        &quot;exp-baseline&quot;
+      ],
+      &quot;hypothesis&quot;: &quot;Сравнить альтернативную регуляризацию с базовым рецептом.&quot;,
+      &quot;expected_effect&quot;: &quot;Улучшение основной метрики при той же валидации.&quot;,
+      &quot;recipe_id&quot;: &quot;catboost-classifier-v1&quot;,
+      &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+      &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+      &quot;validation_id&quot;: &quot;validation-v1&quot;,
+      &quot;seed&quot;: 42,
+      &quot;fidelity&quot;: &quot;full&quot;,
+      &quot;model&quot;: {
+        &quot;family&quot;: &quot;catboost&quot;,
+        &quot;hyperparameters&quot;: {
+          &quot;iterations&quot;: 300,
+          &quot;depth&quot;: 6,
+          &quot;learning_rate&quot;: 0.05
+        }
+      },
+      &quot;feature_steps&quot;: [
+        {
+          &quot;operation&quot;: &quot;impute_numeric&quot;,
+          &quot;strategy&quot;: &quot;median&quot;
+        }
+      ],
+      &quot;code_artifact_id&quot;: &quot;art-code-001&quot;,
+      &quot;resources&quot;: {
+        &quot;cpu_threads&quot;: 3,
+        &quot;memory_limit_mb&quot;: 10240,
+        &quot;timeout_seconds&quot;: 600
+      }
+    },
+    &quot;tool_calls&quot;: [],
+    &quot;usage&quot;: {
+      &quot;input_tokens&quot;: 5300,
+      &quot;output_tokens&quot;: 1200
+    },
+    &quot;attempts_used&quot;: 1
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Внешний API вызывается адаптером OpenAI-совместимого клиента из baseline; модель и URL берутся из env.</li><li>Здесь показан внутренний контракт. Тело внешнего API формирует адаптер messages/tools; организаторы не принимают этот JSON.</li><li>parsed_payload проверяется против response_schema_id до передачи вызывающему коду; пример ниже является полным ExperimentPlan.</li><li>Общий лимит запросов, таймаут, ограниченные retry с backoff; ключи не попадают в логи. На каждом retry проверяется оставшийся бюджет.</li></ul><p class="route-list">Идемпотентность: at_least_once; API charge may repeat<br>Ошибки: LLM_RATE_LIMIT, LLM_UNAVAILABLE, INVALID_LLM_OUTPUT, BUDGET_EXHAUSTED<br>Схемы: #/$defs/C10_Request · #/$defs/C10_Response</p></div></section><section class="contract" id="C11"><a class="top-link" href="#top">К списку</a><h2>C11 · Сохранить код эксперимента</h2><div class="meta"><span>Владелец C</span><code>tools.write_code</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Researcher</div><div class="arrow">POST /v1/artifacts/code →</div><div class="block">ArtifactStore</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c11&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c11&quot;,
+  &quot;payload&quot;: {
+    &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+    &quot;filename&quot;: &quot;experiment.py&quot;,
+    &quot;content&quot;: &quot;def make_pipeline(task_spec, params):\n    from catboost import CatBoostClassifier\n    return CatBoostClassifier(**params, thread_count=3, verbose=False)\n&quot;,
+    &quot;declared_entrypoint&quot;: &quot;make_pipeline&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c11&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;artifact&quot;: {
+      &quot;artifact_id&quot;: &quot;art-code-001&quot;,
+      &quot;run_id&quot;: &quot;run-demo-001&quot;,
+      &quot;kind&quot;: &quot;python_source&quot;,
+      &quot;relative_path&quot;: &quot;experiments/plan-001/experiment.py&quot;,
+      &quot;sha256&quot;: &quot;fe1b98a2038e60db754a844569a56ffeade70fed57fc70881fc2839f330413b7&quot;,
+      &quot;size_bytes&quot;: 153,
+      &quot;media_type&quot;: &quot;text/x-python&quot;
+    },
+    &quot;syntax_valid&quot;: true,
+    &quot;entrypoint&quot;: &quot;make_pipeline&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Код — иллюстрация формы, не готовый универсальный рецепт. Категориальные признаки и fit kwargs определяет рецепт.</li><li>В MVP код экспортирует make_pipeline(task_spec: dict, params: dict) -&gt; объект с fit/predict; runner владеет загрузкой, разбиением и вызовом fit.</li><li>Версия протокола fit/predict и разрешённые model fit kwargs фиксируются в recipes-v1. Число потоков runner задаёт из lease.</li><li>Только относительный filename внутри рабочего каталога; никаких изменений task.md или итогового CSV.</li><li>Проверка синтаксиса не гарантирует успешное обучение и не является песочницей безопасности.</li></ul><p class="route-list">Идемпотентность: run_id + code sha256<br>Ошибки: INVALID_CODE, PATH_OUTSIDE_WORKSPACE<br>Схемы: #/$defs/C11_Request · #/$defs/C11_Response</p></div></section><section class="contract" id="C12"><a class="top-link" href="#top">К списку</a><h2>C12 · Зарезервировать уникальный эксперимент</h2><div class="meta"><span>Владелец A</span><code>orchestrator.submit_plan</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Researcher</div><div class="arrow">POST /v1/experiments →</div><div class="block">Orchestrator</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c12&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c12&quot;,
+  &quot;payload&quot;: {
+    &quot;plan&quot;: {
+      &quot;plan_id&quot;: &quot;plan-001&quot;,
+      &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+      &quot;parent_ids&quot;: [
+        &quot;exp-baseline&quot;
+      ],
+      &quot;hypothesis&quot;: &quot;Сравнить альтернативную регуляризацию с базовым рецептом.&quot;,
+      &quot;expected_effect&quot;: &quot;Улучшение основной метрики при той же валидации.&quot;,
+      &quot;recipe_id&quot;: &quot;catboost-classifier-v1&quot;,
+      &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+      &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+      &quot;validation_id&quot;: &quot;validation-v1&quot;,
+      &quot;seed&quot;: 42,
+      &quot;fidelity&quot;: &quot;full&quot;,
+      &quot;model&quot;: {
+        &quot;family&quot;: &quot;catboost&quot;,
+        &quot;hyperparameters&quot;: {
+          &quot;iterations&quot;: 300,
+          &quot;depth&quot;: 6,
+          &quot;learning_rate&quot;: 0.05
+        }
+      },
+      &quot;feature_steps&quot;: [
+        {
+          &quot;operation&quot;: &quot;impute_numeric&quot;,
+          &quot;strategy&quot;: &quot;median&quot;
+        }
+      ],
+      &quot;code_artifact_id&quot;: &quot;art-code-001&quot;,
+      &quot;resources&quot;: {
+        &quot;cpu_threads&quot;: 3,
+        &quot;memory_limit_mb&quot;: 10240,
+        &quot;timeout_seconds&quot;: 600
+      }
+    }
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c12&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;fingerprint&quot;: &quot;fe0070161cc652a36ed0b8e9ab1fd0f85279638bc1ff291c4667c37105d0c94d&quot;,
+    &quot;disposition&quot;: &quot;created&quot;,
+    &quot;state&quot;: &quot;queued&quot;,
+    &quot;existing_experiment_id&quot;: null
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>SQLite UNIQUE(run_id, fingerprint) и транзакция создают единственную логическую запись.</li><li>Fingerprint = SHA256 канонического JSON: dataset_id, task_spec_id, validation_id, recipe_version, code_sha256, model params, feature steps, seed, fidelity. Все defaults раскрываются; worker, текст гипотезы и пути исключаются.</li><li>disposition=duplicate возвращает существующий experiment_id; новый процесс не запускается.</li><li>Повтор неудачного запуска — новая attempt_no внутри той же записи, после подтверждённой остановки прошлого процесса.</li></ul><p class="route-list">Идемпотентность: fingerprint<br>Ошибки: INVALID_PLAN, PARENT_NOT_FOUND, STALE_VALIDATION<br>Схемы: #/$defs/C12_Request · #/$defs/C12_Response</p></div></section><section class="contract" id="C13"><a class="top-link" href="#top">К списку</a><h2>C13 · Получить или продлить ресурсы</h2><div class="meta"><span>Владелец A</span><code>budget.acquire_or_renew</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator / Finalizer</div><div class="arrow">POST /v1/resources/lease →</div><div class="block">BudgetManager</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c13&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c13&quot;,
+  &quot;payload&quot;: {
+    &quot;operation&quot;: &quot;acquire&quot;,
+    &quot;owner_id&quot;: &quot;exp-001&quot;,
+    &quot;phase&quot;: &quot;train&quot;,
+    &quot;requested&quot;: {
+      &quot;cpu_threads&quot;: 3,
+      &quot;memory_limit_mb&quot;: 10240,
+      &quot;timeout_seconds&quot;: 600
+    },
+    &quot;lease_id&quot;: null,
+    &quot;fencing_token&quot;: null
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c13&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;granted&quot;: true,
+    &quot;lease&quot;: {
+      &quot;lease_id&quot;: &quot;lease-001&quot;,
+      &quot;fencing_token&quot;: 1,
+      &quot;cpu_threads&quot;: 3,
+      &quot;memory_limit_mb&quot;: 10240,
+      &quot;timeout_seconds&quot;: 600,
+      &quot;heartbeat_interval_seconds&quot;: 10,
+      &quot;expires_at&quot;: &quot;2026-10-21T12:20:00Z&quot;
+    },
+    &quot;retry_after_seconds&quot;: null,
+    &quot;budget&quot;: {
+      &quot;wall_seconds_remaining&quot;: 9200,
+      &quot;finalization_reserve_seconds&quot;: 1200,
+      &quot;cpu_threads_available&quot;: 6,
+      &quot;memory_mb_available&quot;: 20480,
+      &quot;llm_calls_remaining&quot;: 30,
+      &quot;search_allowed&quot;: true
+    }
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Стартовые внутренние лимиты: два обучения по 3 CPU и до 10240 MiB, 2 CPU и 8192 MiB оставлены служебным процессам. Это настройка, не требование ТЗ.</li><li>timeout &lt;= min(запрошенный лимит, остаток до дедлайна фазы). Запрет нового поиска учитывает запас на refit и запись.</li><li>renew/release требуют актуальных lease_id и fencing_token; release идемпотентен. heartbeat каждые 10 секунд, lease TTL 30 секунд.</li><li>Истёкшая аренда не освобождает ресурсы для нового обучения до подтверждённой остановки дерева процессов; поздние сообщения старой попытки отклоняются.</li></ul><p class="route-list">Идемпотентность: owner_id + phase + operation + token<br>Ошибки: BUDGET_EXHAUSTED, STALE_LEASE<br>Схемы: #/$defs/C13_Request · #/$defs/C13_Response</p></div></section><section class="contract" id="C14"><a class="top-link" href="#top">К списку</a><h2>C14 · Запустить обучение на split</h2><div class="meta"><span>Владелец A</span><code>runner.start_train</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/jobs/train →</div><div class="block">Runner</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c14&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c14&quot;,
+  &quot;payload&quot;: {
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;attempt_no&quot;: 1,
+    &quot;plan&quot;: {
+      &quot;plan_id&quot;: &quot;plan-001&quot;,
+      &quot;researcher_id&quot;: &quot;researcher-1&quot;,
+      &quot;parent_ids&quot;: [
+        &quot;exp-baseline&quot;
+      ],
+      &quot;hypothesis&quot;: &quot;Сравнить альтернативную регуляризацию с базовым рецептом.&quot;,
+      &quot;expected_effect&quot;: &quot;Улучшение основной метрики при той же валидации.&quot;,
+      &quot;recipe_id&quot;: &quot;catboost-classifier-v1&quot;,
+      &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+      &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+      &quot;validation_id&quot;: &quot;validation-v1&quot;,
+      &quot;seed&quot;: 42,
+      &quot;fidelity&quot;: &quot;full&quot;,
+      &quot;model&quot;: {
+        &quot;family&quot;: &quot;catboost&quot;,
+        &quot;hyperparameters&quot;: {
+          &quot;iterations&quot;: 300,
+          &quot;depth&quot;: 6,
+          &quot;learning_rate&quot;: 0.05
+        }
+      },
+      &quot;feature_steps&quot;: [
+        {
+          &quot;operation&quot;: &quot;impute_numeric&quot;,
+          &quot;strategy&quot;: &quot;median&quot;
+        }
+      ],
+      &quot;code_artifact_id&quot;: &quot;art-code-001&quot;,
+      &quot;resources&quot;: {
+        &quot;cpu_threads&quot;: 3,
+        &quot;memory_limit_mb&quot;: 10240,
+        &quot;timeout_seconds&quot;: 600
+      }
+    },
+    &quot;lease&quot;: {
+      &quot;lease_id&quot;: &quot;lease-001&quot;,
+      &quot;fencing_token&quot;: 1,
+      &quot;cpu_threads&quot;: 3,
+      &quot;memory_limit_mb&quot;: 10240,
+      &quot;timeout_seconds&quot;: 600,
+      &quot;heartbeat_interval_seconds&quot;: 10,
+      &quot;expires_at&quot;: &quot;2026-10-21T12:20:00Z&quot;
+    },
+    &quot;train_rows_artifact_id&quot;: &quot;art-split-train&quot;,
+    &quot;valid_rows_artifact_id&quot;: &quot;art-split-valid&quot;,
+    &quot;output_kinds&quot;: [
+      &quot;validation_predictions&quot;,
+      &quot;fitted_pipeline&quot;,
+      &quot;execution_log&quot;
+    ]
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c14&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;job_id&quot;: &quot;job-train-001&quot;,
+    &quot;state&quot;: &quot;accepted&quot;,
+    &quot;event_target&quot;: &quot;orchestrator.on_job_event&quot;,
+    &quot;heartbeat_seconds&quot;: 10
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Ответ accepted подтверждает постановку в исполнение, а не успешное обучение.</li><li>Все обучаемые преобразования fit выполняются только на train-части; validation используется через transform/predict.</li><li>Runner ограничивает процессы и потоки; cwd и выходные файлы отдельные для experiment_id/attempt_no.</li><li>Предсказания содержат __row_index и prediction; для вероятностей — согласованные колонки классов. Метрики runner не утверждает.</li></ul><p class="route-list">Идемпотентность: experiment_id + attempt_no<br>Ошибки: STALE_LEASE, WORKER_START_FAILED<br>Схемы: #/$defs/C14_Request · #/$defs/C14_Response</p></div></section><section class="contract" id="C15"><a class="top-link" href="#top">К списку</a><h2>C15 · Доставить событие выполнения</h2><div class="meta"><span>Владелец A</span><code>runtime.on_job_event</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Runner</div><div class="arrow">POST /v1/jobs/events →</div><div class="block">Orchestrator / Finalizer</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c15&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c15&quot;,
+  &quot;payload&quot;: {
+    &quot;event&quot;: {
+      &quot;event_id&quot;: &quot;evt-job-train-001-done&quot;,
+      &quot;job_id&quot;: &quot;job-train-001&quot;,
+      &quot;experiment_id&quot;: &quot;exp-001&quot;,
+      &quot;attempt_no&quot;: 1,
+      &quot;lease_id&quot;: &quot;lease-001&quot;,
+      &quot;fencing_token&quot;: 1,
+      &quot;state&quot;: &quot;succeeded&quot;,
+      &quot;output_artifact_ids&quot;: [
+        &quot;art-valid-predictions-001&quot;,
+        &quot;art-fitted-pipeline-001&quot;,
+        &quot;art-log-001&quot;
+      ],
+      &quot;duration_seconds&quot;: 84.2,
+      &quot;peak_memory_mb&quot;: 2300,
+      &quot;error&quot;: null
+    }
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c15&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;event_id&quot;: &quot;evt-job-train-001-done&quot;,
+    &quot;disposition&quot;: &quot;applied&quot;,
+    &quot;job_state&quot;: &quot;succeeded&quot;,
+    &quot;experiment_state&quot;: &quot;trained&quot;,
+    &quot;submission_state&quot;: null
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Доставка at-least-once; UNIQUE(run_id,event_id) предотвращает повторную фиксацию.</li><li>Поздние события с устаревшим fencing_token отклоняются. C15 также доставляет завершение refit в Finalizer по job_id.</li><li>Для train success переводит эксперимент в trained; для refit меняется состояние submission job, evaluated-эксперимент не откатывается в trained.</li><li>При failed/timed_out/cancelled error обязателен; ресурсы освобождаются после остановки всего дерева процессов.</li></ul><p class="route-list">Идемпотентность: event_id<br>Ошибки: STALE_LEASE, UNKNOWN_JOB, ARTIFACT_MISSING<br>Схемы: #/$defs/C15_Request · #/$defs/C15_Response</p></div></section><section class="contract" id="C16"><a class="top-link" href="#top">К списку</a><h2>C16 · Независимо оценить предсказания</h2><div class="meta"><span>Владелец C</span><code>evaluation.evaluate</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/evaluations →</div><div class="block">Evaluator</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c16&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c16&quot;,
+  &quot;payload&quot;: {
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+    &quot;validation_id&quot;: &quot;validation-v1&quot;,
+    &quot;predictions_artifact_id&quot;: &quot;art-valid-predictions-001&quot;,
+    &quot;fidelity&quot;: &quot;full&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c16&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;evaluation&quot;: {
+      &quot;evaluation_id&quot;: &quot;eval-001&quot;,
+      &quot;experiment_id&quot;: &quot;exp-001&quot;,
+      &quot;valid&quot;: true,
+      &quot;primary_metric&quot;: {
+        &quot;metric_id&quot;: &quot;f1_macro&quot;,
+        &quot;direction&quot;: &quot;maximize&quot;,
+        &quot;value&quot;: 0.714,
+        &quot;validation_id&quot;: &quot;validation-v1&quot;,
+        &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+        &quot;fidelity&quot;: &quot;full&quot;
+      },
+      &quot;diagnostics_artifact_id&quot;: &quot;art-diagnostics-001&quot;,
+      &quot;violations&quot;: []
+    }
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Оценщик проверяет количество и порядок строк, типы, конечность чисел, допустимые классы; затем считает метрику по своим labels.</li><li>Для invalid результата C16 возвращает ok=false с кодом INVALID_PREDICTIONS, эксперимент становится invalid. Numeric metric не выдумывается.</li><li>Сравнимость требует одинаковых dataset_id, validation_id, metric_id, direction, fidelity и версии оценщика.</li><li>Дополнительные диагностические метрики не заменяют основную.</li></ul><p class="route-list">Идемпотентность: prediction sha256 + protocol sha256<br>Ошибки: INVALID_PREDICTIONS, STALE_VALIDATION, METRIC_FAILED<br>Схемы: #/$defs/C16_Request · #/$defs/C16_Response</p></div></section><section class="contract" id="C17"><a class="top-link" href="#top">К списку</a><h2>C17 · Зафиксировать оценку и выбрать кандидата</h2><div class="meta"><span>Владелец A</span><code>store.commit_evaluation</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/experiments/commit-evaluation →</div><div class="block">ExperimentStore</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c17&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c17&quot;,
+  &quot;payload&quot;: {
+    &quot;evaluation_id&quot;: &quot;eval-001&quot;,
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;selection_policy_id&quot;: &quot;same-protocol-primary-v1&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c17&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;experiment_state&quot;: &quot;evaluated&quot;,
+    &quot;best_evaluated_experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;published_champion_experiment_id&quot;: &quot;exp-baseline&quot;,
+    &quot;should_prepare_submission&quot;: true,
+    &quot;store_revision&quot;: 11
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Оценка берётся из доверенного реестра по evaluation_id, а не из поля score исследователя.</li><li>Выбор и запись происхождения — одна транзакция SQLite. У evaluated-статуса отдельно хранится признак best_evaluated.</li><li>Первый валидный baseline создаёт первоначального кандидата. При равенстве метрики сохраняется более ранний проверенный кандидат.</li><li>Screening-кандидат проходит full-проверку перед продвижением в финальный ответ.</li></ul><p class="route-list">Идемпотентность: evaluation_id<br>Ошибки: EVALUATION_NOT_FOUND, INCOMPARABLE_EVALUATIONS<br>Схемы: #/$defs/C17_Request · #/$defs/C17_Response</p></div></section><section class="contract" id="C18"><a class="top-link" href="#top">К списку</a><h2>C18 · Подготовить полный ответ кандидата</h2><div class="meta"><span>Владелец C</span><code>submission.prepare</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/submissions/prepare →</div><div class="block">Finalizer</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c18&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c18&quot;,
+  &quot;payload&quot;: {
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;evaluation_id&quot;: &quot;eval-001&quot;,
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;mode&quot;: &quot;refit_full_train&quot;,
+    &quot;expected_champion_version&quot;: 1
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c18&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;submission_job_id&quot;: &quot;subjob-001&quot;,
+    &quot;state&quot;: &quot;preparing&quot;,
+    &quot;published_champion_experiment_id&quot;: &quot;exp-baseline&quot;,
+    &quot;output_path&quot;: &quot;/task/submission.csv&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Предыдущий готовый submission.csv остаётся доступен всё время refit.</li><li>Одновременно активна одна финализация; более новый кандидат коалесцируется в очередь, чтобы не расходовать ресурс на много refit.</li><li>Finalizer использует C13 для аренды refit и C19 для запуска. При нехватке времени остаётся опубликованный ответ.</li></ul><p class="route-list">Идемпотентность: experiment_id + task_spec_id + mode<br>Ошибки: CANDIDATE_NOT_EVALUATED, BUDGET_EXHAUSTED<br>Схемы: #/$defs/C18_Request · #/$defs/C18_Response</p></div></section><section class="contract" id="C19"><a class="top-link" href="#top">К списку</a><h2>C19 · Обучить на всём train и предсказать test</h2><div class="meta"><span>Владелец A</span><code>runner.start_refit</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">Finalizer</div><div class="arrow">POST /v1/jobs/refit →</div><div class="block">Runner</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c19&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c19&quot;,
+  &quot;payload&quot;: {
+    &quot;submission_job_id&quot;: &quot;subjob-001&quot;,
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;code_artifact_id&quot;: &quot;art-code-001&quot;,
+    &quot;lease&quot;: {
+      &quot;lease_id&quot;: &quot;lease-refit-001&quot;,
+      &quot;fencing_token&quot;: 1,
+      &quot;cpu_threads&quot;: 3,
+      &quot;memory_limit_mb&quot;: 10240,
+      &quot;timeout_seconds&quot;: 900,
+      &quot;heartbeat_interval_seconds&quot;: 10,
+      &quot;expires_at&quot;: &quot;2026-10-21T12:20:00Z&quot;
+    },
+    &quot;fit_scope&quot;: &quot;all_train&quot;,
+    &quot;predict_artifact_id&quot;: &quot;art-test&quot;,
+    &quot;output_relative_path&quot;: &quot;submissions/subjob-001/candidate.csv&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c19&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;job_id&quot;: &quot;job-refit-001&quot;,
+    &quot;state&quot;: &quot;accepted&quot;,
+    &quot;completion_contract&quot;: &quot;C15&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Параметры и feature pipeline берутся из проверенного experiment_id; после валидации их не меняют незаметно.</li><li>Если рецепт использует early stopping, число итераций фиксируется по валидации; refit не требует скрытых test labels.</li><li>Runner пишет уникальный кандидат, итоговый путь submission.csv ему не выдаётся. Событие C15 связывается с subjob по job_id.</li></ul><p class="route-list">Идемпотентность: submission_job_id<br>Ошибки: STALE_LEASE, REFIT_FAILED<br>Схемы: #/$defs/C19_Request · #/$defs/C19_Response</p></div></section><section class="contract" id="C20"><a class="top-link" href="#top">К списку</a><h2>C20 · Проверить формат полного ответа</h2><div class="meta"><span>Владелец C</span><code>submission.validate_output</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Finalizer</div><div class="arrow">POST /v1/submissions/validate →</div><div class="block">OutputValidator</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c20&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c20&quot;,
+  &quot;payload&quot;: {
+    &quot;submission_job_id&quot;: &quot;subjob-001&quot;,
+    &quot;task_spec_id&quot;: &quot;task-v1&quot;,
+    &quot;candidate_artifact_id&quot;: &quot;art-submission-001&quot;,
+    &quot;reference_test_artifact_id&quot;: &quot;art-test&quot;
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c20&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;validation_report_id&quot;: &quot;outcheck-001&quot;,
+    &quot;valid&quot;: true,
+    &quot;rows&quot;: 200,
+    &quot;columns&quot;: [
+      &quot;id&quot;,
+      &quot;label&quot;
+    ],
+    &quot;id_order_matches&quot;: true,
+    &quot;finite_predictions&quot;: true,
+    &quot;allowed_labels_only&quot;: true,
+    &quot;candidate_sha256&quot;: &quot;e0decf976d8b07013e498ed23ab8279286c75708f527e8ad8f582a04d0f95368&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Формат и путь берутся из TaskSpec, порядок и id — из test или шаблона в соответствии с условием.</li><li>Проверяются точный набор и порядок колонок, строки, пропуски, дубли идентификаторов там, где они запрещены, значения и классы.</li><li>Неприменимые проверки считаются пройденными: например finite_predictions для строковых меток.</li><li>Любое нарушение возвращает ok=false; прежний опубликованный ответ сохраняется.</li></ul><p class="route-list">Идемпотентность: candidate sha256 + TaskSpec version<br>Ошибки: INVALID_OUTPUT_SCHEMA, INVALID_OUTPUT_VALUES, ID_ORDER_MISMATCH<br>Схемы: #/$defs/C20_Request · #/$defs/C20_Response</p></div></section><section class="contract" id="C21"><a class="top-link" href="#top">К списку</a><h2>C21 · Опубликовать готовый лучший ответ</h2><div class="meta"><span>Владелец C</span><code>submission.publish</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Finalizer</div><div class="arrow">POST /v1/submissions/publish →</div><div class="block">Publisher</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c21&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c21&quot;,
+  &quot;payload&quot;: {
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;evaluation_id&quot;: &quot;eval-001&quot;,
+    &quot;candidate_artifact_id&quot;: &quot;art-submission-001&quot;,
+    &quot;validation_report_id&quot;: &quot;outcheck-001&quot;,
+    &quot;candidate_sha256&quot;: &quot;e0decf976d8b07013e498ed23ab8279286c75708f527e8ad8f582a04d0f95368&quot;,
+    &quot;expected_champion_version&quot;: 1
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c21&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;disposition&quot;: &quot;published&quot;,
+    &quot;champion&quot;: {
+      &quot;experiment_id&quot;: &quot;exp-001&quot;,
+      &quot;evaluation_id&quot;: &quot;eval-001&quot;,
+      &quot;primary_metric&quot;: {
+        &quot;metric_id&quot;: &quot;f1_macro&quot;,
+        &quot;direction&quot;: &quot;maximize&quot;,
+        &quot;value&quot;: 0.714,
+        &quot;validation_id&quot;: &quot;validation-v1&quot;,
+        &quot;dataset_id&quot;: &quot;dataset-demo-v1&quot;,
+        &quot;fidelity&quot;: &quot;full&quot;
+      },
+      &quot;submission_artifact_id&quot;: &quot;art-submission-001&quot;,
+      &quot;output_sha256&quot;: &quot;e0decf976d8b07013e498ed23ab8279286c75708f527e8ad8f582a04d0f95368&quot;,
+      &quot;champion_version&quot;: 2
+    },
+    &quot;output_path&quot;: &quot;/task/submission.csv&quot;,
+    &quot;publication_event_id&quot;: &quot;evt-publish-002&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Единственный Publisher под mutex сравнивает кандидата с текущим опубликованным чемпионом по проверенной основной метрике.</li><li>Сначала проверяются версия, отчёт и hash. Затем уникальный temp в каталоге итогового файла, flush/fsync и os.replace.</li><li>SQLite и filesystem не образуют общую атомарную транзакцию: до replace пишется publish journal, после — champion metadata. Восстановление сверяет hash файла и journal.</li><li>При VERSION_CONFLICT перечитать чемпиона и повторно сравнить; поздний более слабый кандидат не ухудшает ответ.</li><li>Если готового ответа ещё нет, первый валидный baseline допускается независимо от порога улучшения.</li></ul><p class="route-list">Идемпотентность: run_id + candidate sha256<br>Ошибки: VERSION_CONFLICT, CANDIDATE_CHANGED, OUTPUT_WRITE_FAILED, INCOMPARABLE_EVALUATIONS<br>Схемы: #/$defs/C21_Request · #/$defs/C21_Response</p></div></section><section class="contract" id="C22"><a class="top-link" href="#top">К списку</a><h2>C22 · Остановить поиск по бюджету</h2><div class="meta"><span>Владелец A</span><code>orchestrator.control</code><span>Ответ ≤ 10 с</span></div><div class="transition"><div class="block">BudgetMonitor</div><div class="arrow">POST /v1/runs/control →</div><div class="block">Orchestrator</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c22&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c22&quot;,
+  &quot;payload&quot;: {
+    &quot;action&quot;: &quot;stop_search&quot;,
+    &quot;reason&quot;: &quot;finalization_reserve_reached&quot;,
+    &quot;wall_seconds_remaining&quot;: 1200,
+    &quot;cancel_job_ids&quot;: []
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c22&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;run_state&quot;: &quot;finalizing&quot;,
+    &quot;new_experiments_allowed&quot;: false,
+    &quot;published_champion_present&quot;: true,
+    &quot;active_job_ids&quot;: [
+      &quot;job-refit-001&quot;
+    ]
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Монитор работает без LLM. Запас на финализацию оценивается по длительности fit/predict плюс запас на запись, а не навсегда фиксированные 20 минут.</li><li>stop_search запрещает новые эксперименты; cancel_jobs вызывает C24 и только после подтверждения остановки освобождает lease через C13.</li><li>К моменту жёсткого дедлайна ранний готовый ответ должен уже существовать.</li></ul><p class="route-list">Идемпотентность: action + reason + control epoch<br>Ошибки: UNKNOWN_JOB<br>Схемы: #/$defs/C22_Request · #/$defs/C22_Response</p></div></section><section class="contract" id="C23"><a class="top-link" href="#top">К списку</a><h2>C23 · Завершить запуск</h2><div class="meta"><span>Владелец A</span><code>runtime.finish</code><span>Ответ ≤ 120 с</span></div><div class="transition"><div class="block">Orchestrator</div><div class="arrow">POST /v1/runs/finish →</div><div class="block">Runtime</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c23&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c23&quot;,
+  &quot;payload&quot;: {
+    &quot;reason&quot;: &quot;search_budget_finished&quot;,
+    &quot;require_valid_output&quot;: true
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c23&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;state&quot;: &quot;completed&quot;,
+    &quot;exit_code&quot;: 0,
+    &quot;output_path&quot;: &quot;/task/submission.csv&quot;,
+    &quot;champion_experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;summary_artifact_id&quot;: &quot;art-run-summary&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>До C23 новые задания запрещены, все незавершённые jobs остановлены через C24, активная публикация закончена.</li><li>Runtime проверяет существование и соответствие выходного файла текущему publication record.</li><li>На платформу не вызывается endpoint отправки: процесс завершает работу, платформа читает файл.</li><li>При отсутствии корректного файла ok=false, NO_VALID_SUBMISSION и ненулевой exit code. При доступном baseline и сбое LLM допускается degraded с сохранённым ответом.</li></ul><p class="route-list">Идемпотентность: run_id + finish<br>Ошибки: NO_VALID_SUBMISSION<br>Схемы: #/$defs/C23_Request · #/$defs/C23_Response</p></div></section><section class="contract" id="C24"><a class="top-link" href="#top">К списку</a><h2>C24 · Остановить дерево процессов задания</h2><div class="meta"><span>Владелец A</span><code>runner.cancel</code><span>Ответ ≤ 15 с</span></div><div class="transition"><div class="block">Orchestrator / Finalizer</div><div class="arrow">POST /v1/jobs/cancel →</div><div class="block">Runner</div></div><div class="body-grid"><div><h3>JSON запроса</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c24&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;idempotency_key&quot;: &quot;key-c24&quot;,
+  &quot;payload&quot;: {
+    &quot;job_id&quot;: &quot;job-train-001&quot;,
+    &quot;experiment_id&quot;: &quot;exp-001&quot;,
+    &quot;attempt_no&quot;: 1,
+    &quot;fencing_token&quot;: 1,
+    &quot;reason&quot;: &quot;search_deadline_reached&quot;,
+    &quot;terminal_state&quot;: &quot;cancelled&quot;,
+    &quot;grace_seconds&quot;: 5
+  }
+}</pre></div><div><h3>JSON ответа</h3><pre>{
+  &quot;schema_version&quot;: &quot;1.0&quot;,
+  &quot;request_id&quot;: &quot;req-c24&quot;,
+  &quot;run_id&quot;: &quot;run-demo-001&quot;,
+  &quot;ok&quot;: true,
+  &quot;data&quot;: {
+    &quot;job_id&quot;: &quot;job-train-001&quot;,
+    &quot;disposition&quot;: &quot;stopped&quot;,
+    &quot;terminal_state&quot;: &quot;cancelled&quot;,
+    &quot;process_tree_stopped&quot;: true,
+    &quot;remaining_processes&quot;: 0,
+    &quot;completion_event_id&quot;: &quot;evt-job-train-001-cancelled&quot;
+  },
+  &quot;error&quot;: null
+}</pre></div></div><div class="rules"><h3>Инварианты</h3><ul><li>Проверяется token нужной попытки; остановка допустима и после истечения её lease, если процесс ещё существует.</li><li>Сначала мягкая остановка группы процессов, затем принудительная в пределах дедлайна. Ответ stopped допустим только после подтверждения завершения дочерних процессов.</li><li>Терминальное событие доставляется по C15 с тем же completion_event_id. Только после подтверждения остановки BudgetManager освобождает ресурсы через C13 release.</li><li>Повторный cancel завершённого задания возвращает already_stopped и фактический terminal_state, без изменения истории.</li></ul><p class="route-list">Идемпотентность: job_id + attempt_no + terminal state<br>Ошибки: UNKNOWN_JOB, STALE_LEASE, PROCESS_STOP_FAILED<br>Схемы: #/$defs/C24_Request · #/$defs/C24_Response</p></div></section></main></body></html>

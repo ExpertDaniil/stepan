@@ -2,6 +2,8 @@ import hashlib
 import uuid
 
 from agent.contracts import canonical
+from agent.catalog import factory_source
+from agent.errors import AgentError
 from tools.code import write_code
 
 
@@ -14,13 +16,19 @@ class Researcher:
         if not payload["budget"]["search_allowed"]:
             return {"proposal_id": "proposal-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                     "plan": None, "decision": "stop", "stop_reason": "No search time remains"}
+        catalog_mode = self.config.research_mode == "catalog"
+        context = self.artifacts.read_json(payload["context_id"])
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
-                                        "response_schema_id": "ResearchProposal-v1", "tool_schema_ids": ["write_code"],
+                                        "response_schema_id": "ResearchChoice-v1" if catalog_mode else "ResearchProposal-v1",
+                                        "tool_schema_ids": [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
-                                        "deadline_seconds": self.config.llm_timeout_seconds, "attempt_limit": 3}, self.gateway.complete)["data"]
+                                        "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
+        if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
+            raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
         params = self.catalog.normalize(proposed["recipe_id"], proposed["hyperparameters"])
-        args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": proposed["code"], "declared_entrypoint": "make_pipeline"}
+        source = factory_source(proposed["recipe_id"]) if catalog_mode else proposed["code"]
+        args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
         code = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
                              key="code/" + hashlib.sha256(canonical(args).encode()).hexdigest())["data"]["artifact"]
         plan = {"plan_id": "plan-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
@@ -29,12 +37,13 @@ class Researcher:
                 "task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
                 "validation_id": self.validation_id, "seed": self.config.seed, "fidelity": "full",
                 "model": {"family": self.catalog.recipes[proposed["recipe_id"]]["family"], "hyperparameters": params},
-                "feature_steps": proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
+                "feature_steps": self.catalog.feature_steps(params) if catalog_mode else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
                 "resources": {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                               "timeout_seconds": self.config.experiment_timeout_seconds}}
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)
         self.log.event("research.hypothesis_proposed", researcher_id=payload["researcher_id"],
                        context_id=payload["context_id"], model_output_artifact_id=answer["output_artifact_id"],
-                       hypothesis=plan["hypothesis"], expected_effect=plan["expected_effect"], recipe_id=plan["recipe_id"])
+                       hypothesis=plan["hypothesis"], expected_effect=plan["expected_effect"], recipe_id=plan["recipe_id"],
+                       hyperparameters=params, source_mode=self.config.research_mode, code_artifact_id=code["artifact_id"])
         return {"proposal_id": "proposal-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                 "plan": plan, "decision": "propose", "stop_reason": None}

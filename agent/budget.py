@@ -13,6 +13,11 @@ class Budget:
         self.leases = {}
         self.token = 0
         self.calls = 0
+        self.output_tokens_charged = 0
+        self.output_tokens_reported = 0
+        self.input_tokens_reported = 0
+        self.cached_tokens_reported = 0
+        self.pending_llm_tokens = {}
         self.last_train_duration = 0.0
         self.search_stopped = False
         self.lock = threading.RLock()
@@ -40,6 +45,39 @@ class Budget:
                 raise AgentError("BUDGET_EXHAUSTED", "LLM budget exhausted")
             self.calls += 1
             return self.calls
+
+    def begin_llm_call(self, max_tokens):
+        """Reserve per-run token capacity and one API attempt atomically."""
+        with self.lock:
+            available = self.config.llm_max_total_output_tokens - self.output_tokens_charged - sum(self.pending_llm_tokens.values())
+            if max_tokens > available:
+                raise AgentError("BUDGET_EXHAUSTED", "Per-run output token budget cannot reserve this request",
+                                 details={"requested": max_tokens, "available": max(0, available)})
+            call_no = self.llm_call()
+            self.pending_llm_tokens[call_no] = max_tokens
+            return call_no
+
+    def finish_llm_call(self, call_no, usage=None):
+        with self.lock:
+            reserved = self.pending_llm_tokens.pop(call_no, None)
+            if reserved is None:
+                return
+            usage = usage or {}
+            def count(value):
+                return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+            output = count(usage.get("completion_tokens"))
+            self.output_tokens_charged += reserved if output is None else output
+            self.output_tokens_reported += output or 0
+            self.input_tokens_reported += count(usage.get("prompt_tokens")) or 0
+            self.cached_tokens_reported += count((usage.get("prompt_tokens_details") or {}).get("cached_tokens")) or 0
+
+    def token_snapshot(self):
+        with self.lock:
+            reserved = sum(self.pending_llm_tokens.values())
+            return {"output_limit": self.config.llm_max_total_output_tokens, "output_charged": self.output_tokens_charged,
+                    "output_reported": self.output_tokens_reported, "output_reserved": reserved,
+                    "output_available": max(0, self.config.llm_max_total_output_tokens - self.output_tokens_charged - reserved),
+                    "input_reported": self.input_tokens_reported, "cached_input_reported": self.cached_tokens_reported}
 
     def lease(self, payload):
         with self.lock:

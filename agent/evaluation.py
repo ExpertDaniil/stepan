@@ -11,6 +11,7 @@ class Evaluator:
     def __init__(self, spec, artifacts, store, log):
         self.spec, self.artifacts, self.store, self.log = spec, artifacts, store, log
         self.protocols = {}
+        self.baseline_value = None
 
     def create_protocol(self, payload):
         import numpy as np
@@ -70,6 +71,9 @@ class Evaluator:
         valid_art = self.artifacts.write_json(f"validation/{ident}.valid.json", b, "split_valid")
         self.artifacts.write_json(f"validation/{ident}.protocol.json", protocol, "validation_protocol")
         self.protocols[ident] = protocol
+        self.log.event("validation.created", validation_id=ident, strategy=strategy, parameters=params,
+                       metric_id=self.spec["metric"]["metric_id"], direction=self.spec["metric"]["direction"],
+                       train_rows=len(a), validation_rows=len(b), protocol_sha256=sha, reason=proposal["reason"])
         return {"validation_id": ident, "train_rows_artifact_id": train_art["artifact_id"],
                 "valid_rows_artifact_id": valid_art["artifact_id"], "labels_visibility": "evaluator_only",
                 "metric": self.spec["metric"], "protocol_sha256": sha}
@@ -105,12 +109,26 @@ class Evaluator:
             value = accuracy_score(y, prediction) if key == "accuracy" else f1_score(y, prediction, average="macro" if key == "f1_macro" else "weighted", labels=self.spec["allowed_labels"], zero_division=0)
         if not math.isfinite(float(value)):
             raise AgentError("METRIC_FAILED", "Metric is not finite")
-        diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json",
-                                         {"rows": len(frame), "metric_id": key, "score": float(value)}, "diagnostics")
+        experiment = self.store.get(payload["experiment_id"])
+        if experiment["plan"]["model"]["family"] == "dummy" and self.baseline_value is None:
+            self.baseline_value = float(value)
+        direction = self.spec["metric"]["direction"]
+        improvement = ((self.baseline_value-float(value)) if direction == "minimize" else (float(value)-self.baseline_value)) if self.baseline_value is not None else None
+        diagnostics = {"rows": len(frame), "metric_id": key, "direction": direction, "score": float(value),
+                       "baseline_score": self.baseline_value, "improvement_over_baseline": improvement,
+                       "improvement_percent": 100*improvement/abs(self.baseline_value) if self.baseline_value and improvement is not None else None}
+        if self.spec["task_kind"] == "regression":
+            errors = np.abs(np.asarray(y, dtype=float)-prediction)
+            diagnostics.update(mae=float(mean_absolute_error(y, prediction)), target_mean=float(np.mean(y)),
+                               target_std=float(np.std(y)), absolute_error_p50=float(np.quantile(errors, 0.5)),
+                               absolute_error_p90=float(np.quantile(errors, 0.9)))
+        diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json", diagnostics, "diagnostics")
         record = {"evaluation_id": "eval-" + uuid.uuid4().hex[:12], "experiment_id": payload["experiment_id"], "valid": True,
                   "primary_metric": {"metric_id": key, "direction": self.spec["metric"]["direction"], "value": float(value),
                                      "validation_id": payload["validation_id"], "dataset_id": payload["dataset_id"], "fidelity": payload["fidelity"]},
                   "diagnostics_artifact_id": diag["artifact_id"], "violations": []}
         self.store.save_evaluation(record)
-        self.log.event("experiment.evaluated", experiment_id=payload["experiment_id"], score=float(value), metric_id=key)
+        self.log.event("experiment.evaluated", experiment_id=payload["experiment_id"], recipe_id=experiment["plan"]["recipe_id"],
+                       hyperparameters=experiment["plan"]["model"]["hyperparameters"], validation_id=payload["validation_id"],
+                       diagnostics_artifact_id=diag["artifact_id"], **diagnostics)
         return {"evaluation": record}

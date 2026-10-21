@@ -1,9 +1,10 @@
 test_all_original_contract_examples (test_contracts.ContractTests.test_all_original_contract_examples) ... ok
 test_concurrent_idempotent_call_executes_once (test_contracts.ContractTests.test_concurrent_idempotent_call_executes_once) ... ok
 test_nonfinite_and_extra_fields_rejected (test_contracts.ContractTests.test_nonfinite_and_extra_fields_rejected) ... ok
-test_reused_key_with_different_payload_fails (test_contracts.ContractTests.test_reused_key_with_different_payload_fails) ... 2026-10-21T17:06:46.649+00:00 ERROR contract.failed contract_id=C00 code=IDEMPOTENCY_CONFLICT message=Idempotency key reused with a different payload duration_ms=0.4
+test_reused_key_with_different_payload_fails (test_contracts.ContractTests.test_reused_key_with_different_payload_fails) ... 2026-10-21T18:14:29.133+00:00 ERROR [unit-run] contract.failed contract_id=C00 request_id=req-7ebf31a3aff74643 sender=CLI receiver=Runtime endpoint=POST /v1/runs code=IDEMPOTENCY_CONFLICT message=Idempotency key reused with a different payload retryable=False details={} duration_ms=0.4
 ok
 test_binary_task (test_end_to_end.EndToEndTests.test_binary_task) ... ok
+test_catalog_warmup_trains_before_llm_research (test_end_to_end.EndToEndTests.test_catalog_warmup_trains_before_llm_research) ... ok
 test_classification_full_research_loop (test_end_to_end.EndToEndTests.test_classification_full_research_loop) ... ok
 test_daily_budget_after_baseline_retains_output (test_end_to_end.EndToEndTests.test_daily_budget_after_baseline_retains_output) ... ok
 test_flat_platform_copy_runs_research_without_repository_path (test_end_to_end.EndToEndTests.test_flat_platform_copy_runs_research_without_repository_path) ... ok
@@ -24,11 +25,28 @@ test_changed_official_requirements_are_rejected (test_packaging.PackagingTests.t
 test_flat_archive_is_reproducible_and_contains_only_owned_runtime (test_packaging.PackagingTests.test_flat_archive_is_reproducible_and_contains_only_owned_runtime) ... ok
 test_invalid_build_preserves_previous_archive (test_packaging.PackagingTests.test_invalid_build_preserves_previous_archive) ... ok
 test_cancel_stops_parent_and_grandchild_before_release (test_processes.ProcessTests.test_cancel_stops_parent_and_grandchild_before_release) ... ok
-test_failed_spawn_releases_unstarted_lease (test_processes.ProcessTests.test_failed_spawn_releases_unstarted_lease) ... 2026-10-21T17:07:35.538+00:00 ERROR contract.failed contract_id=C14 code=INTERNAL_ERROR message=simulated spawn failure duration_ms=1.5
+test_failed_spawn_releases_unstarted_lease (test_processes.ProcessTests.test_failed_spawn_releases_unstarted_lease) ... 2026-10-21T18:15:44.590+00:00 ERROR [unit-run] contract.failed contract_id=C14 request_id=req-0bb941d224534985 sender=Orchestrator receiver=Runner endpoint=POST /v1/jobs/train code=INTERNAL_ERROR message=simulated spawn failure retryable=False details={} duration_ms=1.5
 ok
-test_timeout_routes_through_cancel_event_and_resource_release (test_processes.ProcessTests.test_timeout_routes_through_cancel_event_and_resource_release) ... ok
+test_timeout_routes_through_cancel_event_and_resource_release (test_processes.ProcessTests.test_timeout_routes_through_cancel_event_and_resource_release) ... 2026-10-21T18:15:46.657+00:00 ERROR [unit-run] job.finished job_id=job-test experiment_id=exp-9f53ef7fe0c4 phase=train state=timed_out duration_seconds=2.0475 peak_memory_mb=0.0 exit_code=-15 error={"code": "JOB_TIMEOUT", "message": "Job or run deadline reached", "retryable": false, "retry_after_seconds": null, "details": {}} stderr_log_path=/tmp/tmpgmc2da6d/run/job/stderr.log
+ok
 test_training_environment_does_not_receive_api_credentials (test_processes.ProcessTests.test_training_environment_does_not_receive_api_credentials) ... ok
 test_worker_has_its_own_memory_watchdog (test_processes.ProcessTests.test_worker_has_its_own_memory_watchdog) ... ok
+test_incomplete_tool_arguments_at_cap_retry_without_executing_tool (test_research_improvements.AdaptiveGatewayTests.test_incomplete_tool_arguments_at_cap_retry_without_executing_tool) ... ok
+test_missing_usage_is_charged_conservatively_without_fabricating_usage (test_research_improvements.AdaptiveGatewayTests.test_missing_usage_is_charged_conservatively_without_fabricating_usage) ... ok
+test_per_request_timeout_is_distinct_from_operation_budget (test_research_improvements.AdaptiveGatewayTests.test_per_request_timeout_is_distinct_from_operation_budget) ... ok
+test_slow_api_emits_progress_without_extra_requests (test_research_improvements.AdaptiveGatewayTests.test_slow_api_emits_progress_without_extra_requests) ... ok
+test_token_reservations_prevent_parallel_overcommit (test_research_improvements.AdaptiveGatewayTests.test_token_reservations_prevent_parallel_overcommit) ... ok
+test_truncation_at_ceiling_is_not_repeated (test_research_improvements.AdaptiveGatewayTests.test_truncation_at_ceiling_is_not_repeated) ... ok
+test_truncation_grows_budget_and_preserves_actual_usage (test_research_improvements.AdaptiveGatewayTests.test_truncation_grows_budget_and_preserves_actual_usage) ... ok
+test_archive_analysis_detects_censored_output_without_reading_csv (test_research_improvements.RecipeAndLoggingTests.test_archive_analysis_detects_censored_output_without_reading_csv) ... ok
+test_catalog_assignments_use_incumbent_and_different_families (test_research_improvements.RecipeAndLoggingTests.test_catalog_assignments_use_incumbent_and_different_families) ... ok
+test_configure_preserves_credentials_unknown_settings_and_supports_dry_run (test_research_improvements.RecipeAndLoggingTests.test_configure_preserves_credentials_unknown_settings_and_supports_dry_run) ... ok
+test_console_shows_state_parameters_tokens_and_redacts_secrets (test_research_improvements.RecipeAndLoggingTests.test_console_shows_state_parameters_tokens_and_redacts_secrets) ... ok
+test_extra_trees_nested_thread_limit_is_enforced (test_research_improvements.RecipeAndLoggingTests.test_extra_trees_nested_thread_limit_is_enforced) ... ok
+test_histogram_recipe_has_valid_parameters_and_runs (test_research_improvements.RecipeAndLoggingTests.test_histogram_recipe_has_valid_parameters_and_runs) ... ok
+test_invalid_nested_estimator_is_rejected_before_fit (test_research_improvements.RecipeAndLoggingTests.test_invalid_nested_estimator_is_rejected_before_fit) ... ok
+test_json_console_preserves_all_structured_fields (test_research_improvements.RecipeAndLoggingTests.test_json_console_preserves_all_structured_fields) ... ok
+test_target_transform_uses_fit_labels_and_returns_original_units (test_research_improvements.RecipeAndLoggingTests.test_target_transform_uses_fit_labels_and_returns_original_units) ... ok
 test_comparison_rejects_different_protocol (test_store.StoreTests.test_comparison_rejects_different_protocol) ... ok
 test_duplicate_and_stale_job_events (test_store.StoreTests.test_duplicate_and_stale_job_events) ... ok
 test_duplicate_plan_ignores_researcher_and_plan_id (test_store.StoreTests.test_duplicate_plan_ignores_researcher_and_plan_id) ... ok
@@ -59,6 +77,6 @@ test_group_holdout_keeps_groups_disjoint (test_validation.ValidationTests.test_g
 test_temporal_holdout_preserves_complete_periods (test_validation.ValidationTests.test_temporal_holdout_preserves_complete_periods) ... ok
 
 ----------------------------------------------------------------------
-Ran 57 tests in 51.866s
+Ran 74 tests in 79.630s
 
 OK

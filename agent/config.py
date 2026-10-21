@@ -32,13 +32,21 @@ class Config:
     train_cpu_threads: int = 3
     train_memory_mb: int = 10240
     experiment_timeout_seconds: int = 600
-    max_research_experiments: int = 4
-    llm_max_calls: int = 24
-    llm_timeout_seconds: int = 90
-    llm_max_output_tokens: int = 4096
+    max_research_experiments: int = 12
+    catalog_warmup_experiments: int = 4
+    research_mode: str = "catalog"
+    llm_max_calls: int = 32
+    llm_timeout_seconds: int = 600
+    llm_operation_timeout_seconds: int = 1200
+    llm_max_output_tokens: int = 16384
+    llm_bootstrap_output_tokens: int = 4096
+    llm_max_output_tokens_limit: int = 32768
+    llm_max_total_output_tokens: int = 262144
+    llm_progress_seconds: int = 15
     max_context_tokens: int = 16000
     log_level: str = "INFO"
     log_model_io: bool = True
+    console_format: str = "human"
     work_dir: Path = Path("runs")
     seed: int = 42
 
@@ -54,18 +62,30 @@ class Config:
             train_cpu_threads=integer("TRAIN_CPU_THREADS", 3, 1, 3),
             train_memory_mb=integer("TRAIN_MEMORY_MB", 10240, 256, 10240),
             experiment_timeout_seconds=integer("EXPERIMENT_TIMEOUT_SECONDS", 600, 1, 3600),
-            max_research_experiments=integer("MAX_RESEARCH_EXPERIMENTS", 4, 0, 100),
-            llm_max_calls=integer("LLM_MAX_CALLS", 24, 1, 1000),
-            llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 90, 1, 600),
-            llm_max_output_tokens=integer("LLM_MAX_OUTPUT_TOKENS", 4096, 128, 16000),
+            max_research_experiments=integer("MAX_RESEARCH_EXPERIMENTS", 12, 0, 100),
+            catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
+            research_mode=os.environ.get("RESEARCH_MODE", "catalog"),
+            llm_max_calls=integer("LLM_MAX_CALLS", 32, 1, 1000),
+            llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 600, 1, 1800),
+            llm_operation_timeout_seconds=integer("LLM_OPERATION_TIMEOUT_SECONDS", 1200, 1, 3600),
+            llm_max_output_tokens=integer("LLM_MAX_OUTPUT_TOKENS", 16384, 128, 131072),
+            llm_bootstrap_output_tokens=integer("LLM_BOOTSTRAP_OUTPUT_TOKENS", 4096, 128, 131072),
+            llm_max_output_tokens_limit=integer("LLM_MAX_OUTPUT_TOKENS_LIMIT", 32768, 128, 131072),
+            llm_max_total_output_tokens=integer("LLM_MAX_TOTAL_OUTPUT_TOKENS", 262144, 1024, 4000000),
+            llm_progress_seconds=integer("LLM_PROGRESS_SECONDS", 15, 1, 60),
             max_context_tokens=integer("MAX_CONTEXT_TOKENS", 16000, 1000, 32768),
             log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
             log_model_io=boolean("LOG_MODEL_IO", True),
+            console_format=os.environ.get("CONSOLE_LOG_FORMAT", "human"),
             work_dir=Path(work_dir or os.environ.get("WORK_DIR", "runs")).resolve(),
             seed=integer("SEED", 42, 0, 2**31 - 1),
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
+        if cfg.research_mode not in {"catalog", "code"} or cfg.console_format not in {"human", "json"}:
+            raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
+        if max(cfg.llm_max_output_tokens, cfg.llm_bootstrap_output_tokens) > cfg.llm_max_output_tokens_limit:
+            raise AgentError("INVALID_CONFIG", "Initial output token limits must not exceed LLM_MAX_OUTPUT_TOKENS_LIMIT")
         return cfg
 
     def public_dict(self):

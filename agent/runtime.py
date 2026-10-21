@@ -109,7 +109,10 @@ def bootstrap(config, started, task_path, run_id, root, log):
                     "champion_experiment_id": champion["experiment_id"], "summary_artifact_id": art["artifact_id"]}
 
         result = bus.call("C23", {"reason": "research_finished", "require_valid_output": True}, finish, key=run_id + "/finish")["data"]
-        log.event("run.finished", state=result["state"], output_path=result["output_path"], run_directory=str(root))
+        log.event("run.finished", level="WARNING" if result["state"] == "degraded" else "INFO", state=result["state"],
+                  output_path=result["output_path"], run_directory=str(root), token_budget=budget.token_snapshot(),
+                  metric_id=submission.require_output()["primary_metric"]["metric_id"],
+                  score=submission.require_output()["primary_metric"]["value"])
         return 0
     except BaseException as exc:
         if controller:
@@ -131,6 +134,8 @@ def write_summary(root, store, budget, config, champion, state):
     lines = ["# Run report\n", f"State: {state}\n", f"Run: {store.run_id}\n", f"LLM mode: {config.llm_mode}\n",
              f"Elapsed seconds: {time.monotonic() - budget.started:.2f}\n", f"LLM requests: {budget.calls}\n",
              f"Published experiment: {champion['experiment_id']}\n", f"Published metric: {champion['primary_metric']['value']}\n",
+             f"Metric: {champion['primary_metric']['metric_id']} ({champion['primary_metric']['direction']})\n",
+             f"Research mode: {config.research_mode}\n", f"Token accounting: {json.dumps(budget.token_snapshot())}\n",
              "\n| Experiment | State | Recipe | Metric | Hypothesis |\n|---|---|---|---|---|\n"]
     for row in rows:
         plan = json.loads(row["plan"])
@@ -163,7 +168,7 @@ def main(argv=None, *, started_monotonic=None):
     root = config.work_dir / run_id
     root.mkdir(parents=True, exist_ok=False, mode=0o700)
     log = RunLogger(root, run_id, level=config.log_level, log_model_io=config.log_model_io,
-                    secrets=[os.environ.get("OPENAI_API_KEY", "")])
+                    secrets=[os.environ.get("OPENAI_API_KEY", "")], console_format=config.console_format)
     previous = None
     if threading_is_main():
         previous = signal.getsignal(signal.SIGTERM)

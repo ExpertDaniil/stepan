@@ -26,7 +26,7 @@ class Catalog:
         for tool in tools:
             markdown += "## " + tool["name"] + "\n\n" + tool["description"] + "\n\n```json\n" + json.dumps(tool["input_schema"], indent=2) + "\n```\n\n"
         art = artifacts.write_text("task/TOOLS.md", markdown, "tools_catalog", "text/markdown")
-        return {"catalog_version": "recipes-v1", "recipe_ids": list(self.recipes), "tools_catalog_version": "tools-v1",
+        return {"catalog_version": "recipes-v2", "recipe_ids": list(self.recipes), "tools_catalog_version": "tools-v1",
                 "tools_markdown_artifact_id": art["artifact_id"], "tools": tools}
 
     def normalize(self, recipe_id, params):
@@ -60,6 +60,35 @@ class Catalog:
         if artifacts.meta(plan["code_artifact_id"])["kind"] != "python_source":
             raise AgentError("INVALID_PLAN", "Expected a Python code artifact")
         return plan
+
+    @staticmethod
+    def feature_steps(params):
+        return ([{"step": "target_transform", "name": "shifted_log1p", "fit_scope": "train_only"}]
+                if params.get("target_transform") == "shifted_log1p" else [])
+
+    def assignment_recipes(self, assignment, recent):
+        usable = [key for key, value in self.recipes.items() if value["family"] != "dummy"]
+        # Snapshot order is recent-first; the dispatcher supplies the incumbent
+        # separately in the assignment context when available.
+        focus = next((row.get("recipe_id") for row in recent if row.get("is_incumbent") and row.get("recipe_id") in usable), None)
+        focus = focus or next((key for key in usable if key.startswith("catboost-")), usable[0])
+        if assignment == "exploit_incumbent":
+            return [focus]
+        alternatives = [key for key in usable if self.recipes[key]["family"] != self.recipes[focus]["family"]]
+        return alternatives or usable
+
+    def warmup_choices(self):
+        suffix = "regressor-v1" if self.kind == "regression" else "classifier-v1"
+        choices = []
+        for family in ("catboost", "hist-gradient", "extra-trees", "linear"):
+            key = family + "-" + suffix
+            if key not in self.recipes:
+                continue
+            variants = ["identity", "shifted_log1p"] if self.kind == "regression" and family in {"catboost", "hist-gradient"} else ["identity"]
+            for transform in variants:
+                params = {"target_transform": transform} if "target_transform" in self.recipes[key]["parameters"] else {}
+                choices.append((key, self.normalize(key, params)))
+        return choices
 
 
 def factory_source(recipe_id):

@@ -74,11 +74,21 @@ class MockTransport:
             researcher = context["metadata"]["researcher_id"]
             preferred = "linear-" if researcher == "researcher-1" else "hist-gradient-"
             recipe = next((x for x in choices if x.startswith(preferred)), choices[0])
-            params = {"alpha": 1.0 + round_no} if "regressor" in recipe and recipe.startswith("linear-") else {"C": 1.0 / (round_no + 1)} if recipe.startswith("linear-") else {"max_iter": 40 + 10 * round_no}
+            if recipe.startswith("linear-"):
+                params = {"alpha": 1.0+round_no} if "regressor" in recipe else {"C": 1.0/(round_no+1)}
+            elif recipe.startswith("catboost-"):
+                params = {"iterations": 100+20*round_no}
+            elif recipe.startswith(("random-forest-", "extra-trees-")):
+                params = {"n_estimators": 60+10*round_no}
+            else:
+                params = {"max_iter": 40+10*round_no}
             payload = {"recipe_id": recipe, "hyperparameters": params,
                        "hypothesis": "Check a catalogue alternative against the recorded incumbent on the same split.",
                        "expected_effect": "An evidence-based comparison; improvement is not assumed.",
                        "feature_steps": [], "code": factory_source(recipe)}
+            if purpose == "ResearchChoice-v1":
+                payload.pop("feature_steps")
+                payload.pop("code")
         return {"id": "mock-" + uuid.uuid4().hex[:12],
                 "choices": [{"message": {"role": "assistant", "content": json.dumps(payload, ensure_ascii=False)}, "finish_reason": "stop"}]}
 
@@ -99,6 +109,75 @@ class Gateway:
             raise AgentError("LLM_BUDGET_EXHAUSTED", "The shared provider key budget is exhausted; reset is at 03:00 MSK",
                              details={"reset_time_msk": "03:00", "daily_key_limit_rub": 600})
 
+    def _progress(self, done, call_no, purpose, started, timeout):
+        while not done.wait(self.config.llm_progress_seconds):
+            self.log.event("llm.waiting", call_no=call_no, purpose=purpose,
+                           elapsed_seconds=round(time.monotonic() - started, 1), request_timeout_seconds=round(timeout, 1),
+                           run_seconds_remaining=round(self.budget.remaining(), 1))
+
+    def _request(self, request, context, payload, attempt, deadline):
+        from contextvars import copy_context
+        timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
+        if timeout < 1:
+            raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
+        self.check_daily_budget()
+        call_no = self.budget.begin_llm_call(request["max_tokens"])
+        settled = False
+        started = time.monotonic()
+        done = threading.Event()
+        progress = threading.Thread(target=copy_context().run,
+            args=(self._progress, done, call_no, payload["purpose"], started, timeout), daemon=True)
+        try:
+            if self.log.log_model_io:
+                self.log.snapshot(f"llm/{call_no:04d}.request.json", request)
+            self.log.event("llm.call_started", call_no=call_no, attempt=attempt, purpose=payload["purpose"],
+                           model=request["model"], max_output_tokens=request["max_tokens"],
+                           request_timeout_seconds=round(timeout, 1), operation_seconds_remaining=round(deadline-time.monotonic(), 1),
+                           context_artifact_id=payload["context_artifact_id"], mode=self.config.llm_mode,
+                           destination=self._destination(), token_budget=self.budget.token_snapshot())
+            progress.start()
+            response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
+            token_data = response.get("usage") or {}
+            self.budget.finish_llm_call(call_no, token_data)
+            settled = True
+            if self.log.log_model_io:
+                self.log.snapshot(f"llm/{call_no:04d}.response.json", response)
+            choice = (response.get("choices") or [{}])[0]
+            message = choice.get("message") or {}
+            output = token_data.get("completion_tokens")
+            reasoning = (token_data.get("completion_tokens_details") or {}).get("reasoning_tokens")
+            self.log.event("llm.call_completed", call_no=call_no, attempt=attempt, purpose=payload["purpose"],
+                           duration_ms=round((time.monotonic()-started)*1000, 1), finish_reason=choice.get("finish_reason"),
+                           content_chars=len(message.get("content") or ""), tool_calls=len(message.get("tool_calls") or []),
+                           input_tokens=token_data.get("prompt_tokens"), output_tokens=output, reasoning_tokens=reasoning,
+                           cached_input_tokens=(token_data.get("prompt_tokens_details") or {}).get("cached_tokens"),
+                           usage_inconsistent=isinstance(reasoning, int) and isinstance(output, int) and reasoning > output,
+                           token_budget=self.budget.token_snapshot())
+            return response, call_no
+        except AgentError:
+            raise
+        except Exception as exc:
+            status = getattr(exc, "status_code", None)
+            body = str(exc) + " " + json.dumps(getattr(exc, "body", None), default=str)
+            if "budget has been exceeded" in body.casefold():
+                self.daily_budget_exhausted.set()
+                self.log.event("llm.daily_budget_exhausted", level="WARNING", call_no=call_no,
+                               status_code=status, reset_time_msk="03:00", daily_key_limit_rub=600)
+                self.check_daily_budget()
+            retryable = status == 429 or status is None or (isinstance(status, int) and status >= 500)
+            error = AgentError("LLM_RATE_LIMIT" if status == 429 else "LLM_UNAVAILABLE", str(exc), retryable=retryable)
+            self.log.event("llm.call_failed", level="WARNING", call_no=call_no, code=error.code, message=str(exc),
+                           attempt=attempt, status_code=status, retryable=retryable)
+            raise error from exc
+        finally:
+            done.set()
+            if progress.ident is not None:
+                progress.join(timeout=0.2)
+            if not settled:
+                # A timed-out request may have been billed without returning usage.
+                # Charge its reservation conservatively; never fabricate reported usage.
+                self.budget.finish_llm_call(call_no)
+
     def complete(self, payload):
         context = self.artifacts.read_json(payload["context_artifact_id"])
         messages = deepcopy(context["messages"])
@@ -115,95 +194,90 @@ class Gateway:
         if "write_code" in payload["tool_schema_ids"]:
             tools.append({"type": "function", "function": {
                 "name": "write_code", "description": "Save Python source exporting make_pipeline(task_spec, params).",
-                "parameters": self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"]}})
+                "parameters": expanded(self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"])}})
+        token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
-        calls = []
-        last_error = None
-        last_art = None
+        calls, last_error = [], None
         completion_id = "completion-" + uuid.uuid4().hex[:12]
         for attempt in range(1, payload["attempt_limit"] + 1):
             self.check_daily_budget()
-            left = deadline - time.monotonic()
-            if left <= 0:
-                raise AgentError("LLM_UNAVAILABLE", "LLM operation deadline reached")
+            left = deadline-time.monotonic()
+            if left < 1:
+                raise AgentError("LLM_OPERATION_TIMEOUT", "LLM operation deadline reached before a new attempt")
             if not self.semaphore.acquire(timeout=left):
-                raise AgentError("LLM_UNAVAILABLE", "Timed out waiting for LLM concurrency slot")
+                raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
-                self.check_daily_budget()
-                left = deadline - time.monotonic()
-                if left <= 0:
-                    raise AgentError("BUDGET_EXHAUSTED", "Deadline reached while waiting for API slot")
-                call_no = self.budget.llm_call()
-                request = {"model": request_model(self.config.llm_mode), "messages": messages,
-                           "max_tokens": payload["max_output_tokens"]}
+                request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
                 if tools:
                     request.update(tools=tools, parallel_tool_calls=False)
-                if self.log.log_model_io:
-                    self.log.snapshot(f"llm/{call_no:04d}.request.json", request)
-                self.log.event("llm.call_started", call_no=call_no, purpose=payload["purpose"],
-                               context_artifact_id=payload["context_artifact_id"], mode=self.config.llm_mode,
-                               destination=self._destination())
-                started = time.monotonic()
-                response = self.transport.complete(request, max(0.1, min(left, self.config.llm_timeout_seconds)), context)
-                if self.log.log_model_io:
-                    self.log.snapshot(f"llm/{call_no:04d}.response.json", response)
-                completion_id = response.get("id", completion_id)
-                token_data = response.get("usage", {})
-                for dst, src in [("input_tokens", "prompt_tokens"), ("output_tokens", "completion_tokens")]:
-                    if isinstance(token_data.get(src), int):
-                        usage[dst] = (usage[dst] or 0) + token_data[src]
-                self.log.event("llm.call_completed", call_no=call_no, duration_ms=round((time.monotonic() - started) * 1000, 1), usage=usage)
-            except AgentError:
-                raise
-            except Exception as exc:
-                status = getattr(exc, "status_code", None)
-                body = str(exc) + " " + json.dumps(getattr(exc, "body", None), default=str)
-                if "budget has been exceeded" in body.casefold():
-                    self.daily_budget_exhausted.set()
-                    self.log.event("llm.call_failed", level="WARNING", code="LLM_BUDGET_EXHAUSTED",
-                                   message="The shared provider daily key budget is exhausted", attempt=attempt,
-                                   status_code=status, retryable=False)
-                    self.log.event("llm.daily_budget_exhausted", level="WARNING", status_code=status,
-                                   reset_time_msk="03:00", daily_key_limit_rub=600)
-                    self.check_daily_budget()
-                retryable = status == 429 or status is None or (isinstance(status, int) and status >= 500)
-                last_error = AgentError("LLM_RATE_LIMIT" if status == 429 else "LLM_UNAVAILABLE", str(exc), retryable=retryable)
-                self.log.event("llm.call_failed", level="WARNING", code=last_error.code, message=str(exc),
-                               attempt=attempt, status_code=status, retryable=retryable)
-                if not retryable or attempt == payload["attempt_limit"]:
-                    raise last_error from exc
-                delay = min(2 ** (attempt - 1), max(0, deadline - time.monotonic() - 0.1))
+                response, call_no = self._request(request, context, payload, attempt, deadline)
+            except AgentError as exc:
+                if not exc.retryable or attempt == payload["attempt_limit"]:
+                    raise
+                last_error = exc
+                delay = min(2 ** (attempt-1), max(0, deadline-time.monotonic()-1))
+                self.log.event("llm.retry_scheduled", level="WARNING", code=exc.code, attempt=attempt, delay_seconds=delay)
                 time.sleep(delay)
                 continue
             finally:
                 self.semaphore.release()
+            token_data = response.get("usage") or {}
+            completion_id = response.get("id", completion_id)
+            for dst, src in (("input_tokens", "prompt_tokens"), ("output_tokens", "completion_tokens")):
+                value = token_data.get(src)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    usage[dst] = (usage[dst] or 0) + value
+            choice = (response.get("choices") or [{}])[0]
+            finish_reason = choice.get("finish_reason")
+            at_cap = isinstance(token_data.get("completion_tokens"), int) and token_data["completion_tokens"] >= token_limit
             try:
-                message = response["choices"][0]["message"]
+                if finish_reason == "length":
+                    raise ValueError("Generation reached the output token limit")
+                message = choice["message"]
                 if message.get("tool_calls"):
-                    assistant = {k: message[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in message}
-                    messages.append(assistant)
+                    prepared = []
                     for call in message["tool_calls"]:
                         if call["function"]["name"] != "write_code" or not tools:
-                            raise AgentError("INVALID_LLM_OUTPUT", "Unexpected model tool call")
+                            raise ValueError("Unexpected model tool call")
                         args = parse_json(call["function"]["arguments"])
+                        self.bus.schemas._check(args, self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"], "$.tool")
                         if args.get("researcher_id") != context["metadata"].get("researcher_id"):
-                            raise AgentError("INVALID_LLM_OUTPUT", "Tool call uses another researcher's namespace")
-                        result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
-                                               key="code/" + self._digest(args))
+                            raise ValueError("Tool call uses another researcher's namespace")
+                        prepared.append((call, args))
+                    messages.append({k: message[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in message})
+                    for call, args in prepared:
+                        result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
                         calls.append({"call_id": call["id"], "name": "write_code", "request_id": result["request_id"]})
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
+                    last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue
                 parsed = parse_json(message.get("content"))
                 self.bus.schemas._check(parsed, expected, "$")
-                last_art = self.artifacts.write_json("llm/parsed-" + uuid.uuid4().hex[:12] + ".json", parsed, "llm_output")
-                return {"completion_id": completion_id, "output_artifact_id": last_art["artifact_id"],
+                art = self.artifacts.write_json("llm/parsed-"+uuid.uuid4().hex[:12]+".json", parsed, "llm_output")
+                self.log.event("llm.output_validated", call_no=call_no, schema_id=payload["response_schema_id"],
+                               attempts_used=attempt, output_artifact_id=art["artifact_id"])
+                return {"completion_id": completion_id, "output_artifact_id": art["artifact_id"],
                         "parsed_payload": parsed, "tool_calls": calls, "usage": usage, "attempts_used": attempt}
-            except AgentError:
-                raise
             except (ValueError, KeyError, TypeError, IndexError) as exc:
-                last_error = AgentError("INVALID_LLM_OUTPUT", f"Model output did not match {payload['response_schema_id']}: {exc}")
-                self.log.event("llm.output_rejected", level="WARNING", message=str(last_error), attempt=attempt)
-                messages.append({"role": "user", "content": "Return one valid JSON object matching the requested schema. Error: " + str(exc)[:600]})
+                truncated = finish_reason == "length" or at_cap
+                code = "LLM_OUTPUT_TRUNCATED" if truncated else "INVALID_LLM_OUTPUT"
+                last_error = AgentError(code, f"Model output did not match {payload['response_schema_id']}: {exc}")
+                self.log.event("llm.output_truncated" if truncated else "llm.output_rejected", level="WARNING",
+                               call_no=call_no, attempt=attempt, code=code, message=str(last_error), finish_reason=finish_reason,
+                               max_output_tokens=token_limit)
+                if truncated:
+                    new_limit = min(token_limit*2, self.config.llm_max_output_tokens_limit)
+                    if new_limit <= token_limit or attempt == payload["attempt_limit"]:
+                        raise last_error
+                    self.log.event("llm.output_budget_increased", level="WARNING", call_no=call_no,
+                                   previous_limit=token_limit, next_limit=new_limit, reason="truncated_generation")
+                    token_limit = new_limit
+                    messages.append({"role": "user", "content": "Generation was truncated. Return a compact complete final JSON matching the schema; avoid unnecessary code or prose."})
+                else:
+                    content = (choice.get("message") or {}).get("content")
+                    if isinstance(content, str) and content.strip():
+                        messages.append({"role": "assistant", "content": content})
+                    messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
 
     @staticmethod
@@ -219,8 +293,8 @@ class Gateway:
         parsed = urlsplit(os.environ.get("OPENAI_BASE_URL", ""))
         host = parsed.hostname or ""
         if parsed.port:
-            host += ":" + str(parsed.port)
-        return parsed.scheme + "://" + host + parsed.path
+            host += ":"+str(parsed.port)
+        return parsed.scheme+"://"+host+parsed.path
 
     def close(self):
         self.transport.close()

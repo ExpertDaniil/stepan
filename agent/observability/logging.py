@@ -38,12 +38,13 @@ class Redactor:
 
 
 class RunLogger:
-    def __init__(self, root, run_id, *, level="INFO", log_model_io=True, secrets=()):
+    def __init__(self, root, run_id, *, level="INFO", log_model_io=True, secrets=(), console_format="human"):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.run_id = run_id
         self.level = level
         self.log_model_io = log_model_io
+        self.console_format = console_format
         self.redactor = Redactor(secrets)
         self.lock = threading.RLock()
         self.handle = (self.root / "events.jsonl").open("a", encoding="utf-8", buffering=1)
@@ -57,9 +58,19 @@ class RunLogger:
             self.handle.flush()
             ranks = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40}
             if ranks.get(level, 20) >= ranks.get(self.level, 20):
-                short = " ".join(f"{k}={v}" for k, v in record.items()
-                                 if k in {"contract_id", "experiment_id", "job_id", "code", "message", "duration_ms", "score"})
-                print(f"{record['timestamp']} {level} {event} {short[:600]}", file=sys.stderr, flush=True)
+                if self.console_format == "json":
+                    print(line, file=sys.stderr, flush=True)
+                else:
+                    omitted = {"timestamp", "level", "run_id", "event", "trace_id", "span_id", "parent_span_id", "traceback"}
+                    parts = []
+                    for key, value in record.items():
+                        if key in omitted or value is None:
+                            continue
+                        value = json.dumps(value, ensure_ascii=False, default=str) if isinstance(value, (dict, list)) else str(value)
+                        parts.append(key + "=" + value.replace("\n", "\\n")[:1600])
+                    print(f"{record['timestamp']} {level} [{self.run_id}] {event} " + " ".join(parts), file=sys.stderr, flush=True)
+                    if record.get("traceback"):
+                        print(record["traceback"].rstrip(), file=sys.stderr, flush=True)
 
     def snapshot(self, relative, value):
         path = self.root / relative

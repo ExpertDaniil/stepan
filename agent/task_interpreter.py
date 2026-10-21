@@ -17,8 +17,8 @@ class TaskInterpreter:
                     self.gateway.log.redactor.clean({"messages": messages, "metadata": {"schema_id": schema_id, "demo_spec": self.demo}}), "llm_context")
         return self.bus.call("C10", {"purpose": purpose, "context_artifact_id": context["artifact_id"],
                                      "response_schema_id": schema_id, "tool_schema_ids": [],
-                                     "max_output_tokens": self.config.llm_max_output_tokens,
-                                     "deadline_seconds": self.config.llm_timeout_seconds, "attempt_limit": 2}, self.gateway.complete)["data"]["parsed_payload"]
+                                     "max_output_tokens": self.config.llm_bootstrap_output_tokens,
+                                     "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 3}, self.gateway.complete)["data"]["parsed_payload"]
 
     def interpret(self, payload):
         draft = self.ask("TaskDraft-v1", "task_interpretation", "task-interpreter.md",

@@ -25,7 +25,8 @@ from scripts.package_solution import build
 class EndToEndTests(unittest.TestCase):
     def env(self, experiments="2"):
         return {**os.environ, "LLM_MODE": "mock", "TIME_BUDGET_SECONDS": "90", "MAX_RESEARCH_EXPERIMENTS": experiments,
-                "LOG_LEVEL": "ERROR", "MAX_WORKERS": "2", "TRAIN_MEMORY_MB": "10240", "EXPERIMENT_TIMEOUT_SECONDS": "30"}
+                "LOG_LEVEL": "ERROR", "MAX_WORKERS": "2", "TRAIN_MEMORY_MB": "10240", "EXPERIMENT_TIMEOUT_SECONDS": "30",
+                "RESEARCH_MODE": "catalog", "CATALOG_WARMUP_EXPERIMENTS": "0"}
 
     def check_run(self, temp, kind, experiments="2", source=ROOT, platform_copy=False):
         import pandas as pd
@@ -82,12 +83,28 @@ class EndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             self.check_run(temp, "binary", "1")
 
+    def test_catalog_warmup_trains_before_llm_research(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = make_demo(Path(temp) / "task", "regression")
+            settings = {**self.env("6"), "CATALOG_WARMUP_EXPERIMENTS": "4"}
+            with patch.dict(os.environ, settings), redirect_stderr(io.StringIO()):
+                code = main([str(task), "--llm-mode", "mock", "--work-dir", str(Path(temp)/"runs")])
+            self.assertEqual(code, 0)
+            events = [json.loads(line) for line in next((Path(temp)/"runs").glob("run-*/events.jsonl")).read_text().splitlines()]
+            warmup = next(i for i, e in enumerate(events) if e["event"] == "search.catalog_warmup")
+            research = next(i for i, e in enumerate(events) if e["event"] == "research.hypothesis_proposed")
+            self.assertLess(warmup, research)
+            self.assertTrue(any(e["event"] == "experiment.evaluated" for e in events[warmup:research]))
+            self.assertLessEqual(sum(e["event"] == "job.started" and e.get("phase") == "train" for e in events), 7)
+            choices = [json.loads(p.read_text())["payload"] for p in next((Path(temp)/"runs").glob("run-*")).glob("messages/*.request.json")]
+            self.assertTrue(any(p.get("response_schema_id") == "ResearchChoice-v1" and p["tool_schema_ids"] == [] for p in choices))
+
     def test_llm_failure_after_baseline_retains_output(self):
         with tempfile.TemporaryDirectory() as temp:
             task = make_demo(Path(temp) / "task")
             original = MockTransport.complete
             def fail_research(transport, request, timeout, context):
-                if context["metadata"]["schema_id"] == "ResearchProposal-v1":
+                if context["metadata"]["schema_id"] in {"ResearchProposal-v1", "ResearchChoice-v1"}:
                     raise AgentError("LLM_UNAVAILABLE", "simulated API outage")
                 return original(transport, request, timeout, context)
             with patch.dict(os.environ, self.env()), patch.object(MockTransport, "complete", fail_research), redirect_stderr(io.StringIO()):
@@ -129,7 +146,7 @@ class EndToEndTests(unittest.TestCase):
             task = make_demo(Path(temp) / "task")
             original = MockTransport.complete
             def exhaust_budget(transport, request, timeout, context):
-                if context["metadata"]["schema_id"] == "ResearchProposal-v1":
+                if context["metadata"]["schema_id"] in {"ResearchProposal-v1", "ResearchChoice-v1"}:
                     exc = RuntimeError("Budget has been exceeded")
                     exc.status_code = 429
                     raise exc

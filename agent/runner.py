@@ -107,6 +107,13 @@ class Runner:
                 if not chunk:
                     break
                 chunk = self.log.redactor.text(chunk)
+                if chunk.startswith("AUTOML_WORKER "):
+                    try:
+                        fields = json.loads(chunk[len("AUTOML_WORKER "):])
+                        stage = fields.pop("stage")
+                        self.log.event("worker."+stage, job_id=path.parent.name, experiment_id=path.parent.parent.name, **fields)
+                    except (ValueError, KeyError, TypeError):
+                        pass
                 if count < maximum:
                     remaining = maximum - count
                     text = chunk[:remaining]
@@ -161,7 +168,9 @@ class Runner:
             thread.start()
             job.threads.append(thread)
         self.log.event("job.started", job_id=ident, experiment_id=job.experiment_id, phase=phase,
-                       pid=proc.pid, cpu_threads=lease["cpu_threads"], memory_limit_mb=lease["memory_limit_mb"])
+                       pid=proc.pid, cpu_threads=lease["cpu_threads"], memory_limit_mb=lease["memory_limit_mb"],
+                       recipe_id=experiment["plan"]["recipe_id"], hyperparameters=job_spec["hyperparameters"],
+                       timeout_seconds=lease["timeout_seconds"], stderr_log_path=str(directory/"stderr.log"))
         return job
 
     def start_train(self, payload, spec, experiment):
@@ -254,8 +263,9 @@ class Runner:
                  "output_artifact_ids": outputs, "duration_seconds": round(time.monotonic() - job.started, 4),
                  "peak_memory_mb": round(job.peak_memory_mb, 2), "error": err}
         job.event = event
-        self.log.event("job.finished", job_id=job.job_id, experiment_id=job.experiment_id,
-                       state=state, duration_seconds=event["duration_seconds"], peak_memory_mb=event["peak_memory_mb"])
+        self.log.event("job.finished", level="INFO" if state == "succeeded" else "ERROR", job_id=job.job_id, experiment_id=job.experiment_id,
+                       phase=job.phase, state=state, duration_seconds=event["duration_seconds"], peak_memory_mb=event["peak_memory_mb"],
+                       exit_code=job.process.returncode, error=err, stderr_log_path=str(job.directory/"stderr.log"))
         return event
 
     def active(self):

@@ -24,6 +24,7 @@ RESOURCE_FILES = (
     "prompts/task-interpreter.md",
     "prompts/validation.md",
     "prompts/researcher.md",
+    "prompts/researcher-catalog.md",
     "prompts/TOOLS.md",
 )
 

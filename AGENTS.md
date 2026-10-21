@@ -14,3 +14,7 @@
 - Preserve the last verified CSV until a complete better candidate has passed output validation. Stop process groups before releasing resources.
 - Log observable model outputs and short explicit hypotheses; never invent unavailable provider reasoning. Keep secrets redacted.
 - Use focused tests for local changes and scripts/check.py for a release or behavior spanning modules. Record actual verification limits honestly.
+
+- Default research is catalogue-only ResearchChoice-v1. Keep code mode explicit; never silently execute LLM code as a catalogue choice.
+- Per-request and per-operation LLM timeouts are distinct. Treat truncated output separately, reserve concurrent output tokens, and never infer RUB or missing usage from guesses.
+- Keep estimator parameter validation and train-only target transforms covered by meaningful synthetic checks. Do not promise a particular benchmark score from infrastructure tests.

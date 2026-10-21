@@ -67,6 +67,9 @@ class Orchestrator:
             self.cancel_job(job, "Lease heartbeat expired")
             return
         if now - job.last_heartbeat >= 10:
+            self.log.event("job.progress", job_id=job.job_id, experiment_id=job.experiment_id, phase=job.phase,
+                           elapsed_seconds=round(elapsed, 1), timeout_seconds=job.lease["timeout_seconds"],
+                           peak_memory_mb=round(job.peak_memory_mb, 1), run_seconds_remaining=round(self.budget.remaining(), 1))
             self.call("C13", {"operation": "renew", "owner_id": job.experiment_id if job.phase == "train" else job.submission_job_id,
                                "phase": job.phase, "requested": self.resources(job.lease["timeout_seconds"]),
                                "lease_id": job.lease["lease_id"], "fencing_token": job.lease["fencing_token"]}, self.budget.lease)
@@ -157,6 +160,18 @@ class Orchestrator:
                 "model": {"family": "dummy", "hyperparameters": self.catalog.normalize(recipe_id, {})},
                 "feature_steps": [], "code_artifact_id": code["artifact_id"], "resources": self.resources()}
 
+    def warmup_plan(self, recipe_id, params):
+        args = {"researcher_id": "catalog-warmup", "filename": "experiment.py", "content": factory_source(recipe_id), "declared_entrypoint": "make_pipeline"}
+        code = self.call("C11", args, lambda p: write_code(p, self.artifacts))["artifact"]
+        parent = self.store.best()
+        return {"plan_id": "warmup-"+uuid.uuid4().hex[:12], "researcher_id": "catalog-warmup",
+                "parent_ids": [parent] if parent else [], "hypothesis": "Measure a verified catalogue configuration before LLM-guided tuning.",
+                "expected_effect": "Establish measured alternatives on the fixed validation; improvement is not assumed.",
+                "recipe_id": recipe_id, "task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
+                "validation_id": self.validation["validation_id"], "seed": self.config.seed, "fidelity": "full",
+                "model": {"family": self.catalog.recipes[recipe_id]["family"], "hyperparameters": params},
+                "feature_steps": self.catalog.feature_steps(params), "code_artifact_id": code["artifact_id"], "resources": self.resources()}
+
     def finalize_best(self):
         previous = set(self.submission.jobs)
         try:
@@ -223,9 +238,22 @@ class Orchestrator:
         self.submission.require_output()
         self.store.set_run_state("searching")
         accepted = 0
+        choices = self.catalog.warmup_choices()[:min(self.config.catalog_warmup_experiments, self.config.max_research_experiments)]
+        for start in range(0, len(choices), self.config.max_workers):
+            if not self.budget.snapshot()["search_allowed"]:
+                break
+            batch = choices[start:start+self.config.max_workers]
+            self.log.event("search.catalog_warmup", configurations=[{"recipe_id": key, "hyperparameters": params} for key, params in batch])
+            accepted += self.run_training([self.warmup_plan(key, params) for key, params in batch])
+            self.finalize_best()
+        stop_reason = "round_limit"
         for round_no in range(self.config.max_research_experiments + 2):
             if accepted >= self.config.max_research_experiments or not self.budget.snapshot()["search_allowed"]:
+                stop_reason = "experiment_limit" if accepted >= self.config.max_research_experiments else "time_reserve"
                 break
+            self.log.event("search.round_started", round_no=round_no+1, attempted_experiments=accepted,
+                           experiment_limit=self.config.max_research_experiments, budget=self.budget.snapshot(),
+                           token_budget=self.budget.token_snapshot())
             self.context.round_no = round_no
             snapshot = self.call("C07", {"task_spec_id": self.spec["task_spec_id"], "validation_id": self.validation["validation_id"],
                                          "limit_recent": 6, "limit_best": 3}, lambda p: self.store.snapshot(p, self.artifacts))
@@ -251,6 +279,7 @@ class Orchestrator:
                         self.degraded = True
                         self.log.exception("research.proposal_failed", exc)
             if not plans:
+                stop_reason = "no_valid_proposals"
                 break
             try:
                 accepted += self.run_training(plans)
@@ -258,8 +287,11 @@ class Orchestrator:
             except AgentError as exc:
                 self.degraded = True
                 self.log.exception("research.round_failed", exc)
+                stop_reason = "round_failed"
                 break
-        self.call("C22", {"action": "stop_search", "reason": "search_budget_or_rounds_finished",
+        self.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted,
+                       experiment_limit=self.config.max_research_experiments, budget=self.budget.snapshot())
+        self.call("C22", {"action": "stop_search", "reason": stop_reason,
                            "wall_seconds_remaining": int(self.budget.remaining()), "cancel_job_ids": []}, self.control)
         self.cleanup()
         return self.submission.require_output()

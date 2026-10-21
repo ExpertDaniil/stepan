@@ -162,11 +162,16 @@ class Store:
         rows = self.db.execute("SELECT experiment_id,state,plan,fingerprint FROM experiments WHERE run_id=? ORDER BY rowid DESC LIMIT ?",
                                (self.run_id, payload["limit_recent"])).fetchall()
         summary = []
+        best = self.best()
+        if best and not any(row["experiment_id"] == best for row in rows):
+            rows = list(rows) + [self.db.execute("SELECT experiment_id,state,plan,fingerprint FROM experiments WHERE experiment_id=?", (best,)).fetchone()]
         for row in rows:
             ev = self.experiment_evaluation(row["experiment_id"])
             p = json.loads(row["plan"])
             summary.append({"experiment_id": row["experiment_id"], "state": row["state"], "recipe_id": p["recipe_id"],
-                            "hypothesis": p["hypothesis"], "metric": ev["primary_metric"] if ev else None})
+                            "hypothesis": p["hypothesis"], "metric": ev["primary_metric"] if ev else None,
+                            "hyperparameters": p["model"]["hyperparameters"], "feature_steps": p["feature_steps"],
+                            "seed": p["seed"], "is_incumbent": row["experiment_id"] == best})
         art = artifacts.write_json("contexts/snapshot-" + uuid.uuid4().hex[:8] + ".json", summary, "research_summary")
         champion = self.champion()
         revision = self.db.execute("SELECT revision FROM selections WHERE run_id=?", (self.run_id,)).fetchone()[0]

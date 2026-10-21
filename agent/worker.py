@@ -41,7 +41,7 @@ def execute(job):
     import pandas as pd
     import joblib
     from threadpoolctl import threadpool_limits
-    from agent.ml import enforce_threads
+    from agent.ml import enforce_threads, validate_estimator
     from tools.data import read_table
     task = job["task_spec"]
     train = read_table(job["train_path"])
@@ -55,10 +55,12 @@ def execute(job):
     module = importlib.util.module_from_spec(module_spec)
     sys.modules[module_name] = module
     module_spec.loader.exec_module(module)
-    model = enforce_threads(module.make_pipeline(task, params), job["cpu_threads"])
+    print("AUTOML_WORKER "+json.dumps({"stage": "constructing", "phase": job["phase"], "rows": len(train), "features": len(features)}),flush=True)
+    model = validate_estimator(enforce_threads(module.make_pipeline(task, params), job["cpu_threads"]))
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
     started = time.monotonic()
+    print("AUTOML_WORKER "+json.dumps({"stage": "fit_started", "phase": job["phase"], "cpu_threads": job["cpu_threads"]}),flush=True)
     with threadpool_limits(limits=job["cpu_threads"]):
         if job["phase"] == "train":
             fit_indices = json.loads(Path(job["train_indices_path"]).read_text(encoding="utf-8"))
@@ -79,6 +81,7 @@ def execute(job):
             frame[task["output"]["prediction_columns"][0]] = prediction
             frame = frame[task["output"]["columns"]]
     output = Path(job["prediction_path"])
+    print("AUTOML_WORKER "+json.dumps({"stage": "prediction_completed", "phase": job["phase"], "fit_seconds": fit_seconds, "prediction_rows": len(frame)}),flush=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False, encoding="utf-8")
     model_path = Path(job["model_path"])

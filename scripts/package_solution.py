@@ -18,9 +18,12 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_ZIP_BYTES = 100_000_000
 RESOURCE_FILES = (
     "agent/schema.sql",
+    "agent/graph/schema.sql",
     "contracts/contracts.json",
     "contracts/contracts.schema.json",
     "recipes/catalog.json",
+    "recipes/components.json",
+    "recipes/graph-policy.json",
     "prompts/task-interpreter.md",
     "prompts/validation.md",
     "prompts/researcher.md",
@@ -40,6 +43,7 @@ def checked_bytes(root, relative):
 
 def runtime_files(root):
     files = {name: checked_bytes(root, name) for name in RESOURCE_FILES}
+    files["recipes/requirements.lock.txt"] = checked_bytes(root, "requirements.organizers.txt")
     for directory in ("agent", "tools"):
         for path in sorted((root / directory).rglob("*")):
             if path.is_symlink():

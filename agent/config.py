@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict
 from pathlib import Path
+import math
 import os
 
 from agent.errors import AgentError
@@ -22,6 +23,16 @@ def boolean(name, default):
     if value not in {"1", "0", "true", "false", "yes", "no"}:
         raise AgentError("INVALID_CONFIG", f"{name} must be a boolean")
     return value in {"1", "true", "yes"}
+
+
+def real(name, default, low, high):
+    try:
+        value = float(os.environ.get(name, str(default)))
+    except ValueError as exc:
+        raise AgentError("INVALID_CONFIG", f"{name} must be a number") from exc
+    if not math.isfinite(value) or not low <= value <= high:
+        raise AgentError("INVALID_CONFIG", f"{name} must be between {low} and {high}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -49,6 +60,17 @@ class Config:
     console_format: str = "human"
     work_dir: Path = Path("runs")
     seed: int = 42
+    graph_enabled: bool = True
+    graph_peers: int = 2
+    graph_train_workers: int = 1
+    graph_max_live_branches: int = 3
+    graph_max_total_branches: int = 15
+    graph_plateau_window: int = 3
+    graph_plateau_seconds: int = 300
+    graph_min_effect: float = 0.001
+    graph_context_bytes: int = 48000
+    graph_max_artifact_bytes: int = 8000000000
+    graph_min_free_disk_bytes: int = 2000000000
 
     @classmethod
     def from_env(cls, *, llm_mode=None, work_dir=None):
@@ -79,11 +101,26 @@ class Config:
             console_format=os.environ.get("CONSOLE_LOG_FORMAT", "human"),
             work_dir=Path(work_dir or os.environ.get("WORK_DIR", "runs")).resolve(),
             seed=integer("SEED", 42, 0, 2**31 - 1),
+            graph_enabled=boolean("GRAPH_ENABLED", True),
+            graph_peers=integer("GRAPH_PEERS", min(2, integer("MAX_WORKERS", 2, 1, 2)), 1, 2),
+            graph_train_workers=integer("GRAPH_TRAIN_WORKERS", 1, 1, 2),
+            graph_max_live_branches=integer("GRAPH_MAX_LIVE_BRANCHES", 3, 1, 31),
+            graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
+            graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 3, 1, 20),
+            graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 300, 0, 10800),
+            graph_min_effect=real("GRAPH_MIN_EFFECT", 0.001, 0, 1000000),
+            graph_context_bytes=integer("GRAPH_CONTEXT_BYTES", 48000, 3000, 2000000),
+            graph_max_artifact_bytes=integer("GRAPH_MAX_ARTIFACT_BYTES", 8000000000, 1000000, 100000000000),
+            graph_min_free_disk_bytes=integer("GRAPH_MIN_FREE_DISK_BYTES", 2000000000, 0, 100000000000),
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
         if cfg.research_mode not in {"catalog", "code"} or cfg.console_format not in {"human", "json"}:
             raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
+        if cfg.graph_peers > cfg.max_workers or cfg.graph_train_workers > cfg.max_workers:
+            raise AgentError("INVALID_CONFIG", "GRAPH_PEERS/GRAPH_TRAIN_WORKERS must not exceed MAX_WORKERS")
+        if cfg.graph_max_live_branches > cfg.graph_max_total_branches:
+            raise AgentError("INVALID_CONFIG", "Live graph limit must not exceed total graph limit")
         if max(cfg.llm_max_output_tokens, cfg.llm_bootstrap_output_tokens) > cfg.llm_max_output_tokens_limit:
             raise AgentError("INVALID_CONFIG", "Initial output token limits must not exceed LLM_MAX_OUTPUT_TOKENS_LIMIT")
         return cfg

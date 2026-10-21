@@ -26,7 +26,7 @@ class Catalog:
         for tool in tools:
             markdown += "## " + tool["name"] + "\n\n" + tool["description"] + "\n\n```json\n" + json.dumps(tool["input_schema"], indent=2) + "\n```\n\n"
         art = artifacts.write_text("task/TOOLS.md", markdown, "tools_catalog", "text/markdown")
-        return {"catalog_version": "recipes-v2", "recipe_ids": list(self.recipes), "tools_catalog_version": "tools-v1",
+        return {"catalog_version": "recipes-v3", "recipe_ids": list(self.recipes), "tools_catalog_version": "tools-v1",
                 "tools_markdown_artifact_id": art["artifact_id"], "tools": tools}
 
     def normalize(self, recipe_id, params):
@@ -38,7 +38,7 @@ class Catalog:
         result = {}
         for name, domain in recipe["parameters"].items():
             value = params.get(name, domain["default"])
-            if "enum" in domain and value not in domain["enum"]:
+            if "enum" in domain and not any((isinstance(value, bool) == isinstance(option, bool)) and value == option for option in domain["enum"]):
                 raise AgentError("INVALID_PLAN", f"Invalid {name}")
             if domain.get("type") in {"int", "float"}:
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or (domain["type"] == "int" and not isinstance(value, int)):
@@ -47,6 +47,29 @@ class Catalog:
                     raise AgentError("INVALID_PLAN", f"Out of range: {name}")
             result[name] = value
         return result
+
+    def constrain_params(self, recipe_id, params, constraints):
+        from agent.graph.constraints import check
+        params = self.normalize(recipe_id, params)
+        features = json.loads((ROOT / "recipes/components.json").read_text(encoding="utf-8"))["features"]
+        for capability, feature in features.items():
+            required = capability in constraints["required_capability_ids"]
+            forbidden = capability in constraints["forbidden_capability_ids"]
+            if required and feature["parameter"] not in params:
+                raise AgentError("UNSUPPORTED_TRANSFER", "Recipe cannot implement " + capability)
+            if feature["parameter"] in params and (required or forbidden):
+                params[feature["parameter"]] = feature["enabled_value"] if required else feature["disabled_value"]
+        params = self.normalize(recipe_id, params)
+        caps = ["model."+self.recipes[recipe_id]["family"]] + [cap for cap, feature in features.items() if params.get(feature["parameter"]) == feature["enabled_value"]]
+        check({"constraints": constraints, "effective_capability_ids": caps})
+        return params
+
+    def allows_constraints(self, recipe_id, constraints):
+        try:
+            self.constrain_params(recipe_id, {}, constraints)
+            return True
+        except AgentError:
+            return False
 
     def validate_plan(self, plan, spec, validation_id, artifacts):
         if plan["task_spec_id"] != spec["task_spec_id"] or plan["dataset_id"] != spec["dataset_id"] or plan["validation_id"] != validation_id:
@@ -63,8 +86,10 @@ class Catalog:
 
     @staticmethod
     def feature_steps(params):
-        return ([{"step": "target_transform", "name": "shifted_log1p", "fit_scope": "train_only"}]
-                if params.get("target_transform") == "shifted_log1p" else [])
+        result = [{"step": "numeric_interactions", "max_numeric_columns": 8, "fit_scope": "train_only"}] if params.get("numeric_interactions") else []
+        if params.get("target_transform") == "shifted_log1p":
+            result.append({"step": "target_transform", "name": "shifted_log1p", "fit_scope": "train_only"})
+        return result
 
     def assignment_recipes(self, assignment, recent):
         usable = [key for key, value in self.recipes.items() if value["family"] != "dummy"]

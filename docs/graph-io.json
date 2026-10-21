@@ -1,0 +1,227 @@
+{
+  "version": "graph-1.0-implemented",
+  "base_commit": "3b6d7d84879fffbe76d111d05a9d58816b009e77",
+  "modules": [
+    {
+      "path": "agent/graph/service.py",
+      "contracts": [
+        {
+          "id": "G00",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G00_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G00_Response"
+        },
+        {
+          "id": "G01",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G01_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G01_Response"
+        },
+        {
+          "id": "G02",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G02_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G02_Response"
+        },
+        {
+          "id": "G04",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G04_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G04_Response"
+        },
+        {
+          "id": "G05",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G05_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G05_Response"
+        },
+        {
+          "id": "G08",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G08_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G08_Response"
+        },
+        {
+          "id": "I02",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/I02_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/I02_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/context.py",
+      "contracts": [
+        {
+          "id": "G03",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G03_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G03_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/search_policy.py",
+      "contracts": [
+        {
+          "id": "G06",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G06_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G06_Response"
+        },
+        {
+          "id": "G07",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G07_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G07_Response"
+        },
+        {
+          "id": "G14",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G14_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G14_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/artifacts.py",
+      "contracts": [
+        {
+          "id": "G09",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G09_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G09_Response"
+        },
+        {
+          "id": "G10",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G10_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G10_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/export.py",
+      "contracts": [
+        {
+          "id": "G11",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G11_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G11_Response"
+        },
+        {
+          "id": "G13",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G13_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G13_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/recovery.py",
+      "contracts": [
+        {
+          "id": "G12",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G12_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G12_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/constructor.py",
+      "contracts": [
+        {
+          "id": "I00",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/I00_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/I00_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/constraints.py",
+      "contracts": [
+        {
+          "id": "I01",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/I01_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/I01_Response"
+        }
+      ]
+    },
+    {
+      "path": "agent/graph/identity.py",
+      "contracts": [
+        {
+          "id": "I03",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/I03_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/I03_Response"
+        }
+      ]
+    }
+  ],
+  "artifact_formats": [
+    {
+      "kind": "graph_policy",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GPolicy"
+    },
+    {
+      "kind": "graph_task_contract",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GTaskContract"
+    },
+    {
+      "kind": "solution_manifest",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GSolutionManifest"
+    },
+    {
+      "kind": "team_checkpoint",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GCheckpoint"
+    },
+    {
+      "kind": "graph_capsule",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GContextCapsule"
+    },
+    {
+      "kind": "work_order",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GWorkOrder"
+    },
+    {
+      "kind": "snapshot_binding",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GSnapshotBinding"
+    },
+    {
+      "kind": "proposal_record",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GProposalRecord"
+    },
+    {
+      "kind": "component_idea",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GIdea"
+    },
+    {
+      "kind": "transfer_patch",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GTransferPatch"
+    },
+    {
+      "kind": "component_trial",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GComponentTrial"
+    },
+    {
+      "kind": "plateau_report",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GPlateau"
+    },
+    {
+      "kind": "search_decision",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GSearchDecision"
+    },
+    {
+      "kind": "environment_manifest",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GEnvironmentManifest"
+    },
+    {
+      "kind": "component_catalog",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GCatalogManifest"
+    },
+    {
+      "kind": "component_provenance",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GProvenance"
+    },
+    {
+      "kind": "graph_export",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GGraphExport"
+    },
+    {
+      "kind": "ranking_report",
+      "body_schema": "../contracts/contracts.schema.json#/$defs/GRanking"
+    }
+  ],
+  "native_formats": {
+    "owned_runtime": "ZIP with owned sources/resources; ArtifactRef metadata",
+    "validation_predictions": "CSV __row_index,prediction in frozen valid row order",
+    "submission": "CSV according to TaskSpec.output",
+    "state.sqlite": "native schema + agent/graph/schema.sql",
+    "llm_context": "messages + metadata; GResearchContext in graph mode"
+  }
+}

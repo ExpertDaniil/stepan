@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g03",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "work_order": {
+      "work_order_id": "work-001",
+      "run_id": "run-demo-001",
+      "researcher_id": "researcher-1",
+      "branch_id": "branch-root",
+      "branch_revision": 0,
+      "base_head_revision": 1,
+      "base_experiment_id": "exp-baseline",
+      "base_solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+      "base_team_checkpoint_id": "checkpoint-001",
+      "allowed_donor_experiment_ids": [],
+      "action": "improve",
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": []
+      },
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "validation_id": "validation-a269d545925fba82",
+      "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+      "context_id": "context-001",
+      "context_capsule_artifact_id": "artifact-capsule-001",
+      "issued_elapsed_ms": 1000,
+      "expires_elapsed_ms": 61000,
+      "state": "issued"
+    },
+    "capsule": {
+      "capsule_version": "capsule-1.0",
+      "run_id": "run-demo-001",
+      "work_order_id": "work-001",
+      "branch_id": "branch-root",
+      "branch_revision": 0,
+      "task_spec_id": "task-v1",
+      "validation_id": "validation-a269d545925fba82",
+      "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+      "mandatory_contract_artifact_id": "artifact-task-contract",
+      "base_solution_manifest_artifact_id": "artifact-manifest-baseline",
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": []
+      },
+      "facts": [],
+      "included_record_ids": [],
+      "omitted_record_count": 0,
+      "estimated_input_tokens": 2500,
+      "token_count_mode": "estimated_bytes",
+      "messages_artifact_id": "artifact-messages-001"
+    },
+    "researcher_request": {
+      "schema_version": "1.0",
+      "request_id": "req-c09",
+      "run_id": "run-demo-001",
+      "idempotency_key": "key-c09",
+      "payload": {
+        "researcher_id": "researcher-1",
+        "context_id": "context-001",
+        "assignment": "exploit_incumbent",
+        "base_experiment_ids": [
+          "exp-baseline"
+        ],
+        "forbidden_fingerprints": [],
+        "budget": {
+          "wall_seconds_remaining": 9200,
+          "finalization_reserve_seconds": 1200,
+          "cpu_threads_available": 6,
+          "memory_mb_available": 20480,
+          "llm_calls_remaining": 30,
+          "search_allowed": true
+        },
+        "proposal_limit": 1
+      }
+    }
+  },
+  "error": null
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g08",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g08",
+  "payload": {
+    "branch_id": "branch-reject-f",
+    "expected_branch_revision": 0,
+    "action": "resume",
+    "reason": "accept sibling plateau"
+  }
+}

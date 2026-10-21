@@ -52,3 +52,15 @@ v0.3.1 добавляет job.descendants_cleanup_started/completed: job/experim
 число оставшихся процессов и подтверждение остановки группы. Это внутренняя уборка после выхода
 worker, до C15/C13 release. Она не устанавливает cancelled. Фактический результат обучения
 отдельно сообщает job.finished после проверки exit code/result.json; C20 всё ещё проверяет CSV.
+
+## Граф v0.4
+
+G00–G14/I00–I03 проходят ту же трассировку ContractBus. graph.committed содержит operation и
+graph_revision. context.built дополнительно связывает work_order_id/branch_id с контекстом peer.
+llm.request_budget_checked проверяет полное отправляемое тело со schema/tools/repair, а не только
+исходные messages. graph.proposal_rejected и graph.component_gate_failed не выдают текст LLM за score.
+
+Root events.jsonl остаётся telemetry. Authoritative graph events находятся в SQLite g_events;
+их export — exports/<scope>-<cut>/graph-events.jsonl. Каждый event содержит typed record_schema,
+проверенный record, run_id, request_id и event_seq. Graph export фиксирует read-cut до создания
+самих экспортных артефактов; последующие G09/G11 поэтому не включаются в этот же срез.

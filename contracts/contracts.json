@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
+  "version": "0.4.0",
   "created_at": "2026-10-21",
-  "status": "proposed_for_team_agreement",
+  "status": "implemented_graph_extension",
   "description": "Предлагаемые внутренние контракты AutoML-агента. Не API платформы; все примеры синтетические.",
   "transport": "Python calls / local process queue; REST-style labels only",
   "contracts": [
@@ -1783,6 +1783,2171 @@
         "PROCESS_STOP_FAILED"
       ],
       "owner": "A"
+    },
+    {
+      "id": "G00",
+      "python_call": "graph.initialize",
+      "title": "Инициализировать журнал и корневую ветку",
+      "owner": "A",
+      "input_schema": "G00_Request",
+      "output_schema": "G00_Response",
+      "transaction": "T0",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C00",
+        "C04",
+        "C05",
+        "C06"
+      ],
+      "rules": [
+        "После C04–C06; run_id уже создан C00. Проверить TaskSpec, неизменяемый протокол и готовые артефакты.",
+        "peer_count равен числу уникальных researcher_ids; max_train_workers <= C00.max_workers. Ресурсы выдаёт только C13.",
+        "Одна корневая ветка на запуск. Существующий запуск с другой конфигурацией — конфликт; повтор не обнуляет граф или бюджет."
+      ],
+      "errors": [
+        "GRAPH_CONFIG_CONFLICT",
+        "PROTOCOL_MISMATCH",
+        "ARTIFACT_NOT_READY"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g00",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g00",
+        "payload": {
+          "task_spec_id": "task-v1",
+          "dataset_id": "dataset-demo-v1",
+          "validation_id": "validation-a269d545925fba82",
+          "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+          "environment_lock_artifact_id": "artifact-environment",
+          "catalog_manifest_artifact_id": "artifact-catalog",
+          "researcher_ids": [
+            "researcher-1",
+            "researcher-2"
+          ],
+          "policy": {
+            "policy_version": "graph-1.0",
+            "peer_count": 2,
+            "max_train_workers": 1,
+            "max_children_per_branch": 2,
+            "max_live_branches": 3,
+            "max_total_branches": 15,
+            "constraint_mode": "generated_python",
+            "context": {
+              "max_input_tokens": 12000,
+              "max_output_tokens": 3000,
+              "safety_tokens": 1500,
+              "provider_context_window_tokens": null,
+              "max_related_records": 8,
+              "max_error_excerpt_bytes": 2000,
+              "token_count_mode": "estimated_bytes",
+              "max_api_request_bytes": 36000
+            },
+            "promotion": {
+              "min_paired_seeds": 1,
+              "require_transfer_pilot": true,
+              "min_effect": 0.001
+            },
+            "plateau": {
+              "window_full_evaluations": 3,
+              "min_distinct_solutions": 3,
+              "min_elapsed_seconds": 300,
+              "absolute_epsilon": 0.001,
+              "relative_epsilon": 0.001
+            },
+            "scheduling": {
+              "preferred_branch_share": 0.7,
+              "minimum_alternative_trials": 1
+            },
+            "retention": {
+              "max_artifact_bytes": 8000000000,
+              "min_free_disk_bytes": 2000000000,
+              "keep_prediction_policy": "full_and_best"
+            }
+          }
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g00",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "root_branch": {
+            "branch_id": "branch-root",
+            "parent_branch_id": null,
+            "fork_checkpoint_id": null,
+            "decision_idea_id": null,
+            "decision": "root",
+            "state": "active",
+            "branch_revision": 0,
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "created_event_seq": 1
+          },
+          "heads": [
+            {
+              "researcher_id": "researcher-1",
+              "solution_id": null,
+              "experiment_id": null,
+              "head_revision": 0
+            },
+            {
+              "researcher_id": "researcher-2",
+              "solution_id": null,
+              "experiment_id": null,
+              "head_revision": 0
+            }
+          ],
+          "policy_artifact_id": "artifact-policy",
+          "graph_revision": 1
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g00",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "GRAPH_CONFIG_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G00"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.initialize",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G00_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G00_Response"
+      },
+      "request_schema_name": "G00_Request",
+      "response_schema_name": "G00_Response"
+    },
+    {
+      "id": "G01",
+      "python_call": "graph.checkpoint",
+      "title": "Зафиксировать согласованный снимок команды",
+      "owner": "A",
+      "input_schema": "G01_Request",
+      "output_schema": "G01_Response",
+      "transaction": "T1",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "Один SQLite read-cut: все головы, ограничения и event_seq из одного состояния. Каждая непустая голова ссылается на доверенно evaluated эксперимент.",
+        "Снимок неизменяемый; фиксирует только исследовательское состояние. Не содержит и не восстанавливает бюджет, leases, процессы или published champion.",
+        "JSON-артефакт публикуется через G09. Только после READY регистрируется checkpoint. При изменении ветки между чтением и фиксацией — CAS отказ."
+      ],
+      "errors": [
+        "BRANCH_REVISION_CONFLICT",
+        "HEAD_NOT_EVALUATED",
+        "ARTIFACT_NOT_READY"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g01",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g01",
+        "payload": {
+          "branch_id": "branch-root",
+          "expected_branch_revision": 0,
+          "reason": "before_work"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g01",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "checkpoint": {
+            "checkpoint_id": "checkpoint-001",
+            "run_id": "run-demo-001",
+            "branch_id": "branch-root",
+            "branch_revision": 0,
+            "store_revision": 7,
+            "captured_event_seq": 7,
+            "heads": [
+              {
+                "researcher_id": "researcher-1",
+                "solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+                "experiment_id": "exp-baseline",
+                "head_revision": 1
+              },
+              {
+                "researcher_id": "researcher-2",
+                "solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+                "experiment_id": "exp-baseline",
+                "head_revision": 1
+              }
+            ],
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "capsule_artifact_ids": [],
+            "reason": "before_work",
+            "artifact_id": "artifact-checkpoint-001",
+            "graph_revision": 7
+          },
+          "artifact": {
+            "artifact_id": "artifact-checkpoint-001",
+            "run_id": "run-demo-001",
+            "kind": "team_checkpoint",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/json"
+          }
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g01",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "BRANCH_REVISION_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G01"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.checkpoint",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G01_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G01_Response"
+      },
+      "request_schema_name": "G01_Request",
+      "response_schema_name": "G01_Response"
+    },
+    {
+      "id": "G02",
+      "python_call": "graph.fork_decision",
+      "title": "Создать пару ветвей «принять / без идеи»",
+      "owner": "A",
+      "input_schema": "G02_Request",
+      "output_schema": "G02_Response",
+      "transaction": "T2",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "Одна транзакция: проверить confirmed идею и её pre-idea checkpoint; запечатать родителя и увеличить его branch_revision; создать ровно двух детей и клонировать головы снимка.",
+        "accept наследует ограничения родителя + required capabilities идеи; reject наследует + forbidden capabilities. Конфликт или зависимость от запрещённого компонента запрещает fork.",
+        "Оба ребёнка стартуют с голов checkpoint; seed-головы accept могут ещё не содержать идею. Каждый новый план accept уже обязан её содержать. Источник и пилот доступны как разрешённые доноры.",
+        "accept active, reject paused; это начальный порядок, а не постоянные роли агентов. Оба ребёнка учитываются в лимите live, пока не archived. max_children=2, повтор другого fork у sealed родителя запрещён.",
+        "Отозвать issued work orders родителя. submitted/running попытки остаются связаны с исходной веткой; отмена процессов только C24. Никакого удаления их результатов."
+      ],
+      "errors": [
+        "BRANCH_REVISION_CONFLICT",
+        "IDEA_NOT_CONFIRMED",
+        "BRANCH_LIMIT",
+        "CONSTRAINT_CONFLICT",
+        "INVALID_FORK_CHECKPOINT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g02",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g02",
+        "payload": {
+          "parent_branch_id": "branch-root",
+          "expected_branch_revision": 0,
+          "checkpoint_id": "checkpoint-001",
+          "idea_id": "idea-encoding-001"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g02",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "parent_branch": {
+            "branch_id": "branch-root",
+            "parent_branch_id": null,
+            "fork_checkpoint_id": null,
+            "decision_idea_id": null,
+            "decision": "root",
+            "state": "sealed",
+            "branch_revision": 1,
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "created_event_seq": 1
+          },
+          "accept_branch": {
+            "branch_id": "branch-accept-f",
+            "parent_branch_id": "branch-root",
+            "fork_checkpoint_id": "checkpoint-001",
+            "decision_idea_id": "idea-encoding-001",
+            "decision": "accept",
+            "state": "active",
+            "branch_revision": 0,
+            "constraints": {
+              "required_capability_ids": [
+                "feature.class_weight"
+              ],
+              "forbidden_capability_ids": []
+            },
+            "created_event_seq": 21
+          },
+          "reject_branch": {
+            "branch_id": "branch-reject-f",
+            "parent_branch_id": "branch-root",
+            "fork_checkpoint_id": "checkpoint-001",
+            "decision_idea_id": "idea-encoding-001",
+            "decision": "reject",
+            "state": "paused",
+            "branch_revision": 0,
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": [
+                "feature.class_weight"
+              ]
+            },
+            "created_event_seq": 22
+          },
+          "revoked_work_order_ids": [
+            "work-old-peer3"
+          ],
+          "origin_running_job_ids": [
+            "job-old-peer3"
+          ],
+          "graph_revision": 22
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g02",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "BRANCH_REVISION_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G02"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.fork_decision",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G02_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G02_Response"
+      },
+      "request_schema_name": "G02_Request",
+      "response_schema_name": "G02_Response"
+    },
+    {
+      "id": "G03",
+      "python_call": "graph.issue_work",
+      "title": "Выдать ограниченное задание и контекст",
+      "owner": "B",
+      "input_schema": "G03_Request",
+      "output_schema": "G03_Response",
+      "transaction": "T3",
+      "timeout_seconds": 30,
+      "lead_contracts": [
+        "C07",
+        "C08",
+        "C09",
+        "C10",
+        "C11",
+        "C13"
+      ],
+      "rules": [
+        "Dispatcher выдаёт одно задание peer: G01 checkpoint → C07 snapshot → side binding → C08 context → CAS branch/head → issued. C08/C09 не получают новых JSON полей.",
+        "Future→work_order_id/context_id сохраняется контроллером до C09; при ответе именно эта связка подаётся G04. Не угадывать work order по researcher_id или глобальному best.",
+        "C09 вызывает существующий C10 с response_schema_id=ResearchChoice-v1 в catalog mode, ResearchProposal-v1 только в явном code mode. Researcher превращает его в оригинальный ExperimentPlan после C11 и Catalog.normalize.",
+        "C08 messages artifact сохраняет формат {messages,metadata}; добавляется GResearchContext.metadata.graph_binding и отдельная capsule. JSON внутри user.content валидируется GContextUser.",
+        "Один preparing/issued/submitted order на peer. baseline строится доверенным factory без C09 LLM; привязка и G04 те же. Второй peer принимает duplicate baseline через свой binding.",
+        "store_revision C07 — selections.revision. graph_revision — новый независимый счётчик. Актуальность: branch_revision + head_revision, не изменение чужого best."
+      ],
+      "errors": [
+        "BRANCH_REVISION_CONFLICT",
+        "PEER_BUSY",
+        "CONTEXT_BUDGET_EXCEEDED",
+        "SEARCH_CLOSED",
+        "DONOR_NOT_ALLOWED"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g03",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g03",
+        "payload": {
+          "branch_id": "branch-root",
+          "expected_branch_revision": 0,
+          "researcher_id": "researcher-1",
+          "action": "improve",
+          "allowed_donor_experiment_ids": [],
+          "tools_catalog_version": "tools-v1",
+          "ttl_seconds": 60
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g03",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "work_order": {
+            "work_order_id": "work-001",
+            "run_id": "run-demo-001",
+            "researcher_id": "researcher-1",
+            "branch_id": "branch-root",
+            "branch_revision": 0,
+            "base_head_revision": 1,
+            "base_experiment_id": "exp-baseline",
+            "base_solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+            "base_team_checkpoint_id": "checkpoint-001",
+            "allowed_donor_experiment_ids": [],
+            "action": "improve",
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "task_spec_id": "task-v1",
+            "dataset_id": "dataset-demo-v1",
+            "validation_id": "validation-a269d545925fba82",
+            "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+            "context_id": "context-001",
+            "context_capsule_artifact_id": "artifact-capsule-001",
+            "issued_elapsed_ms": 1000,
+            "expires_elapsed_ms": 61000,
+            "state": "issued"
+          },
+          "capsule": {
+            "capsule_version": "capsule-1.0",
+            "run_id": "run-demo-001",
+            "work_order_id": "work-001",
+            "branch_id": "branch-root",
+            "branch_revision": 0,
+            "task_spec_id": "task-v1",
+            "validation_id": "validation-a269d545925fba82",
+            "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+            "mandatory_contract_artifact_id": "artifact-task-contract",
+            "base_solution_manifest_artifact_id": "artifact-manifest-baseline",
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "facts": [],
+            "included_record_ids": [],
+            "omitted_record_count": 0,
+            "estimated_input_tokens": 2500,
+            "token_count_mode": "estimated_bytes",
+            "messages_artifact_id": "artifact-messages-001"
+          },
+          "researcher_request": {
+            "schema_version": "1.0",
+            "request_id": "req-c09",
+            "run_id": "run-demo-001",
+            "idempotency_key": "key-c09",
+            "payload": {
+              "researcher_id": "researcher-1",
+              "context_id": "context-001",
+              "assignment": "exploit_incumbent",
+              "base_experiment_ids": [
+                "exp-baseline"
+              ],
+              "forbidden_fingerprints": [],
+              "budget": {
+                "wall_seconds_remaining": 9200,
+                "finalization_reserve_seconds": 1200,
+                "cpu_threads_available": 6,
+                "memory_mb_available": 20480,
+                "llm_calls_remaining": 30,
+                "search_allowed": true
+              },
+              "proposal_limit": 1
+            }
+          }
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g03",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "BRANCH_REVISION_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G03"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.issue_work",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G03_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G03_Response"
+      },
+      "request_schema_name": "G03_Request",
+      "response_schema_name": "G03_Response"
+    },
+    {
+      "id": "G04",
+      "python_call": "graph.submit_proposal",
+      "title": "Проверить предложение и атомарно зарезервировать эксперимент",
+      "owner": "A",
+      "input_schema": "G04_Request",
+      "output_schema": "G04_Response",
+      "transaction": "T4",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C09",
+        "C11",
+        "C12"
+      ],
+      "rules": [
+        "Проверить trusted work order/Future binding, TTL, branch/head revisions и родителей. В T4 атомарно C12 Store.reserve_tx + graph solution/link/binding/event/idempotency; исходный C12 payload={plan}.",
+        "Fingerprint воспроизводит реальный Store.reserve на e9a9d04: dataset_id/task_spec_id/validation_id/recipe_id/model/feature_steps/seed/fidelity/code_sha256. Не заменять recipe_id на recipe_version и не добавлять solution_hash в C12 версии 1.0.",
+        "I00 строит manifest по реальным code bytes и переданным normalized params. catalog_verified требует детерминированного зарегистрированного конструктора; свободный код получает declared_only.",
+        "В generated_python допустим declared_only на линии без hard restrictions. При required/forbidden capability — только catalog_verified. Hash/AST не доказывают отсутствие семантического аналога f.",
+        "Изменение feature_steps не исполняется вторым конвейером: текущий worker использует код и hyperparameters. Strict constructor обязан подтвердить, что заявленные шаги действительно реализованы кодом; иначе MANIFEST_MISMATCH.",
+        "stop требует plan/manifest/lineage=null. До первого full baseline screening запрещён. Другой seed — experiment той же solution. Duplicate evaluated не запускается повторно: новый binding обрабатывается G05."
+      ],
+      "errors": [
+        "STALE_WORK_ORDER",
+        "CONSTRAINT_VIOLATION",
+        "MANIFEST_MISMATCH",
+        "UNVERIFIABLE_COMPONENT",
+        "LINEAGE_MISMATCH",
+        "IDEMPOTENCY_CONFLICT",
+        "FIRST_BASELINE_FULL_REQUIRED"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g04",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g04",
+        "payload": {
+          "work_order_id": "work-001",
+          "proposal": {
+            "proposal_id": "proposal-001",
+            "researcher_id": "researcher-1",
+            "plan": {
+              "plan_id": "plan-001",
+              "researcher_id": "researcher-1",
+              "parent_ids": [
+                "exp-baseline"
+              ],
+              "hypothesis": "Проверить линейный рецепт на общем протоколе.",
+              "expected_effect": "Измерить качество независимого простого направления.",
+              "recipe_id": "linear-classifier-v1",
+              "task_spec_id": "task-v1",
+              "dataset_id": "dataset-demo-v1",
+              "validation_id": "validation-a269d545925fba82",
+              "seed": 42,
+              "fidelity": "full",
+              "model": {
+                "family": "linear",
+                "hyperparameters": {
+                  "C": 1.0,
+                  "class_weight": null
+                }
+              },
+              "feature_steps": [],
+              "code_artifact_id": "art-code-001",
+              "resources": {
+                "cpu_threads": 3,
+                "memory_limit_mb": 10240,
+                "timeout_seconds": 600
+              }
+            },
+            "decision": "propose",
+            "stop_reason": null
+          },
+          "manifest": {
+            "manifest_version": "solution-1.0",
+            "run_id": "run-demo-001",
+            "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "core": {
+              "recipe_id": "linear-classifier-v1",
+              "recipe_version": "1.0",
+              "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+              "model_family": "linear",
+              "effective_hyperparameters": {
+                "C": 1.0,
+                "class_weight": null
+              },
+              "effective_feature_steps": [],
+              "components": [
+                {
+                  "capability_id": "model.linear",
+                  "version": "1.0",
+                  "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+                  "parameters": {
+                    "C": 1.0
+                  },
+                  "dependency_component_ids": [],
+                  "origin": "builtin",
+                  "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+                }
+              ],
+              "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "constructor_version": "constructor-1.0",
+              "candidate_interface_version": "make_pipeline-2arg-v1"
+            },
+            "component_provenance_artifact_ids": [
+              {
+                "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf",
+                "artifact_id": "artifact-catalog-provenance"
+              }
+            ],
+            "verification_level": "catalog_verified"
+          },
+          "lineage": {
+            "base_experiment_id": "exp-baseline",
+            "idea_donor_experiment_ids": [],
+            "ensemble_member_experiment_ids": [],
+            "source_idea_ids": []
+          }
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g04",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "work_order_id": "work-001",
+          "disposition": "submitted",
+          "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+          "solution_disposition": "created",
+          "lead_submission": {
+            "experiment_id": "exp-001",
+            "fingerprint": "186210102e34ccdc6069a58b92e229f51228c3f8da5b0076662a7b950f47621b",
+            "disposition": "created",
+            "state": "queued",
+            "existing_experiment_id": null
+          },
+          "reused_evaluation_id": null,
+          "graph_revision": 8
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g04",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "STALE_WORK_ORDER",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G04"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.submit_proposal",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G04_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G04_Response"
+      },
+      "request_schema_name": "G04_Request",
+      "response_schema_name": "G04_Response"
+    },
+    {
+      "id": "G05",
+      "python_call": "graph.commit_evaluation",
+      "title": "Сохранить оценку и условно продвинуть головы",
+      "owner": "A",
+      "input_schema": "G05_Request",
+      "output_schema": "G05_Response",
+      "transaction": "T5",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C15",
+        "C16",
+        "C17",
+        "C18",
+        "C21"
+      ],
+      "rules": [
+        "В одной T5 выполнить Store.commit_evaluation_tx и graph pending bindings/head CAS/event/outbox. Evaluation только из доверенного C16.",
+        "lead_commit.store_revision остаётся selections.revision (меняется лишь при новом incumbent); graph_revision увеличивается от graph commit. Счётчики могут различаться.",
+        "Голова меняется только для active origin branch, действительного binding, совпавших branch/head revisions и лучшего full кандидата. Screening→kept_screening; старый/закрытый binding→архив без изменения новой ветки.",
+        "Late valid full по актуальному fence сохраняется и может выиграть глобальный C17. Ошибка старой попытки по fence не становится валидной оценкой.",
+        "После commit outbox вызывает C18–C21; только Publisher заменяет CSV. Для duplicate/new binding новый G05 key, внутренний C17 key производный от него; не подставлять старый cached C17 revision."
+      ],
+      "errors": [
+        "EVALUATION_NOT_TRUSTED",
+        "PROTOCOL_MISMATCH",
+        "ARTIFACT_NOT_READY",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g05",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g05",
+        "payload": {
+          "evaluation_id": "eval-001",
+          "experiment_id": "exp-001",
+          "selection_policy_id": "same-protocol-primary-v1"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g05",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "lead_commit": {
+            "experiment_state": "evaluated",
+            "best_evaluated_experiment_id": "exp-001",
+            "published_champion_experiment_id": "exp-baseline",
+            "should_prepare_submission": true,
+            "store_revision": 11
+          },
+          "head_results": [
+            {
+              "work_order_id": "work-001",
+              "branch_id": "branch-root",
+              "researcher_id": "researcher-1",
+              "disposition": "advanced",
+              "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+              "experiment_id": "exp-001",
+              "head_revision": 2
+            }
+          ],
+          "graph_revision": 12
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g05",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "EVALUATION_NOT_TRUSTED",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G05"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.commit_evaluation",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G05_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G05_Response"
+      },
+      "request_schema_name": "G05_Request",
+      "response_schema_name": "G05_Response"
+    },
+    {
+      "id": "G06",
+      "python_call": "graph.register_idea",
+      "title": "Зарегистрировать идею по проверяемым результатам",
+      "owner": "B+C",
+      "input_schema": "G06_Request",
+      "output_schema": "G06_Response",
+      "transaction": "T6",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C16",
+        "C17"
+      ],
+      "rules": [
+        "Сервис извлекает evaluations и deltas из trusted store; в запросе нет предоставленного агентом score. Baseline/candidate сравниваются в одинаковом evaluation protocol, full fidelity и paired seed.",
+        "Capability — стабильный идентификатор смысла операции в каталоге, а не хэш конкретных параметров. Проверить patch artifact и actual component diff; название идеи не является критерием новизны.",
+        "confirmed означает выполнение конфигурируемого gate: достаточное число paired seeds, min_effect и перенос на другого peer при включённом pilot. Это не заявление о статистической значимости.",
+        "fork_checkpoint_id обязан быть согласованным team checkpoint до первого применения идеи на исходной линии; исходные головы/их effective dependency closure не содержат новых capabilities. Иначе INVALID_FORK_CHECKPOINT.",
+        "provisional сохраняется в журнале, но G02 не запускается. Промоция — новая запись idea с новым id, supersession фиксируется событием; существующая IdeaRecord неизменяема."
+      ],
+      "errors": [
+        "IDEA_EVIDENCE_INVALID",
+        "INVALID_FORK_CHECKPOINT",
+        "UNVERIFIABLE_COMPONENT",
+        "ARTIFACT_NOT_READY"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g06",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g06",
+        "payload": {
+          "title": "Балансировка классов в линейном рецепте",
+          "hypothesis": "Проверить class_weight=balanced против того же рецепта без весов.",
+          "source_experiment_id": "exp-idea-001",
+          "capability_ids": [
+            "feature.class_weight"
+          ],
+          "fork_checkpoint_id": "checkpoint-001",
+          "baseline_experiment_ids": [
+            "exp-001"
+          ],
+          "candidate_experiment_ids": [
+            "exp-idea-001"
+          ],
+          "transfer_pilot_experiment_ids": [
+            "exp-peer2-pilot"
+          ],
+          "transfer_patch_artifact_id": "artifact-transfer-patch"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g06",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "idea": {
+            "idea_id": "idea-encoding-001",
+            "title": "Балансировка классов в линейном рецепте",
+            "hypothesis": "Проверить class_weight=balanced против того же рецепта без весов.",
+            "source_experiment_id": "exp-idea-001",
+            "capability_ids": [
+              "feature.class_weight"
+            ],
+            "transfer_patch_artifact_id": "artifact-transfer-patch",
+            "fork_checkpoint_id": "checkpoint-001",
+            "effects": [
+              {
+                "baseline_experiment_id": "exp-001",
+                "candidate_experiment_id": "exp-idea-001",
+                "baseline_evaluation_id": "eval-001",
+                "candidate_evaluation_id": "eval-idea-001",
+                "seed": 42,
+                "delta_utility": 0.006
+              }
+            ],
+            "transfer_pilot_experiment_ids": [
+              "exp-peer2-pilot"
+            ],
+            "status": "confirmed",
+            "gate_reasons": [],
+            "created_event_seq": 20,
+            "component_trial_ids": [
+              "component-trial-001"
+            ]
+          },
+          "graph_revision": 20
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g06",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "IDEA_EVIDENCE_INVALID",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G06"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.register_idea",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G06_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G06_Response"
+      },
+      "request_schema_name": "G06_Request",
+      "response_schema_name": "G06_Response"
+    },
+    {
+      "id": "G07",
+      "python_call": "graph.assess_plateau",
+      "title": "Оценить плато по полным проверкам",
+      "owner": "A",
+      "input_schema": "G07_Request",
+      "output_schema": "G07_Response",
+      "transaction": "T7",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C13",
+        "C22"
+      ],
+      "rules": [
+        "Окно — последние K завершённых full evaluations этой ветки по единому ключу сравнимости, в порядке commit_event_seq. Общий cached experiment учитывается один раз на ветку.",
+        "Должны выполняться min_distinct_solutions и min_elapsed_seconds с последнего значимого улучшения. Failed, cancelled и screening не считаются нулевыми оценками и не заполняют окно.",
+        "utility=value для maximize, -value для minimize. epsilon=max(absolute_epsilon,relative_epsilon*max(abs(best_before_utility),1e-12)). Gain — best_after-best_before. Нет достаточного before/window → insufficient_evidence.",
+        "Признак plateau — практическое правило распределения бюджета, не доказательство оптимума. Реплики seed нужны для оценки шума; их не выдавать за разные идеи.",
+        "Операция сохраняет assessment, но сама не переключает ветки. Orchestrator применяет G08; deadline/search reserve C13/C22 имеет приоритет."
+      ],
+      "errors": [
+        "BRANCH_REVISION_CONFLICT",
+        "PROTOCOL_MISMATCH"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g07",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g07",
+        "payload": {
+          "branch_id": "branch-accept-f",
+          "expected_branch_revision": 0
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g07",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "assessment": {
+            "assessment_id": "assessment-001",
+            "branch_id": "branch-accept-f",
+            "branch_revision": 0,
+            "status": "plateau",
+            "evaluation_ids": [
+              "eval-101",
+              "eval-102",
+              "eval-103",
+              "eval-104",
+              "eval-105"
+            ],
+            "distinct_solution_count": 3,
+            "elapsed_seconds": 400,
+            "best_before_evaluation_id": "eval-100",
+            "best_after_evaluation_id": "eval-105",
+            "utility_gain": 0.0003,
+            "epsilon": 0.001,
+            "recommended_action": "pause_and_resume_sibling",
+            "reasons": [
+              "window_gain_below_epsilon"
+            ]
+          },
+          "artifact": {
+            "artifact_id": "artifact-assessment",
+            "run_id": "run-demo-001",
+            "kind": "plateau_report",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/json"
+          }
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g07",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "BRANCH_REVISION_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G07"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.assess_plateau",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G07_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G07_Response"
+      },
+      "request_schema_name": "G07_Request",
+      "response_schema_name": "G07_Response"
+    },
+    {
+      "id": "G08",
+      "python_call": "graph.control_branch",
+      "title": "Приостановить, возобновить или архивировать ветку",
+      "owner": "A",
+      "input_schema": "G08_Request",
+      "output_schema": "G08_Response",
+      "transaction": "T8",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C13",
+        "C22",
+        "C24"
+      ],
+      "rules": [
+        "pause active→paused; resume paused→active; archive active/paused→archived. sealed и archived финальны. Каждый реальный переход увеличивает branch_revision и отзывает issued задания.",
+        "При pause/archive submitted binding помечается revoked для продвижения голов; процессы не считаются остановленными. При нужде Orchestrator отдельно вызывает C24, ждёт stopped и только затем C13.release.",
+        "Возврат — resume reject sibling, у которого уже сохранены головы до идеи и inherited ban. Это не undo базы: accept архив и глобальный incumbent сохраняются.",
+        "Новый fork внутри reject создаёт ещё одну accept/reject пару и наследует ban f. Для комбинации f+g нужна отдельная допустимая линия; запрет не снимается молча.",
+        "Все peers равноправны. Распределение заданий по active веткам меняется; policy оставляет долю альтернативе. TTL и бюджет никогда не возобновляются за счёт перехода."
+      ],
+      "errors": [
+        "BRANCH_REVISION_CONFLICT",
+        "INVALID_BRANCH_TRANSITION",
+        "SEARCH_CLOSED"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g08",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g08",
+        "payload": {
+          "branch_id": "branch-reject-f",
+          "expected_branch_revision": 0,
+          "action": "resume",
+          "reason": "accept sibling plateau"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g08",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "branch": {
+            "branch_id": "branch-reject-f",
+            "parent_branch_id": "branch-root",
+            "fork_checkpoint_id": "checkpoint-001",
+            "decision_idea_id": "idea-encoding-001",
+            "decision": "reject",
+            "state": "active",
+            "branch_revision": 1,
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": [
+                "feature.class_weight"
+              ]
+            },
+            "created_event_seq": 22
+          },
+          "revoked_work_order_ids": [],
+          "origin_running_job_ids": [],
+          "graph_revision": 30
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g08",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "BRANCH_REVISION_CONFLICT",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G08"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.control_branch",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G08_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G08_Response"
+      },
+      "request_schema_name": "G08_Request",
+      "response_schema_name": "G08_Response"
+    },
+    {
+      "id": "G09",
+      "python_call": "artifacts.register_staged",
+      "title": "Проверить и опубликовать неизменяемый артефакт",
+      "owner": "A",
+      "input_schema": "G09_Request",
+      "output_schema": "G09_Response",
+      "transaction": "T9",
+      "timeout_seconds": 30,
+      "lead_contracts": [
+        "C11",
+        "C14",
+        "C19"
+      ],
+      "rules": [
+        "Новые graph blobs: staging → hash/size/schema check → durable intent → objects/<sha256>/content + fsync → READY SQL. Это не общая атомарность DB+filesystem; G12 закрывает intent.",
+        "Существующие C11/code, validation, contexts, experiments и submissions сохраняют свои пути/ArtifactRef. Dispatcher принимает их в persistent registry после проверки bytes, фиксирует immutable pin. Optional blob archive получает отдельный artifact_id, не меняет C11 trace.",
+        "Artifacts.resolve использует доверенный locator; relative_path внешнего input_ артефакта — виртуальный alias, не физический путь. Сохранить GArtifactLocation(root=task/run, root_relative_path, external) отдельно.",
+        "Research threads могут писать только staged files через Artifacts lock; все SQLite операции, включая g_artifacts, только в dispatcher. READY bytes/metadata не перезаписываются.",
+        "G09 не публикует итоговый CSV. Источники данных не копируются без необходимости; task external locations проверяются относительно task_root."
+      ],
+      "errors": [
+        "ARTIFACT_HASH_MISMATCH",
+        "ARTIFACT_SCHEMA_INVALID",
+        "UNSAFE_PATH",
+        "DISK_BUDGET_EXCEEDED"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g09",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g09",
+        "payload": {
+          "staging_relative_path": "staging/producer-001/solution.json",
+          "kind": "solution_manifest",
+          "media_type": "application/json",
+          "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_size_bytes": 100
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g09",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "artifact": {
+            "artifact_id": "artifact-solution-001",
+            "run_id": "run-demo-001",
+            "kind": "solution_manifest",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/json"
+          },
+          "disposition": "created",
+          "ready": true
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g09",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "ARTIFACT_HASH_MISMATCH",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G09"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL artifacts.register_staged",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G09_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G09_Response"
+      },
+      "request_schema_name": "G09_Request",
+      "response_schema_name": "G09_Response"
+    },
+    {
+      "id": "G10",
+      "python_call": "artifacts.resolve",
+      "title": "Разрешить ссылки на готовые артефакты",
+      "owner": "A",
+      "input_schema": "G10_Request",
+      "output_schema": "G10_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "Все ссылки принадлежат envelope.run_id; вернуть в порядке запроса. STAGED/MISSING/CORRUPT — ошибка всего запроса.",
+        "verify_bytes=true читает фактический файл и проверяет hash/размер; false доверяет READY registry. При обнаружении порчи G12 блокирует зависимые операции, не меняя исторический score на выдуманный."
+      ],
+      "errors": [
+        "ARTIFACT_NOT_READY",
+        "ARTIFACT_HASH_MISMATCH",
+        "CROSS_RUN_REFERENCE"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g10",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "artifact_ids": [
+            "artifact-solution-001"
+          ],
+          "verify_bytes": true
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g10",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "artifacts": [
+            {
+              "artifact_id": "artifact-solution-001",
+              "run_id": "run-demo-001",
+              "kind": "solution_manifest",
+              "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size_bytes": 100,
+              "media_type": "application/json"
+            }
+          ]
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g10",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "ARTIFACT_NOT_READY",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G10"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL artifacts.resolve",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G10_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G10_Response"
+      },
+      "request_schema_name": "G10_Request",
+      "response_schema_name": "G10_Response"
+    },
+    {
+      "id": "G11",
+      "python_call": "graph.export",
+      "title": "Зафиксировать граф и итоговое сравнение",
+      "owner": "A+C",
+      "input_schema": "G11_Request",
+      "output_schema": "G11_Response",
+      "transaction": "T11",
+      "timeout_seconds": 30,
+      "lead_contracts": [
+        "C17",
+        "C21",
+        "C23"
+      ],
+      "rules": [
+        "Сравнивать все eligible full evaluations запуска: предки, листья, paused/archived/sealed ветви, late results и evaluated ensembles. Только лучшие листья — неверный критерий.",
+        "Группировка сравнимости: task/dataset/validation protocol_sha256/metric_id/direction/fidelity/evaluator implementation. Нельзя ранжировать screening рядом с full или разные validation в одной таблице.",
+        "Основной режим совместим с C17: лучший отдельный full experiment; equality сохраняет ранее committed. Реплики и uncertainty показываются отдельно; переход на mean-of-seeds требует новой selection_policy_id и согласованного C17/C21.",
+        "Граф/ранкинг/JSONL — derived immutable exports из одного read-cut, не второй источник истины. final делается после закрытия очереди результатов или явно маркирует выбранный captured_event_seq.",
+        "C23 проверяет реально опубликованный champion через C21 и hash выходного файла. Лучший оценённый может отличаться от готового CSV, если refit ещё не завершён."
+      ],
+      "errors": [
+        "PROTOCOL_MISMATCH",
+        "ARTIFACT_NOT_READY",
+        "SELECTION_POLICY_MISMATCH"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g11",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g11",
+        "payload": {
+          "task_spec_id": "task-v1",
+          "validation_id": "validation-a269d545925fba82",
+          "selection_policy_id": "selection-v1",
+          "scope": "final"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g11",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "graph_artifact": {
+            "artifact_id": "artifact-graph-export",
+            "run_id": "run-demo-001",
+            "kind": "graph_export",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/json"
+          },
+          "ranking_artifact": {
+            "artifact_id": "artifact-ranking",
+            "run_id": "run-demo-001",
+            "kind": "ranking_report",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/json"
+          },
+          "events_artifact": {
+            "artifact_id": "artifact-events",
+            "run_id": "run-demo-001",
+            "kind": "events_export",
+            "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size_bytes": 100,
+            "media_type": "application/x-ndjson"
+          },
+          "best_evaluated_experiment_id": "exp-001",
+          "published_champion_experiment_id": "exp-001",
+          "captured_event_seq": 40
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g11",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "PROTOCOL_MISMATCH",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G11"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.export",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G11_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G11_Response"
+      },
+      "request_schema_name": "G11_Request",
+      "response_schema_name": "G11_Response"
+    },
+    {
+      "id": "G12",
+      "python_call": "graph.recover",
+      "title": "Восстановить целостность перед выдачей заданий",
+      "owner": "A",
+      "input_schema": "G12_Request",
+      "output_schema": "G12_Response",
+      "transaction": "T12",
+      "timeout_seconds": 60,
+      "lead_contracts": [
+        "C13",
+        "C15",
+        "C21",
+        "C24"
+      ],
+      "rules": [
+        "Проверка/repair только текущего run при закрытой выдаче: SQLite FK/integrity, intents/READY checksums, pending outbox, process fences и существующий publication_journal.",
+        "Текущий Runtime при новом CLI создаёт новый run_id и не возобновляет старое исследование. G12 не обещает automatic resume контейнера; это отдельная будущая задача.",
+        "При repair старые issued/preparing контексты отзываются и branch epochs увеличиваются; уже выполненные оценки/публикации не откатываются. Перед перевыдачей ресурсов остановить process group через C24.",
+        "Исходный monotonic deadline не продлевается. Без доверенного остатка времени search_allowed=false; сохранить готовый CSV."
+      ],
+      "errors": [
+        "WRITER_LOCK_UNAVAILABLE",
+        "RECOVERY_UNSAFE",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g12",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g12",
+        "payload": {
+          "mode": "repair",
+          "trusted_wall_seconds_remaining": 9000
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g12",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "state": "recovered",
+          "repaired_intent_ids": [
+            "intent-001"
+          ],
+          "revoked_work_order_ids": [
+            "work-old-001"
+          ],
+          "orphan_job_ids": [],
+          "blocking_reasons": [],
+          "search_allowed": true,
+          "graph_revision": 41
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g12",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "WRITER_LOCK_UNAVAILABLE",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": true,
+          "retry_after_seconds": 0,
+          "details": {
+            "contract_id": "G12"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.recover",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G12_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G12_Response"
+      },
+      "request_schema_name": "G12_Request",
+      "response_schema_name": "G12_Response"
+    },
+    {
+      "id": "G13",
+      "python_call": "graph.inspect",
+      "title": "Прочитать ограниченное представление графа",
+      "owner": "A",
+      "input_schema": "G13_Request",
+      "output_schema": "G13_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "Только чтение и только run scope. limit<=1000 проверяется семантически; after_event_seq — исключительная нижняя граница.",
+        "Пагинация ограничивает events; branches/heads — текущая bounded policy структура, не весь набор solutions. Для полного воспроизводимого графа G11.",
+        "next_event_seq — continuation cursor: последний реально выданный event_seq, если остаются строки; иначе null. Следующий запрос использует after_event_seq=этот cursor, не seq ещё не выданного события.",
+        "GEvent.record_schema — allowlisted имя схемы или оригинального Cxx payload/data; record дополнительно валидируется по нему. Нельзя передавать произвольный $ref/SQL/путь.",
+        "Интерфейс мониторинга. LLM не получает его полный ответ автоматически: контекст строится только G03/C08."
+      ],
+      "errors": [
+        "CROSS_RUN_REFERENCE",
+        "INVALID_PAGE_LIMIT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g13",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "branch_id": "branch-root",
+          "after_event_seq": 0,
+          "limit": 100
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g13",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "branches": [
+            {
+              "branch_id": "branch-root",
+              "parent_branch_id": null,
+              "fork_checkpoint_id": null,
+              "decision_idea_id": null,
+              "decision": "root",
+              "state": "active",
+              "branch_revision": 0,
+              "constraints": {
+                "required_capability_ids": [],
+                "forbidden_capability_ids": []
+              },
+              "created_event_seq": 1
+            }
+          ],
+          "heads": [
+            {
+              "branch_id": "branch-root",
+              "head": {
+                "researcher_id": "researcher-1",
+                "solution_id": null,
+                "experiment_id": null,
+                "head_revision": 0
+              }
+            }
+          ],
+          "events": [],
+          "next_event_seq": null,
+          "captured_event_seq": 1,
+          "graph_revision": 1
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g13",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "CROSS_RUN_REFERENCE",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "G13"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.inspect",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G13_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G13_Response"
+      },
+      "request_schema_name": "G13_Request",
+      "response_schema_name": "G13_Response"
+    },
+    {
+      "id": "I00",
+      "python_call": "constructor.verify",
+      "title": "Проверить исполняемый manifest конструктора",
+      "owner": "C",
+      "input_schema": "I00_Request",
+      "output_schema": "I00_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C06",
+        "C11",
+        "C12"
+      ],
+      "rules": [
+        "Текущий entrypoint: make_pipeline(task_spec, params); worker добавляет _cpu_threads и _seed, затем enforce_threads. Нельзя подменять это трёхаргументным интерфейсом без общей миграции.",
+        "Manifest фиксирует code hash, переданные normalized params, component/provenance hashes и окружение. Применимость component проверяется registry.",
+        "catalog_verified: повторная компиляция известного recipe/patch даёт тот же код и реализацию feature steps. generated arbitrary Python: declared_only; не считать его доказанной реализацией/отсутствием capability."
+      ],
+      "errors": [
+        "MANIFEST_MISMATCH",
+        "UNVERIFIABLE_COMPONENT",
+        "ARTIFACT_NOT_READY"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i00",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "plan": {
+            "plan_id": "plan-001",
+            "researcher_id": "researcher-1",
+            "parent_ids": [
+              "exp-baseline"
+            ],
+            "hypothesis": "Проверить линейный рецепт на общем протоколе.",
+            "expected_effect": "Измерить качество независимого простого направления.",
+            "recipe_id": "linear-classifier-v1",
+            "task_spec_id": "task-v1",
+            "dataset_id": "dataset-demo-v1",
+            "validation_id": "validation-a269d545925fba82",
+            "seed": 42,
+            "fidelity": "full",
+            "model": {
+              "family": "linear",
+              "hyperparameters": {
+                "C": 1.0,
+                "class_weight": null
+              }
+            },
+            "feature_steps": [],
+            "code_artifact_id": "art-code-001",
+            "resources": {
+              "cpu_threads": 3,
+              "memory_limit_mb": 10240,
+              "timeout_seconds": 600
+            }
+          },
+          "manifest": {
+            "manifest_version": "solution-1.0",
+            "run_id": "run-demo-001",
+            "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "core": {
+              "recipe_id": "linear-classifier-v1",
+              "recipe_version": "1.0",
+              "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+              "model_family": "linear",
+              "effective_hyperparameters": {
+                "C": 1.0,
+                "class_weight": null
+              },
+              "effective_feature_steps": [],
+              "components": [
+                {
+                  "capability_id": "model.linear",
+                  "version": "1.0",
+                  "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+                  "parameters": {
+                    "C": 1.0
+                  },
+                  "dependency_component_ids": [],
+                  "origin": "builtin",
+                  "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+                }
+              ],
+              "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "constructor_version": "constructor-1.0",
+              "candidate_interface_version": "make_pipeline-2arg-v1"
+            },
+            "component_provenance_artifact_ids": [
+              {
+                "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf",
+                "artifact_id": "artifact-catalog-provenance"
+              }
+            ],
+            "verification_level": "catalog_verified"
+          },
+          "code_artifact": {
+            "artifact_id": "art-code-001",
+            "run_id": "run-demo-001",
+            "kind": "python_source",
+            "relative_path": "code/linear-fixture/experiment.py",
+            "sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+            "size_bytes": 144,
+            "media_type": "text/x-python"
+          },
+          "catalog_manifest_artifact_id": "artifact-catalog"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i00",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "manifest": {
+            "manifest_version": "solution-1.0",
+            "run_id": "run-demo-001",
+            "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+            "core": {
+              "recipe_id": "linear-classifier-v1",
+              "recipe_version": "1.0",
+              "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+              "model_family": "linear",
+              "effective_hyperparameters": {
+                "C": 1.0,
+                "class_weight": null
+              },
+              "effective_feature_steps": [],
+              "components": [
+                {
+                  "capability_id": "model.linear",
+                  "version": "1.0",
+                  "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+                  "parameters": {
+                    "C": 1.0
+                  },
+                  "dependency_component_ids": [],
+                  "origin": "builtin",
+                  "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+                }
+              ],
+              "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "constructor_version": "constructor-1.0",
+              "candidate_interface_version": "make_pipeline-2arg-v1"
+            },
+            "component_provenance_artifact_ids": [
+              {
+                "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf",
+                "artifact_id": "artifact-catalog-provenance"
+              }
+            ],
+            "verification_level": "catalog_verified"
+          },
+          "effective_capability_ids": [
+            "model.linear"
+          ],
+          "component_dependency_closure_ids": [
+            "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+          ]
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i00",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "MANIFEST_MISMATCH",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "I00"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL constructor.verify",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/I00_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/I00_Response"
+      },
+      "request_schema_name": "I00_Request",
+      "response_schema_name": "I00_Response"
+    },
+    {
+      "id": "I01",
+      "python_call": "constraints.check",
+      "title": "Проверить required/forbidden по реальным компонентам",
+      "owner": "A",
+      "input_schema": "I01_Request",
+      "output_schema": "I01_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "effective_capability_ids — только выход I00 из доверенного процесса, включая dependency closure; вызов из пользовательского LLM JSON запрещён.",
+        "Все required присутствуют; ни один forbidden не присутствует. Нарушение — error, а не valid=false с разрешением продолжить.",
+        "Запрет относится к capability_id независимо от версии/параметров component. Пересечение required/forbidden — CONSTRAINT_CONFLICT."
+      ],
+      "errors": [
+        "CONSTRAINT_VIOLATION",
+        "CONSTRAINT_CONFLICT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i01",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "constraints": {
+            "required_capability_ids": [],
+            "forbidden_capability_ids": []
+          },
+          "effective_capability_ids": [
+            "model.catboost"
+          ]
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i01",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "valid": true,
+          "satisfied_required_capability_ids": []
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i01",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "CONSTRAINT_VIOLATION",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "I01"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL constraints.check",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/I01_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/I01_Response"
+      },
+      "request_schema_name": "I01_Request",
+      "response_schema_name": "I01_Response"
+    },
+    {
+      "id": "I02",
+      "python_call": "lineage.resolve",
+      "title": "Проверить родителей и подготовить типизированные рёбра",
+      "owner": "A",
+      "input_schema": "I02_Request",
+      "output_schema": "I02_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "Перечитать work order и родителей из DB и сверить с входом; не принимать JSON work_order как источник разрешений.",
+        "plan_parent_ids равен dedup [base]+donors+ensemble_members. Base совпадает с work order; остальные входят в allowed_donor_experiment_ids и имеют trusted full evaluation/READY components.",
+        "Новая solution: только существующие parent solutions, до одного primary, ensemble не менее 2 членов при action=ensemble. Проверить отсутствие цикла recursive SQL.",
+        "Существующая candidate solution: canonical_edges=[], alternate_provenance_only=true, включая replicate. Причинность повторного получения хранится в proposal/event, а не mutable DAG."
+      ],
+      "errors": [
+        "LINEAGE_MISMATCH",
+        "DONOR_NOT_ALLOWED",
+        "DAG_CYCLE",
+        "CROSS_RUN_REFERENCE"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i02",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "work_order": {
+            "work_order_id": "work-001",
+            "run_id": "run-demo-001",
+            "researcher_id": "researcher-1",
+            "branch_id": "branch-root",
+            "branch_revision": 0,
+            "base_head_revision": 1,
+            "base_experiment_id": "exp-baseline",
+            "base_solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+            "base_team_checkpoint_id": "checkpoint-001",
+            "allowed_donor_experiment_ids": [],
+            "action": "improve",
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "task_spec_id": "task-v1",
+            "dataset_id": "dataset-demo-v1",
+            "validation_id": "validation-a269d545925fba82",
+            "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+            "context_id": "context-001",
+            "context_capsule_artifact_id": "artifact-capsule-001",
+            "issued_elapsed_ms": 1000,
+            "expires_elapsed_ms": 61000,
+            "state": "issued"
+          },
+          "lineage": {
+            "base_experiment_id": "exp-baseline",
+            "idea_donor_experiment_ids": [],
+            "ensemble_member_experiment_ids": [],
+            "source_idea_ids": []
+          },
+          "plan_parent_ids": [
+            "exp-baseline"
+          ],
+          "candidate_solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i02",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "canonical_edges": [
+            {
+              "parent_solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+              "child_solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+              "kind": "primary"
+            }
+          ],
+          "alternate_provenance_only": false
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i02",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "LINEAGE_MISMATCH",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "I02"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL lineage.resolve",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/I02_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/I02_Response"
+      },
+      "request_schema_name": "I02_Request",
+      "response_schema_name": "I02_Response"
+    },
+    {
+      "id": "I03",
+      "python_call": "identity.solution",
+      "title": "Вычислить идентичность решения",
+      "owner": "A",
+      "input_schema": "I03_Request",
+      "output_schema": "I03_Response",
+      "transaction": "read",
+      "timeout_seconds": 10,
+      "lead_contracts": [],
+      "rules": [
+        "pyjson-v1 совместим с agent.contracts.canonical: UTF-8 sort_keys=True, ensure_ascii=False, separators=(comma,colon), allow_nan=False.",
+        "solution_hash=SHA256(core), solution_id=sol-<hash>. Seed/fidelity/validation, researcher, пути и гипотеза вне core; environment frozen и документирован.",
+        "C12 fingerprint остаётся отдельной фактической функцией Store.reserve. Схема GExperimentFingerprintCore фиксирует её точные ключи."
+      ],
+      "errors": [
+        "MANIFEST_MISMATCH",
+        "NON_FINITE_JSON"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i03",
+        "run_id": "run-demo-001",
+        "idempotency_key": null,
+        "payload": {
+          "core": {
+            "recipe_id": "linear-classifier-v1",
+            "recipe_version": "1.0",
+            "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+            "model_family": "linear",
+            "effective_hyperparameters": {
+              "C": 1.0,
+              "class_weight": null
+            },
+            "effective_feature_steps": [],
+            "components": [
+              {
+                "capability_id": "model.linear",
+                "version": "1.0",
+                "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+                "parameters": {
+                  "C": 1.0
+                },
+                "dependency_component_ids": [],
+                "origin": "builtin",
+                "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+              }
+            ],
+            "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "constructor_version": "constructor-1.0",
+            "candidate_interface_version": "make_pipeline-2arg-v1"
+          }
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i03",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+          "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+          "canonicalization": "pyjson-v1"
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-i03",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "MANIFEST_MISMATCH",
+          "message": "Синтетический пример отказа; побочные эффекты не завершены.",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {
+            "contract_id": "I03"
+          }
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL identity.solution",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/I03_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/I03_Response"
+      },
+      "request_schema_name": "I03_Request",
+      "response_schema_name": "I03_Response"
+    },
+    {
+      "id": "G14",
+      "python_call": "search.decide",
+      "title": "Сохранить структурированное решение SearchPolicy",
+      "owner": "A",
+      "transaction": "T14",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C07",
+        "C22"
+      ],
+      "rules": [
+        "Стратегия — обычный код, не LLM. Читает согласованный checkpoint, допустимые действия каталога, full evaluations и реальный budget.",
+        "CONTINUE→G03; FORK→G02 confirmed idea; BACKTRACK→G08 resume сохранённого reject; TRANSFER_COMPONENT→G03 action=transfer; FINALIZE→C22.",
+        "Сохранить decision/evidence в graph journal до исполнения. CAS каждого исполняемого действия повторно проверяется его собственным контрактом.",
+        "G14 не гарантирует, что действие ещё доступно через секунду. При конфликте строится новый checkpoint и новое решение; старое не переписывается."
+      ],
+      "errors": [
+        "CHECKPOINT_NOT_FOUND",
+        "SEARCH_CLOSED",
+        "BRANCH_REVISION_CONFLICT"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g14",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g14",
+        "payload": {
+          "checkpoint_id": "checkpoint-001",
+          "budget": {
+            "wall_seconds_remaining": 9200,
+            "finalization_reserve_seconds": 1200,
+            "cpu_threads_available": 6,
+            "memory_mb_available": 20480,
+            "llm_calls_remaining": 30,
+            "search_allowed": true
+          },
+          "plateau_assessment_id": null
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g14",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "decision": {
+            "decision_id": "decision-001",
+            "checkpoint_id": "checkpoint-001",
+            "evidence_ids": [
+              "eval-baseline"
+            ],
+            "reason": "Выбрать отдельное допустимое продолжение без смены чужих голов",
+            "action": "CONTINUE",
+            "parameters": {
+              "branch_id": "branch-root",
+              "researcher_id": "researcher-1",
+              "action": "improve",
+              "allowed_donor_experiment_ids": []
+            }
+          },
+          "decision_artifact_id": "artifact-decision-001",
+          "graph_revision": 15
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g14",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "CHECKPOINT_NOT_FOUND",
+          "message": "Не найден снимок текущего run",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {}
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL search.decide",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G14_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G14_Response"
+      },
+      "request_schema_name": "G14_Request",
+      "response_schema_name": "G14_Response"
     }
   ],
   "shared_definitions": [

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g07",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g07",
+  "payload": {
+    "branch_id": "branch-accept-f",
+    "expected_branch_revision": 0
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g11",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g11",
+  "payload": {
+    "task_spec_id": "task-v1",
+    "validation_id": "validation-a269d545925fba82",
+    "selection_policy_id": "selection-v1",
+    "scope": "final"
+  }
+}

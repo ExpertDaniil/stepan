@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-i02",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "work_order": {
+      "work_order_id": "work-001",
+      "run_id": "run-demo-001",
+      "researcher_id": "researcher-1",
+      "branch_id": "branch-root",
+      "branch_revision": 0,
+      "base_head_revision": 1,
+      "base_experiment_id": "exp-baseline",
+      "base_solution_id": "sol-421ed78b8ab66a6749b953bfaff7271e5acee1d3a24f84e120cf0a5da42f87e8",
+      "base_team_checkpoint_id": "checkpoint-001",
+      "allowed_donor_experiment_ids": [],
+      "action": "improve",
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": []
+      },
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "validation_id": "validation-a269d545925fba82",
+      "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+      "context_id": "context-001",
+      "context_capsule_artifact_id": "artifact-capsule-001",
+      "issued_elapsed_ms": 1000,
+      "expires_elapsed_ms": 61000,
+      "state": "issued"
+    },
+    "lineage": {
+      "base_experiment_id": "exp-baseline",
+      "idea_donor_experiment_ids": [],
+      "ensemble_member_experiment_ids": [],
+      "source_idea_ids": []
+    },
+    "plan_parent_ids": [
+      "exp-baseline"
+    ],
+    "candidate_solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c"
+  }
+}

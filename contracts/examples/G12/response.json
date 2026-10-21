@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g12",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "state": "recovered",
+    "repaired_intent_ids": [
+      "intent-001"
+    ],
+    "revoked_work_order_ids": [
+      "work-old-001"
+    ],
+    "orphan_job_ids": [],
+    "blocking_reasons": [],
+    "search_allowed": true,
+    "graph_revision": 41
+  },
+  "error": null
+}

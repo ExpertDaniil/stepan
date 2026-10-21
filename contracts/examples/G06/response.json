@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g06",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "idea": {
+      "idea_id": "idea-encoding-001",
+      "title": "Балансировка классов в линейном рецепте",
+      "hypothesis": "Проверить class_weight=balanced против того же рецепта без весов.",
+      "source_experiment_id": "exp-idea-001",
+      "capability_ids": [
+        "feature.class_weight"
+      ],
+      "transfer_patch_artifact_id": "artifact-transfer-patch",
+      "fork_checkpoint_id": "checkpoint-001",
+      "effects": [
+        {
+          "baseline_experiment_id": "exp-001",
+          "candidate_experiment_id": "exp-idea-001",
+          "baseline_evaluation_id": "eval-001",
+          "candidate_evaluation_id": "eval-idea-001",
+          "seed": 42,
+          "delta_utility": 0.006
+        }
+      ],
+      "transfer_pilot_experiment_ids": [
+        "exp-peer2-pilot"
+      ],
+      "status": "confirmed",
+      "gate_reasons": [],
+      "created_event_seq": 20,
+      "component_trial_ids": [
+        "component-trial-001"
+      ]
+    },
+    "graph_revision": 20
+  },
+  "error": null
+}

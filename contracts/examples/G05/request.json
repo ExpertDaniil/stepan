@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g05",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g05",
+  "payload": {
+    "evaluation_id": "eval-001",
+    "experiment_id": "exp-001",
+    "selection_policy_id": "same-protocol-primary-v1"
+  }
+}

@@ -117,6 +117,15 @@ class Gateway:
 
     def _request(self, request, context, payload, attempt, deadline):
         from contextvars import copy_context
+        request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+        byte_limit = self.config.max_context_tokens * 3
+        if context["metadata"].get("graph_binding"):
+            user = json.loads(context["messages"][1]["content"])
+            byte_limit = min(byte_limit, self.config.graph_context_bytes, user["profile_summary"]["context_budget"]["max_api_request_bytes"])
+        if request_bytes > byte_limit:
+            raise AgentError("CONTEXT_TOO_LARGE", "Complete API request including schema/tools/repair exceeds the byte budget",
+                             details={"request_bytes": request_bytes, "limit_bytes": byte_limit})
+        self.log.event("llm.request_budget_checked", level="DEBUG", request_bytes=request_bytes, limit_bytes=byte_limit)
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")

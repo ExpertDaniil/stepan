@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g09",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g09",
+  "payload": {
+    "staging_relative_path": "staging/producer-001/solution.json",
+    "kind": "solution_manifest",
+    "media_type": "application/json",
+    "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_size_bytes": 100
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g14",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "decision": {
+      "decision_id": "decision-001",
+      "checkpoint_id": "checkpoint-001",
+      "evidence_ids": [
+        "eval-baseline"
+      ],
+      "reason": "Выбрать отдельное допустимое продолжение без смены чужих голов",
+      "action": "CONTINUE",
+      "parameters": {
+        "branch_id": "branch-root",
+        "researcher_id": "researcher-1",
+        "action": "improve",
+        "allowed_donor_experiment_ids": []
+      }
+    },
+    "decision_artifact_id": "artifact-decision-001",
+    "graph_revision": 15
+  },
+  "error": null
+}

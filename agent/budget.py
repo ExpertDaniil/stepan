@@ -102,7 +102,8 @@ class Budget:
                 raise AgentError("BUDGET_EXHAUSTED", "Insufficient time for this phase")
             if req["cpu_threads"] > 3 or req["memory_limit_mb"] > 10240:
                 raise AgentError("INVALID_PLAN", "Per-job resource limit exceeded")
-            if len(self.leases) >= self.config.max_workers or req["cpu_threads"] > snapshot["cpu_threads_available"] or req["memory_limit_mb"] > snapshot["memory_mb_available"]:
+            train_busy = payload["phase"] == "train" and sum(item["phase"] == "train" for item in self.leases.values()) >= getattr(self, "train_worker_limit", self.config.max_workers)
+            if train_busy or len(self.leases) >= self.config.max_workers or req["cpu_threads"] > snapshot["cpu_threads_available"] or req["memory_limit_mb"] > snapshot["memory_mb_available"]:
                 return {"granted": False, "lease": None, "retry_after_seconds": 1, "budget": snapshot}
             self.token += 1
             lease = {"lease_id": "lease-" + uuid.uuid4().hex[:12], "fencing_token": self.token,

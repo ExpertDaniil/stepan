@@ -12,13 +12,22 @@ from tools.code import write_code
 
 class Orchestrator:
     def __init__(self, *, config, bus, budget, artifacts, store, runner, evaluator, submission, researcher,
-                 spec, validation, catalog, task_text, profile, log, demo=None):
+                 spec, validation, catalog, task_text, profile, log, demo=None, task_root=None):
         self.config, self.bus, self.budget, self.artifacts, self.store = config, bus, budget, artifacts, store
         self.runner, self.evaluator, self.submission, self.researcher = runner, evaluator, submission, researcher
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
         self.researcher.validation_id = validation["validation_id"]
         self.degraded = False
+        self.graph = None
+        if config.graph_enabled:
+            from agent.graph.service import GraphService
+            task_root = task_root or artifacts.resolve(spec["train_artifact_id"]).parent
+            self.graph = GraphService(self, task_root)
+            self.graph.initialize_defaults()
+            recovery = self.graph.invoke("G12", {"mode": "inspect", "trusted_wall_seconds_remaining": int(budget.remaining())})
+            if recovery["state"] == "blocked":
+                raise AgentError("GRAPH_RECOVERY_BLOCKED", "; ".join(recovery["blocking_reasons"]))
 
     def call(self, cid, payload, handler, key=None):
         return self.bus.call(cid, payload, handler, key=key)["data"]
@@ -87,6 +96,13 @@ class Orchestrator:
                     event = self.runner.poll(job)
                 if event is None:
                     continue
+                if getattr(self, "graph", None):
+                    try:
+                        self.graph.pin_event_outputs(event)
+                    except (AgentError, OSError) as exc:
+                        self.degraded = True
+                        error = exc if isinstance(exc, AgentError) else AgentError("ARTIFACT_REGISTRATION_FAILED", str(exc))
+                        event = {**event, "state": "failed", "error": error.as_dict()}
                 self.call("C15", {"event": event}, lambda p, phase=job.phase: self.store.apply_event(p["event"], phase), key=event["event_id"])
                 self.release(job)
                 job.reported = True
@@ -98,7 +114,10 @@ class Orchestrator:
                 time.sleep(0.1)
         return results
 
-    def run_training(self, plans):
+    def run_training(self, plans, tickets=None):
+        if getattr(self, "graph", None):
+            from agent.graph.controller import train
+            return train(self, plans, tickets)
         jobs = []
         for plan in plans:
             record = self.call("C12", {"plan": plan}, self.submit_plan)
@@ -176,7 +195,10 @@ class Orchestrator:
     def finalize_best(self):
         previous = set(self.submission.jobs)
         try:
-            return self._finalize_best()
+            result = self._finalize_best()
+            if self.graph:
+                self.graph.acknowledge_publications()
+            return result
         except Exception:
             for ident in set(self.submission.jobs) - previous:
                 if self.submission.jobs[ident]["state"] not in {"failed", "timed_out", "cancelled", "published", "skipped_not_better"}:
@@ -224,6 +246,8 @@ class Orchestrator:
 
     def control(self, payload):
         self.budget.search_stopped = True
+        if self.graph:
+            self.graph.close_search(payload["reason"])
         self.store.set_run_state("finalizing")
         if payload["action"] == "cancel_jobs":
             for ident in payload["cancel_job_ids"]:
@@ -233,6 +257,9 @@ class Orchestrator:
                 "active_job_ids": [job.job_id for job in self.runner.active()]}
 
     def run(self):
+        if self.graph:
+            from agent.graph.controller import run
+            return run(self)
         self.store.set_run_state("baseline")
         self.run_training([self.baseline_plan()])
         self.finalize_best()

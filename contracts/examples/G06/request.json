@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g06",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g06",
+  "payload": {
+    "title": "Балансировка классов в линейном рецепте",
+    "hypothesis": "Проверить class_weight=balanced против того же рецепта без весов.",
+    "source_experiment_id": "exp-idea-001",
+    "capability_ids": [
+      "feature.class_weight"
+    ],
+    "fork_checkpoint_id": "checkpoint-001",
+    "baseline_experiment_ids": [
+      "exp-001"
+    ],
+    "candidate_experiment_ids": [
+      "exp-idea-001"
+    ],
+    "transfer_pilot_experiment_ids": [
+      "exp-peer2-pilot"
+    ],
+    "transfer_patch_artifact_id": "artifact-transfer-patch"
+  }
+}

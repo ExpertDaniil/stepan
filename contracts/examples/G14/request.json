@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g14",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g14",
+  "payload": {
+    "checkpoint_id": "checkpoint-001",
+    "budget": {
+      "wall_seconds_remaining": 9200,
+      "finalization_reserve_seconds": 1200,
+      "cpu_threads_available": 6,
+      "memory_mb_available": 20480,
+      "llm_calls_remaining": 30,
+      "search_allowed": true
+    },
+    "plateau_assessment_id": null
+  }
+}

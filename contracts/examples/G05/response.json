@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g05",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "lead_commit": {
+      "experiment_state": "evaluated",
+      "best_evaluated_experiment_id": "exp-001",
+      "published_champion_experiment_id": "exp-baseline",
+      "should_prepare_submission": true,
+      "store_revision": 11
+    },
+    "head_results": [
+      {
+        "work_order_id": "work-001",
+        "branch_id": "branch-root",
+        "researcher_id": "researcher-1",
+        "disposition": "advanced",
+        "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+        "experiment_id": "exp-001",
+        "head_revision": 2
+      }
+    ],
+    "graph_revision": 12
+  },
+  "error": null
+}

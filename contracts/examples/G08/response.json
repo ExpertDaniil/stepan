@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g08",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "branch": {
+      "branch_id": "branch-reject-f",
+      "parent_branch_id": "branch-root",
+      "fork_checkpoint_id": "checkpoint-001",
+      "decision_idea_id": "idea-encoding-001",
+      "decision": "reject",
+      "state": "active",
+      "branch_revision": 1,
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": [
+          "feature.class_weight"
+        ]
+      },
+      "created_event_seq": 22
+    },
+    "revoked_work_order_ids": [],
+    "origin_running_job_ids": [],
+    "graph_revision": 30
+  },
+  "error": null
+}

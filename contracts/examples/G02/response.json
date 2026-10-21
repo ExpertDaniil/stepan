@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g02",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "parent_branch": {
+      "branch_id": "branch-root",
+      "parent_branch_id": null,
+      "fork_checkpoint_id": null,
+      "decision_idea_id": null,
+      "decision": "root",
+      "state": "sealed",
+      "branch_revision": 1,
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": []
+      },
+      "created_event_seq": 1
+    },
+    "accept_branch": {
+      "branch_id": "branch-accept-f",
+      "parent_branch_id": "branch-root",
+      "fork_checkpoint_id": "checkpoint-001",
+      "decision_idea_id": "idea-encoding-001",
+      "decision": "accept",
+      "state": "active",
+      "branch_revision": 0,
+      "constraints": {
+        "required_capability_ids": [
+          "feature.class_weight"
+        ],
+        "forbidden_capability_ids": []
+      },
+      "created_event_seq": 21
+    },
+    "reject_branch": {
+      "branch_id": "branch-reject-f",
+      "parent_branch_id": "branch-root",
+      "fork_checkpoint_id": "checkpoint-001",
+      "decision_idea_id": "idea-encoding-001",
+      "decision": "reject",
+      "state": "paused",
+      "branch_revision": 0,
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": [
+          "feature.class_weight"
+        ]
+      },
+      "created_event_seq": 22
+    },
+    "revoked_work_order_ids": [
+      "work-old-peer3"
+    ],
+    "origin_running_job_ids": [
+      "job-old-peer3"
+    ],
+    "graph_revision": 22
+  },
+  "error": null
+}

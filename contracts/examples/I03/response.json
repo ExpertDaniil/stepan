@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-i03",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+    "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+    "canonicalization": "pyjson-v1"
+  },
+  "error": null
+}

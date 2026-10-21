@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g02",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g02",
+  "payload": {
+    "parent_branch_id": "branch-root",
+    "expected_branch_revision": 0,
+    "checkpoint_id": "checkpoint-001",
+    "idea_id": "idea-encoding-001"
+  }
+}

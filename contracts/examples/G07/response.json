@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g07",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "assessment": {
+      "assessment_id": "assessment-001",
+      "branch_id": "branch-accept-f",
+      "branch_revision": 0,
+      "status": "plateau",
+      "evaluation_ids": [
+        "eval-101",
+        "eval-102",
+        "eval-103",
+        "eval-104",
+        "eval-105"
+      ],
+      "distinct_solution_count": 3,
+      "elapsed_seconds": 400,
+      "best_before_evaluation_id": "eval-100",
+      "best_after_evaluation_id": "eval-105",
+      "utility_gain": 0.0003,
+      "epsilon": 0.001,
+      "recommended_action": "pause_and_resume_sibling",
+      "reasons": [
+        "window_gain_below_epsilon"
+      ]
+    },
+    "artifact": {
+      "artifact_id": "artifact-assessment",
+      "run_id": "run-demo-001",
+      "kind": "plateau_report",
+      "relative_path": "objects/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size_bytes": 100,
+      "media_type": "application/json"
+    }
+  },
+  "error": null
+}

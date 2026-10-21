@@ -1,4 +1,5 @@
 import hashlib
+import json
 import uuid
 
 from agent.contracts import canonical
@@ -27,6 +28,9 @@ class Researcher:
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
         params = self.catalog.normalize(proposed["recipe_id"], proposed["hyperparameters"])
+        if context["metadata"].get("graph_binding"):
+            branch_user = json.loads(context["messages"][1]["content"])
+            params = self.catalog.constrain_params(proposed["recipe_id"], params, branch_user["restrictions"])
         source = factory_source(proposed["recipe_id"]) if catalog_mode else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
         code = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
@@ -40,6 +44,8 @@ class Researcher:
                 "feature_steps": self.catalog.feature_steps(params) if catalog_mode else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
                 "resources": {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                               "timeout_seconds": self.config.experiment_timeout_seconds}}
+        if context["metadata"].get("graph_binding") and branch_user["restrictions"]["required_capability_ids"]:
+            plan["parent_ids"] = list(dict.fromkeys(plan["parent_ids"]+branch_user["allowed_donor_experiment_ids"]))
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)
         self.log.event("research.hypothesis_proposed", researcher_id=payload["researcher_id"],
                        context_id=payload["context_id"], model_output_artifact_id=answer["output_artifact_id"],

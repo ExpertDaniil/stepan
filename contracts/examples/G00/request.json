@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g00",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g00",
+  "payload": {
+    "task_spec_id": "task-v1",
+    "dataset_id": "dataset-demo-v1",
+    "validation_id": "validation-a269d545925fba82",
+    "protocol_sha256": "a269d545925fba826d4ba5fc31eca2edf06f80023e4f98e1b32fd4a50dec3a94",
+    "environment_lock_artifact_id": "artifact-environment",
+    "catalog_manifest_artifact_id": "artifact-catalog",
+    "researcher_ids": [
+      "researcher-1",
+      "researcher-2"
+    ],
+    "policy": {
+      "policy_version": "graph-1.0",
+      "peer_count": 2,
+      "max_train_workers": 1,
+      "max_children_per_branch": 2,
+      "max_live_branches": 3,
+      "max_total_branches": 15,
+      "constraint_mode": "generated_python",
+      "context": {
+        "max_input_tokens": 12000,
+        "max_output_tokens": 3000,
+        "safety_tokens": 1500,
+        "provider_context_window_tokens": null,
+        "max_related_records": 8,
+        "max_error_excerpt_bytes": 2000,
+        "token_count_mode": "estimated_bytes",
+        "max_api_request_bytes": 36000
+      },
+      "promotion": {
+        "min_paired_seeds": 1,
+        "require_transfer_pilot": true,
+        "min_effect": 0.001
+      },
+      "plateau": {
+        "window_full_evaluations": 3,
+        "min_distinct_solutions": 3,
+        "min_elapsed_seconds": 300,
+        "absolute_epsilon": 0.001,
+        "relative_epsilon": 0.001
+      },
+      "scheduling": {
+        "preferred_branch_share": 0.7,
+        "minimum_alternative_trials": 1
+      },
+      "retention": {
+        "max_artifact_bytes": 8000000000,
+        "min_free_disk_bytes": 2000000000,
+        "keep_prediction_policy": "full_and_best"
+      }
+    }
+  }
+}

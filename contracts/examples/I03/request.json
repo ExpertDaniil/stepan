@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-i03",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "core": {
+      "recipe_id": "linear-classifier-v1",
+      "recipe_version": "1.0",
+      "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+      "model_family": "linear",
+      "effective_hyperparameters": {
+        "C": 1.0,
+        "class_weight": null
+      },
+      "effective_feature_steps": [],
+      "components": [
+        {
+          "capability_id": "model.linear",
+          "version": "1.0",
+          "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+          "parameters": {
+            "C": 1.0
+          },
+          "dependency_component_ids": [],
+          "origin": "builtin",
+          "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+        }
+      ],
+      "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "constructor_version": "constructor-1.0",
+      "candidate_interface_version": "make_pipeline-2arg-v1"
+    }
+  }
+}

@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import threading
 import uuid
+from contextlib import contextmanager
 
 from agent.contracts import canonical
 from agent.errors import AgentError
@@ -25,10 +26,38 @@ class Store:
         self.owner_thread = threading.get_ident()
         self.db = sqlite3.connect(path)
         self.db.row_factory = sqlite3.Row
+        self.graph = None
         self.db.executescript(Path(__file__).with_name("schema.sql").read_text(encoding="utf-8"))
         with self.db:
             self.db.execute("INSERT OR IGNORE INTO runs VALUES(?,?,?)", (run_id, "initializing", canonical(config)))
             self.db.execute("INSERT OR IGNORE INTO selections VALUES(?,?,?)", (run_id, None, 0))
+
+    @contextmanager
+    def transaction(self):
+        """Nested operations use SAVEPOINT, never commit the caller's transaction."""
+        self._writer()
+        nested = self.db.in_transaction
+        name = "tx_" + uuid.uuid4().hex
+        self.db.execute("SAVEPOINT " + name if nested else "BEGIN IMMEDIATE")
+        try:
+            yield
+        except BaseException:
+            if nested:
+                self.db.execute("ROLLBACK TO " + name)
+                self.db.execute("RELEASE " + name)
+            else:
+                self.db.rollback()
+            raise
+        else:
+            if nested:
+                self.db.execute("RELEASE " + name)
+            else:
+                self.db.commit()
+
+    @staticmethod
+    def fingerprint_core(plan, code_hash):
+        value = {k: plan[k] for k in ("dataset_id", "task_spec_id", "validation_id", "recipe_id", "model", "feature_steps", "seed", "fidelity")}
+        return {**value, "code_sha256": code_hash}
 
     def _writer(self):
         if threading.get_ident() != self.owner_thread:
@@ -50,25 +79,32 @@ class Store:
 
     def reserve(self, plan, code_hash):
         self._writer()
-        identity = {k: plan[k] for k in ("dataset_id", "task_spec_id", "validation_id", "recipe_id", "model", "feature_steps", "seed", "fidelity")}
-        identity["code_sha256"] = code_hash
+        with self.transaction():
+            result = self.reserve_tx(plan, code_hash)
+        if result["disposition"] == "created":
+            self.log.event("experiment.reserved", experiment_id=result["experiment_id"], fingerprint=result["fingerprint"], researcher_id=plan["researcher_id"])
+        return result
+
+    def reserve_tx(self, plan, code_hash):
+        self._writer()
+        if not self.db.in_transaction:
+            raise AgentError("TRANSACTION_REQUIRED", "reserve_tx needs an active transaction")
+        identity = self.fingerprint_core(plan, code_hash)
         fingerprint = hashlib.sha256(canonical(identity).encode()).hexdigest()
-        with self.db:
-            old = self.db.execute("SELECT experiment_id,state FROM experiments WHERE run_id=? AND fingerprint=?", (self.run_id, fingerprint)).fetchone()
-            if old:
-                return {"experiment_id": old["experiment_id"], "fingerprint": fingerprint, "disposition": "duplicate",
-                        "state": old["state"], "existing_experiment_id": old["experiment_id"]}
-            for parent in plan["parent_ids"]:
-                try:
-                    self.get(parent)
-                except AgentError as exc:
-                    raise AgentError("PARENT_NOT_FOUND", parent) from exc
-            ident = "exp-" + uuid.uuid4().hex[:12]
-            self.db.execute("INSERT INTO experiments(experiment_id,run_id,fingerprint,plan,state) VALUES(?,?,?,?,?)",
-                            (ident, self.run_id, fingerprint, canonical(plan), "queued"))
-            for parent in plan["parent_ids"]:
-                self.db.execute("INSERT INTO experiment_parents VALUES(?,?)", (ident, parent))
-        self.log.event("experiment.reserved", experiment_id=ident, fingerprint=fingerprint, researcher_id=plan["researcher_id"])
+        old = self.db.execute("SELECT experiment_id,state FROM experiments WHERE run_id=? AND fingerprint=?", (self.run_id, fingerprint)).fetchone()
+        if old:
+            return {"experiment_id": old["experiment_id"], "fingerprint": fingerprint, "disposition": "duplicate",
+                    "state": old["state"], "existing_experiment_id": old["experiment_id"]}
+        for parent in plan["parent_ids"]:
+            try:
+                self.get(parent)
+            except AgentError as exc:
+                raise AgentError("PARENT_NOT_FOUND", parent) from exc
+        ident = "exp-" + uuid.uuid4().hex[:12]
+        self.db.execute("INSERT INTO experiments(experiment_id,run_id,fingerprint,plan,state) VALUES(?,?,?,?,?)",
+                        (ident, self.run_id, fingerprint, canonical(plan), "queued"))
+        for parent in dict.fromkeys(plan["parent_ids"]):
+            self.db.execute("INSERT INTO experiment_parents VALUES(?,?)", (ident, parent))
         return {"experiment_id": ident, "fingerprint": fingerprint, "disposition": "created", "state": "queued", "existing_experiment_id": None}
 
     def start(self, ident, lease):
@@ -77,7 +113,7 @@ class Store:
         if exp["state"] != "queued":
             raise AgentError("INVALID_STATE_TRANSITION", "Only queued experiments can start")
         attempt = exp["attempt_no"] + 1
-        with self.db:
+        with self.transaction():
             self.db.execute("UPDATE experiments SET state='running',attempt_no=?,lease_id=?,fencing_token=? WHERE experiment_id=?",
                             (attempt, lease["lease_id"], lease["fencing_token"], ident))
         return attempt
@@ -92,14 +128,18 @@ class Store:
             disposition = "already_applied"
         else:
             # Refit has a distinct lease; the runner validates its job token.
-            if phase == "train" and (event["attempt_no"] != exp["attempt_no"] or event["fencing_token"] != exp["fencing_token"]):
+            if phase == "train" and (event["attempt_no"] != exp["attempt_no"] or event["fencing_token"] != exp["fencing_token"] or event["lease_id"] != exp["lease_id"]):
                 raise AgentError("STALE_LEASE", "Late event from an obsolete attempt")
+            if phase == "train" and exp["state"] != "running":
+                raise AgentError("INVALID_STATE_TRANSITION", "A terminal attempt cannot be overwritten by another event")
             state = "trained" if event["state"] == "succeeded" else event["state"]
-            with self.db:
+            with self.transaction():
                 self.db.execute("INSERT INTO job_events VALUES(?,?)", (event["event_id"], canonical(event)))
                 if phase == "train":
                     self.db.execute("UPDATE experiments SET state=?,duration=?,error=? WHERE experiment_id=?",
                                     (state, event["duration_seconds"], canonical(event["error"]) if event["error"] else None, event["experiment_id"]))
+                    if self.graph:
+                        self.graph.capture_event_tx(event)
             disposition = "applied"
             exp = self.get(event["experiment_id"])
         submission_state = ("validating" if event["state"] == "succeeded" else event["state"]) if phase == "refit" else None
@@ -108,13 +148,17 @@ class Store:
 
     def invalidate(self, ident, error):
         self._writer()
-        with self.db:
+        with self.transaction():
             self.db.execute("UPDATE experiments SET state='invalid',error=? WHERE experiment_id=?", (str(error), ident))
+            if self.graph:
+                self.graph.terminal_tx(ident, "invalid", error, "C16")
 
     def fail_start(self, ident, error):
         self._writer()
-        with self.db:
+        with self.transaction():
             self.db.execute("UPDATE experiments SET state='failed',error=? WHERE experiment_id=?", (str(error), ident))
+            if self.graph:
+                self.graph.terminal_tx(ident, "failed", error, "C15")
 
     def save_evaluation(self, record):
         self._writer()
@@ -140,18 +184,26 @@ class Store:
 
     def commit_evaluation(self, payload):
         self._writer()
+        with self.transaction():
+            return self.commit_evaluation_tx(payload)
+
+    def commit_evaluation_tx(self, payload):
+        self._writer()
+        if not self.db.in_transaction:
+            raise AgentError("TRANSACTION_REQUIRED", "commit_evaluation_tx needs an active transaction")
         ev = self.evaluation(payload["evaluation_id"])
         exp = self.get(payload["experiment_id"])
         if ev["experiment_id"] != exp["experiment_id"] or exp["state"] not in {"trained", "evaluated"}:
             raise AgentError("INVALID_STATE_TRANSITION", "Evaluation does not match a trained experiment")
+        if not ev["valid"] or ev["violations"]:
+            raise AgentError("INVALID_EVALUATION", "Only valid trusted evaluations can be committed")
         incumbent = self.best()
         promoted = False
         if ev["primary_metric"]["fidelity"] == "full":
             promoted = not incumbent or is_better(ev["primary_metric"], self.experiment_evaluation(incumbent)["primary_metric"])
-        with self.db:
-            self.db.execute("UPDATE experiments SET state='evaluated' WHERE experiment_id=?", (exp["experiment_id"],))
-            if promoted:
-                self.db.execute("UPDATE selections SET experiment_id=?,revision=revision+1 WHERE run_id=?", (exp["experiment_id"], self.run_id))
+        self.db.execute("UPDATE experiments SET state='evaluated' WHERE experiment_id=?", (exp["experiment_id"],))
+        if promoted:
+            self.db.execute("UPDATE selections SET experiment_id=?,revision=revision+1 WHERE run_id=?", (exp["experiment_id"], self.run_id))
         champion = self.champion()
         revision = self.db.execute("SELECT revision FROM selections WHERE run_id=?", (self.run_id,)).fetchone()[0]
         return {"experiment_state": "evaluated", "best_evaluated_experiment_id": self.best(),

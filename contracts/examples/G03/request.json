@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g03",
+  "run_id": "run-demo-001",
+  "idempotency_key": "key-g03",
+  "payload": {
+    "branch_id": "branch-root",
+    "expected_branch_revision": 0,
+    "researcher_id": "researcher-1",
+    "action": "improve",
+    "allowed_donor_experiment_ids": [],
+    "tools_catalog_version": "tools-v1",
+    "ttl_seconds": 60
+  }
+}

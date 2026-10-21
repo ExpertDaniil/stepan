@@ -1,7 +1,7 @@
 """Recipe implementations. This module is imported inside training processes."""
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, clone
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, StandardScaler
@@ -56,6 +56,29 @@ class ShiftedLogTargetModel(BaseEstimator):
         return np.expm1(self.estimator_.predict(X)) - self.shift_
 
 
+class NumericInteractions(TransformerMixin, BaseEstimator):
+    """Bounded squares/products. Column selection is fitted only on training rows."""
+    def __init__(self, max_numeric_columns=8):
+        self.max_numeric_columns = max_numeric_columns
+
+    def fit(self, X, y=None):
+        columns = [c for c in X if pd.api.types.is_numeric_dtype(X[c]) and not pd.api.types.is_bool_dtype(X[c])]
+        columns = columns[:self.max_numeric_columns]
+        prefix = "__automl_interaction_"
+        while any(str(c).startswith(prefix) for c in X):
+            prefix = "_"+prefix
+        self.pairs_ = [(a, b, prefix+str(i)+"_"+str(j)) for i, a in enumerate(columns) for j, b in enumerate(columns[i:], i)]
+        return self
+
+    def transform(self, X):
+        result = X.copy()
+        with np.errstate(over="ignore", invalid="ignore"):
+            for a, b, name in self.pairs_:
+                values = pd.to_numeric(X[a], errors="coerce") * pd.to_numeric(X[b], errors="coerce")
+                result[name] = values.replace([np.inf, -np.inf], np.nan)
+        return result
+
+
 def validate_estimator(model):
     """Validate sklearn parameter constraints before entering the fit stage."""
     objects = [model]
@@ -84,10 +107,14 @@ def build_pipeline(recipe_id, task_spec, params):
         raise ValueError("Unsupported target transform")
     if transform == "shifted_log1p":
         return ShiftedLogTargetModel(build_pipeline(recipe_id, task_spec, {**params, "_cpu_threads": threads, "_seed": seed}))
+    interactions = params.pop("numeric_interactions", False)
+    if not isinstance(interactions, bool):
+        raise ValueError("numeric_interactions must be boolean")
     if recipe_id.startswith("dummy-"):
         return (DummyRegressor if regression else DummyClassifier)(**params)
     if recipe_id.startswith("catboost-"):
-        return CatBoostFrameModel(regression, params, threads, seed)
+        model = CatBoostFrameModel(regression, params, threads, seed)
+        return Pipeline([("interactions", NumericInteractions()), ("model", model)]) if interactions else model
     numerical = Pipeline([("impute", SimpleImputer(strategy="median", keep_empty_features=True))])
     if recipe_id.startswith("linear-"):
         numerical.steps.append(("scale", StandardScaler()))
@@ -107,8 +134,10 @@ def build_pipeline(recipe_id, task_spec, params):
         ("numeric", numerical, make_column_selector(dtype_include=np.number)),
         ("categorical", categorical, make_column_selector(dtype_exclude=np.number)),
     ], remainder="drop")
-    return Pipeline([("sanitize", FunctionTransformer(sanitize_frame, validate=False)),
-                     ("prepare", prepare), ("model", estimator)])
+    steps = [("sanitize", FunctionTransformer(sanitize_frame, validate=False))]
+    if interactions:
+        steps.append(("interactions", NumericInteractions()))
+    return Pipeline(steps + [("prepare", prepare), ("model", estimator)])
 
 
 def enforce_threads(model, threads):

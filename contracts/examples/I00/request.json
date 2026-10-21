@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-i00",
+  "run_id": "run-demo-001",
+  "idempotency_key": null,
+  "payload": {
+    "plan": {
+      "plan_id": "plan-001",
+      "researcher_id": "researcher-1",
+      "parent_ids": [
+        "exp-baseline"
+      ],
+      "hypothesis": "Проверить линейный рецепт на общем протоколе.",
+      "expected_effect": "Измерить качество независимого простого направления.",
+      "recipe_id": "linear-classifier-v1",
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "validation_id": "validation-a269d545925fba82",
+      "seed": 42,
+      "fidelity": "full",
+      "model": {
+        "family": "linear",
+        "hyperparameters": {
+          "C": 1.0,
+          "class_weight": null
+        }
+      },
+      "feature_steps": [],
+      "code_artifact_id": "art-code-001",
+      "resources": {
+        "cpu_threads": 3,
+        "memory_limit_mb": 10240,
+        "timeout_seconds": 600
+      }
+    },
+    "manifest": {
+      "manifest_version": "solution-1.0",
+      "run_id": "run-demo-001",
+      "solution_id": "sol-b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+      "solution_hash": "b87a75c8176e5310b4b7562833ee5f7519fdbb2e0449519cc5fcad8d0db2ce2c",
+      "core": {
+        "recipe_id": "linear-classifier-v1",
+        "recipe_version": "1.0",
+        "code_sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+        "model_family": "linear",
+        "effective_hyperparameters": {
+          "C": 1.0,
+          "class_weight": null
+        },
+        "effective_feature_steps": [],
+        "components": [
+          {
+            "capability_id": "model.linear",
+            "version": "1.0",
+            "implementation_sha256": "15d16843c8f88197b696245f1b1a3e9e9094455d2b35e4be189819b15f62ed47",
+            "parameters": {
+              "C": 1.0
+            },
+            "dependency_component_ids": [],
+            "origin": "builtin",
+            "provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf"
+          }
+        ],
+        "environment_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "constructor_version": "constructor-1.0",
+        "candidate_interface_version": "make_pipeline-2arg-v1"
+      },
+      "component_provenance_artifact_ids": [
+        {
+          "component_id": "cmp-5b9406a6dd7bba9be1262210f0c5cf17ad1692e7e9a7ff3f218a599d8baa60cf",
+          "artifact_id": "artifact-catalog-provenance"
+        }
+      ],
+      "verification_level": "catalog_verified"
+    },
+    "code_artifact": {
+      "artifact_id": "art-code-001",
+      "run_id": "run-demo-001",
+      "kind": "python_source",
+      "relative_path": "code/linear-fixture/experiment.py",
+      "sha256": "61a5113be28bb7f1f6f3cc9bbe5a67798da6bc766dc890e26408960476f44f6a",
+      "size_bytes": 144,
+      "media_type": "text/x-python"
+    },
+    "catalog_manifest_artifact_id": "artifact-catalog"
+  }
+}

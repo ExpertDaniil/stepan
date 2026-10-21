@@ -87,15 +87,26 @@ def bootstrap(config, started, task_path, run_id, root, log):
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log)
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,
                                   evaluator=evaluator, submission=submission, researcher=researcher, spec=spec,
-                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo)
+                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"])
         try:
             controller.run()
         except Exception as exc:
             controller.degraded = True
             log.exception("run.research_interrupted", exc)
+            if controller.graph:
+                controller.graph.close_search("research_interrupted")
             controller.cleanup()
             # A fallback is acceptable only if it was actually published and verified.
             submission.require_output()
+
+        if controller.graph:
+            try:
+                if not store.db.execute("SELECT 1 FROM g_metadata WHERE run_id=? AND name='latest_export'", (run_id,)).fetchone():
+                    controller.graph.invoke("G11", {"task_spec_id": spec["task_spec_id"], "validation_id": validation["validation_id"],
+                        "selection_policy_id": "same-protocol-primary-v1", "scope": "final"}, key="fallback-final-export")
+            except Exception as exc:
+                controller.degraded = True
+                log.exception("graph.export_failed", exc)
 
         def finish(payload):
             if runner.active():
@@ -144,6 +155,15 @@ def write_summary(root, store, budget, config, champion, state):
         hypothesis = plan["hypothesis"].replace("|", "/").replace("\n", " ")
         lines.append(f"| {row['experiment_id']} | {row['state']} | {plan['recipe_id']} | {score} | {hypothesis} |\n")
     lines.append("\nFull redacted protocol: events.jsonl, messages/, llm/, contexts/, artifacts-index.json.\n")
+    if config.graph_enabled:
+        row = store.db.execute("SELECT value FROM g_metadata WHERE run_id=? AND name='latest_export'", (store.run_id,)).fetchone()
+        branches = store.db.execute("SELECT branch_id,decision,state,revision FROM g_branches WHERE run_id=? ORDER BY rowid", (store.run_id,)).fetchall()
+        lines.append("\n## Research graph\n\nEqual peer heads and branch decisions are stored in state.sqlite (g_*).\n")
+        if row:
+            lines.append("\nGraph/ranking/events export: "+json.loads(row[0])["folder"]+"/\n")
+        lines.append("\n| Branch | Decision | State | Revision |\n|---|---|---|---|\n")
+        for branch in branches:
+            lines.append("| "+" | ".join(map(str, branch))+" |\n")
     path = root / "summary.md"
     path.write_text("".join(lines), encoding="utf-8")
     return path

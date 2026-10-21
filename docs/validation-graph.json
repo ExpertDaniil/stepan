@@ -1,0 +1,36 @@
+{
+  "implementation_version": "0.4.0",
+  "base_commit": "3b6d7d84879fffbe76d111d05a9d58816b009e77",
+  "command": "python3 scripts/check.py",
+  "status": "passed",
+  "test_cases": 116,
+  "upstream_tests": 77,
+  "new_graph_tests": 39,
+  "elapsed_seconds": 143.095,
+  "schema_definitions": 167,
+  "contracts": 44,
+  "C00_C24_definitions_unchanged": true,
+  "official_requirements_unchanged": true,
+  "python": "3.12.14",
+  "sqlite": "3.53.1",
+  "package_versions": {
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scipy": "1.17.0",
+    "scikit-learn": "1.8.0",
+    "joblib": "1.5.3",
+    "openai": null,
+    "catboost": null,
+    "jsonschema": null
+  },
+  "docker_available": false,
+  "real_training": "synthetic classification/binary/regression; LLM mocked; includes controlled transfer/fork/plateau/backtrack and pinned-runtime refit with predictions allclose 1e-9",
+  "state_machine_scores": "explicit fixture injection in graph unit tests; not benchmark evidence",
+  "not_run": [
+    "live provided API",
+    "CatBoost",
+    "official organizer container",
+    "three-hour production task",
+    "actual power-loss/filesystem crash; simulated interruption only"
+  ]
+}

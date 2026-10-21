@@ -1,7 +1,4 @@
 import ast
-import base64
-import hashlib
-import io
 from pathlib import Path
 import shutil
 import tempfile
@@ -10,7 +7,7 @@ from unittest.mock import patch
 import zipfile
 
 from agent.config import ROOT
-from scripts.package_solution import build
+from scripts.package_solution import build, flat_module_name, runtime_files
 
 
 class PackagingTests(unittest.TestCase):
@@ -22,19 +19,30 @@ class PackagingTests(unittest.TestCase):
             build(second)
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with zipfile.ZipFile(first) as archive:
-                self.assertEqual(archive.namelist(), ["solution.py", "requirements.txt"])
+                names = archive.namelist()
+                self.assertEqual(names[:2], ["solution.py", "requirements.txt"])
+                self.assertTrue(all(Path(name).name == name and (name.endswith(".py") or name == "requirements.txt") for name in names))
+                for name in ("agent_runtime.py", "agent_orchestrator.py", "agent_graph_controller.py",
+                             "agent_graph_service.py", "agent_llm_gateway.py", "agent_worker.py", "tools_code.py"):
+                    self.assertIn(name, names)
                 source = archive.read("solution.py").decode("utf-8")
-                assignments = {node.targets[0].id: ast.literal_eval(node.value)
-                               for node in ast.parse(source).body if isinstance(node, ast.Assign)
-                               and isinstance(node.targets[0], ast.Name) and node.targets[0].id in {"BUNDLE", "BUNDLE_SHA256"}}
-                payload = base64.b85decode(assignments["BUNDLE"])
-                self.assertEqual(hashlib.sha256(payload).hexdigest(), assignments["BUNDLE_SHA256"])
-                with zipfile.ZipFile(io.BytesIO(payload)) as runtime:
-                    self.assertIn("agent/worker.py", runtime.namelist())
-                    self.assertIn("contracts/contracts.schema.json", runtime.namelist())
-                    self.assertIn("prompts/researcher.md", runtime.namelist())
-                    self.assertTrue(all(name.startswith(("agent/", "tools/", "contracts/", "recipes/", "prompts/")) for name in runtime.namelist()))
-                    self.assertFalse(any(name.endswith((".csv", ".whl", ".pkl", ".joblib", ".env")) or "__pycache__" in name for name in runtime.namelist()))
+                self.assertIn("from agent.runtime import main", source)
+                for forbidden in ("BUNDLE", "base64", "b85decode", "zipfile", "exec("):
+                    self.assertNotIn(forbidden, source)
+                resources_source = archive.read("stepan_resources.py").decode("utf-8")
+                resources = next(ast.literal_eval(node.value) for node in ast.parse(resources_source).body
+                                 if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                                 and node.targets[0].id == "RESOURCE_TEXT")
+                expected = runtime_files(ROOT)
+                for relative, content in expected.items():
+                    if relative.endswith(".py"):
+                        self.assertEqual(archive.read(flat_module_name(relative)), content, relative)
+                    else:
+                        self.assertEqual(resources[relative].encode("utf-8"), content, relative)
+                self.assertEqual(len(names), sum(name.endswith(".py") for name in expected) + 3)
+                for name in names:
+                    if name.endswith(".py"):
+                        compile(archive.read(name), name, "exec")
 
     def test_invalid_build_preserves_previous_archive(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -103,11 +103,20 @@ class Gateway:
         self.transport = transport or (MockTransport() if config.llm_mode == "mock" else OpenAITransport())
         self.semaphore = threading.BoundedSemaphore(config.max_workers)
         self.daily_budget_exhausted = threading.Event()
+        self.provider_credits_exhausted = threading.Event()
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
             raise AgentError("LLM_BUDGET_EXHAUSTED", "The shared provider key budget is exhausted; reset is at 03:00 MSK",
                              details={"reset_time_msk": "03:00", "daily_key_limit_rub": 600})
+
+    def check_availability(self):
+        if self.provider_credits_exhausted.is_set():
+            raise AgentError("LLM_PROVIDER_CREDITS_EXHAUSTED",
+                             "The LLM provider reported Insufficient credits. Contact the gateway operator to restore provider access; "
+                             "the team's daily balance and reset time are unknown.",
+                             details={"scope": "upstream_provider", "team_daily_budget_status": "unknown", "reset_time_msk": None})
+        self.check_daily_budget()
 
     def _progress(self, done, call_no, purpose, started, timeout):
         while not done.wait(self.config.llm_progress_seconds):
@@ -129,7 +138,7 @@ class Gateway:
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
-        self.check_daily_budget()
+        self.check_availability()
         call_no = self.budget.begin_llm_call(request["max_tokens"])
         settled = False
         started = time.monotonic()
@@ -168,6 +177,17 @@ class Gateway:
         except Exception as exc:
             status = getattr(exc, "status_code", None)
             body = str(exc) + " " + json.dumps(getattr(exc, "body", None), default=str)
+            if "insufficient credits" in body.casefold():
+                self.provider_credits_exhausted.set()
+                self.log.event("llm.provider_credits_exhausted", level="ERROR", call_no=call_no,
+                               status_code=status, reason="insufficient_credits", retryable=False,
+                               team_daily_budget_status="unknown", reset_time_msk=None)
+                try:
+                    self.check_availability()
+                except AgentError as error:
+                    self.log.event("llm.call_failed", level="ERROR", call_no=call_no, code=error.code,
+                                   message=str(error), attempt=attempt, status_code=status, retryable=False)
+                    raise error from exc
             if "budget has been exceeded" in body.casefold():
                 self.daily_budget_exhausted.set()
                 self.log.event("llm.daily_budget_exhausted", level="WARNING", call_no=call_no,
@@ -209,7 +229,7 @@ class Gateway:
         calls, last_error = [], None
         completion_id = "completion-" + uuid.uuid4().hex[:12]
         for attempt in range(1, payload["attempt_limit"] + 1):
-            self.check_daily_budget()
+            self.check_availability()
             left = deadline-time.monotonic()
             if left < 1:
                 raise AgentError("LLM_OPERATION_TIMEOUT", "LLM operation deadline reached before a new attempt")

@@ -1,14 +1,13 @@
-"""Build a flat ZIP containing only solution.py and official requirements.txt.
+"""Export our readable Python modules to a flat platform ZIP.
 
-The modular source tree stays in Git. The generated entry point expands only our
-own runtime sources/resources under /tmp. It contains no third-party packages,
-datasets, credentials or pre-trained models.
+Every owned Python module is a separate, byte-identical source file. SQL, JSON
+and Markdown are readable string literals in stepan_resources.py. The entry
+point copies these files into a temporary package tree; no encoded code or
+embedded archive is used.
 """
 from pathlib import Path
 import argparse
-import base64
 import hashlib
-import io
 import json
 import os
 import tempfile
@@ -65,52 +64,73 @@ def write_entry(archive, name, content):
     archive.writestr(info, content, compresslevel=9)
 
 
-def make_entrypoint(files):
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        for name, content in sorted(files.items()):
-            write_entry(archive, name, content)
-    bundle = buffer.getvalue()
-    encoded = base64.b85encode(bundle).decode("ascii")
-    chunks = "\n".join("    " + repr(encoded[i:i + 100]) for i in range(0, len(encoded), 100))
-    source = '''"""Generated platform entry point. Edit modular Git sources and rebuild."""
+def flat_module_name(relative):
+    return relative.replace("/__init__.py", "_init.py").replace("/", "_")
+
+
+def make_resources(files):
+    lines = ['"""Readable SQL, JSON and prompts. Platform copies only root .py files."""',
+             "", "RESOURCE_TEXT = {"]
+    for name, content in sorted(files.items()):
+        if name.endswith(".py"):
+            continue
+        lines.append("    " + repr(name) + ": (")
+        for line in content.decode("utf-8").splitlines(keepends=True):
+            lines.append("        " + repr(line))
+        if not content:
+            lines.append("        ''")
+        lines.append("    ),")
+    lines.append("}\n")
+    source = "\n".join(lines)
+    compile(source, "stepan_resources.py", "exec")
+    return source.encode("utf-8")
+
+
+def make_entrypoint(modules):
+    mapping = "\n".join("    " + repr(name) + ": " + repr(relative) + ","
+                        for name, relative in sorted(modules.items()))
+    source = '''"""Platform entry point: python3 solution.py task.md.
+
+The adjacent agent_*.py and tools_*.py files are our original source modules.
+They are copied into package directories under /tmp to preserve normal imports.
+"""
 import time
 
 STARTED_MONOTONIC = time.monotonic()
 
-import base64
-import hashlib
-import io
 from pathlib import Path, PurePosixPath
+import shutil
 import sys
 import tempfile
-import zipfile
 
-BUNDLE_SHA256 = __DIGEST__
-BUNDLE = (
-__CHUNKS__
-)
+from stepan_resources import RESOURCE_TEXT
+
+SOURCE_MODULES = {
+__MODULES__
+}
+
+
+def runtime_path(root, relative):
+    path = PurePosixPath(relative)
+    if path.is_absolute() or ".." in path.parts or "\\\\" in relative:
+        raise RuntimeError("Unsafe runtime path")
+    destination = root / path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    return destination
 
 
 def run():
-    payload = base64.b85decode(BUNDLE)
-    if hashlib.sha256(payload).hexdigest() != BUNDLE_SHA256:
-        raise RuntimeError("Corrupted runtime bundle")
-    # Runtime subdirectories in /tmp are explicitly permitted by the platform.
+    source_root = Path(__file__).resolve().parent
+    # The platform permits runtime directories, but copies only root .py files.
     with tempfile.TemporaryDirectory(prefix="automl-runtime-", dir="/tmp") as directory:
         root = Path(directory).resolve()
-        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-            names = archive.namelist()
-            if len(names) != len(set(names)):
-                raise RuntimeError("Duplicate runtime file")
-            for info in archive.infolist():
-                relative = PurePosixPath(info.filename)
-                if (relative.is_absolute() or ".." in relative.parts or "\\\\" in info.filename
-                        or info.is_dir() or (info.external_attr >> 16) & 0o170000 == 0o120000):
-                    raise RuntimeError("Unsafe runtime file")
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(archive.read(info))
+        for filename, relative in SOURCE_MODULES.items():
+            source = source_root / filename
+            if source.name != filename or source.is_symlink() or not source.is_file():
+                raise RuntimeError("Missing or unsafe source module: " + filename)
+            shutil.copyfile(source, runtime_path(root, relative))
+        for relative, text in RESOURCE_TEXT.items():
+            runtime_path(root, relative).write_text(text, encoding="utf-8")
         sys.path.insert(0, str(root))
         try:
             from agent.runtime import main
@@ -122,9 +142,25 @@ def run():
 if __name__ == "__main__":
     raise SystemExit(run())
 '''
-    source = source.replace("__DIGEST__", repr(hashlib.sha256(bundle).hexdigest())).replace("__CHUNKS__", chunks)
+    source = source.replace("__MODULES__", mapping)
     compile(source, "solution.py", "exec")
     return source.encode("utf-8")
+
+
+def platform_files(files, requirements):
+    modules = {}
+    entries = {"requirements.txt": requirements, "stepan_resources.py": make_resources(files)}
+    for relative, content in sorted(files.items()):
+        if not relative.endswith(".py"):
+            continue
+        name = flat_module_name(relative)
+        if name in entries or name == "solution.py":
+            raise ValueError("Flat module filename collision: " + name)
+        compile(content, relative, "exec")
+        modules[name] = relative
+        entries[name] = content
+    entries["solution.py"] = make_entrypoint(modules)
+    return entries
 
 
 def build(destination, root=ROOT):
@@ -134,17 +170,19 @@ def build(destination, root=ROOT):
     if requirements != checked_bytes(root, "requirements.organizers.txt"):
         raise ValueError("Platform requirements.txt must match the organizers' list exactly")
     files = runtime_files(root)
-    entrypoint = make_entrypoint(files)
+    entries = platform_files(files, requirements)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(dir=destination.parent, suffix=".zip", delete=False) as stream:
             temporary = Path(stream.name)
         with zipfile.ZipFile(temporary, "w") as archive:
-            write_entry(archive, "solution.py", entrypoint)
-            write_entry(archive, "requirements.txt", requirements)
+            for name in ["solution.py", "requirements.txt", *sorted(set(entries) - {"solution.py", "requirements.txt"})]:
+                write_entry(archive, name, entries[name])
         with zipfile.ZipFile(temporary) as archive:
-            if archive.namelist() != ["solution.py", "requirements.txt"] or archive.testzip():
+            if (set(archive.namelist()) != set(entries) or len(archive.namelist()) != len(entries)
+                    or any(Path(name).name != name or not (name.endswith(".py") or name == "requirements.txt")
+                           for name in archive.namelist()) or archive.testzip()):
                 raise ValueError("Invalid flat platform ZIP")
         if temporary.stat().st_size > MAX_ZIP_BYTES:
             raise ValueError("Platform ZIP exceeds the 100 MB limit")
@@ -152,7 +190,7 @@ def build(destination, root=ROOT):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    return {"path": str(destination), "files": 2, "runtime_files": len(files),
+    return {"path": str(destination), "files": len(entries), "runtime_files": len(files),
             "bytes": destination.stat().st_size, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}
 
 

@@ -9,6 +9,7 @@
 - `contract.started/completed/failed/replayed`
 - `llm.call_started/completed/failed`, `llm.output_rejected`
 - `llm.daily_budget_exhausted` — сервер сообщил об исчерпании общего бюджета; reset_time_msk=03:00, повторов нет
+- `llm.provider_credits_exhausted` — внешний провайдер ответил Insufficient credits; ERROR, без retry и новых вызовов; остаток командного бюджета и время сброса неизвестны
 - `context.built`, `research.hypothesis_proposed`
 - `artifact.registered`, `experiment.reserved/evaluated/duplicate_skipped`
 - `job.started/finished`, C13 renew/release, C24 cancellation

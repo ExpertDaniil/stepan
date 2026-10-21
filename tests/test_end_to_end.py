@@ -38,11 +38,16 @@ class EndToEndTests(unittest.TestCase):
         cwd = temp
         command = [sys.executable, str(source / "solution.py"), str(task)]
         if platform_copy:
-            for name in ("solution.py", "requirements.txt"):
-                shutil.copy2(source / name, task.parent / name)
+            for path in source.iterdir():
+                if path.is_file() and (path.suffix == ".py" or path.name == "requirements.txt"):
+                    shutil.copy2(path, task.parent / path.name)
+            self.assertFalse((task.parent / "agent").exists())
             command = [sys.executable, "solution.py", "task.md"]
             cwd = task.parent
-        result = subprocess.run(command + ["--llm-mode", "mock", "--work-dir", str(runs)],
+            env["WORK_DIR"] = str(runs)
+        else:
+            command += ["--llm-mode", "mock", "--work-dir", str(runs)]
+        result = subprocess.run(command,
                                 env=env, cwd=cwd, text=True, capture_output=True, timeout=70)
         self.assertEqual(result.returncode, 0, result.stderr[-6000:])
         output = pd.read_csv(task.parent / "submission.csv", dtype=str, keep_default_na=False)
@@ -152,10 +157,22 @@ class EndToEndTests(unittest.TestCase):
             build(archive)
             unpacked = root / "unpacked"
             with zipfile.ZipFile(archive) as z:
-                self.assertEqual(z.namelist(), ["solution.py", "requirements.txt"])
+                self.assertTrue(all(Path(name).name == name and (name.endswith(".py") or name == "requirements.txt") for name in z.namelist()))
+                self.assertIn("agent_graph_controller.py", z.namelist())
                 self.assertEqual(z.read("requirements.txt"), (ROOT / "requirements.organizers.txt").read_bytes())
                 z.extractall(unpacked)
             _, _, events = self.check_run(temp, "classification", "2", source=unpacked, platform_copy=True)
+            self.assertGreaterEqual(sum(e["event"] == "submission.published" for e in events), 2)
+
+    def test_readable_flat_platform_copy_runs_regression(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive = Path(temp) / "solution.zip"
+            build(archive)
+            unpacked = Path(temp) / "unpacked"
+            with zipfile.ZipFile(archive) as z:
+                z.extractall(unpacked)
+            _, _, events = self.check_run(temp, "regression", "2", source=unpacked, platform_copy=True)
+            self.assertEqual(events[-1]["state"], "completed")
             self.assertGreaterEqual(sum(e["event"] == "submission.published" for e in events), 2)
 
     def test_daily_budget_after_baseline_retains_output(self):
@@ -175,3 +192,18 @@ class EndToEndTests(unittest.TestCase):
             run = next((Path(temp) / "runs").glob("run-*"))
             self.assertIn("State: degraded", (run / "summary.md").read_text())
             self.assertIn("llm.daily_budget_exhausted", (run / "events.jsonl").read_text())
+
+    def test_provider_credit_failure_before_bootstrap_reports_cause_without_fake_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = make_demo(Path(temp) / "task")
+            failure = RuntimeError("OpenrouterException - Insufficient credits")
+            failure.status_code = 503
+            with patch.dict(os.environ, self.env()), patch.object(MockTransport, "complete", side_effect=failure) as transport, redirect_stderr(io.StringIO()):
+                code = main([str(task), "--llm-mode", "mock", "--work-dir", str(Path(temp) / "runs")])
+            self.assertEqual(code, 1)
+            self.assertEqual(transport.call_count, 1)
+            self.assertFalse((task.parent / "submission.csv").exists())
+            events = [json.loads(line) for line in next((Path(temp)/"runs").glob("run-*/events.jsonl")).read_text().splitlines()]
+            self.assertEqual(events[-1]["event"], "run.failed")
+            self.assertEqual(events[-1]["code"], "LLM_PROVIDER_CREDITS_EXHAUSTED")
+            self.assertFalse(any(e["event"] in {"llm.daily_budget_exhausted", "job.started"} for e in events))

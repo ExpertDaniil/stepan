@@ -1,0 +1,154 @@
+test_all_original_contract_examples (test_contracts.ContractTests.test_all_original_contract_examples) ... ok
+test_concurrent_idempotent_call_executes_once (test_contracts.ContractTests.test_concurrent_idempotent_call_executes_once) ... ok
+test_nonfinite_and_extra_fields_rejected (test_contracts.ContractTests.test_nonfinite_and_extra_fields_rejected) ... ok
+test_reused_key_with_different_payload_fails (test_contracts.ContractTests.test_reused_key_with_different_payload_fails) ... 2026-10-21T19:56:44.479+00:00 ERROR [unit-run] contract.failed contract_id=C00 request_id=req-41103edd6b654027 sender=CLI receiver=Runtime endpoint=POST /v1/runs code=IDEMPOTENCY_CONFLICT message=Idempotency key reused with a different payload retryable=False details={} duration_ms=0.4
+ok
+test_binary_task (test_end_to_end.EndToEndTests.test_binary_task) ... ok
+test_catalog_warmup_trains_before_llm_research (test_end_to_end.EndToEndTests.test_catalog_warmup_trains_before_llm_research) ... ok
+test_classification_full_research_loop (test_end_to_end.EndToEndTests.test_classification_full_research_loop) ... ok
+test_daily_budget_after_baseline_retains_output (test_end_to_end.EndToEndTests.test_daily_budget_after_baseline_retains_output) ... ok
+test_flat_platform_copy_runs_research_without_repository_path (test_end_to_end.EndToEndTests.test_flat_platform_copy_runs_research_without_repository_path) ... ok
+test_llm_failure_after_baseline_retains_output (test_end_to_end.EndToEndTests.test_llm_failure_after_baseline_retains_output) ... ok
+test_provider_credit_failure_before_bootstrap_reports_cause_without_fake_output (test_end_to_end.EndToEndTests.test_provider_credit_failure_before_bootstrap_reports_cause_without_fake_output) ... ok
+test_readable_flat_platform_copy_runs_regression (test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression) ... ok
+test_regression_full_research_loop (test_end_to_end.EndToEndTests.test_regression_full_research_loop) ... ok
+test_search_deadline_keeps_published_baseline (test_end_to_end.EndToEndTests.test_search_deadline_keeps_published_baseline) ... ok
+test_daily_key_budget_stops_retry_and_followup_calls (test_gateway_logging.GatewayTests.test_daily_key_budget_stops_retry_and_followup_calls) ... ok
+test_http_auth_error_is_not_retried (test_gateway_logging.GatewayTests.test_http_auth_error_is_not_retried) ... ok
+test_invalid_output_has_bounded_repair (test_gateway_logging.GatewayTests.test_invalid_output_has_bounded_repair) ... ok
+test_live_mode_requires_organizers_env (test_gateway_logging.GatewayTests.test_live_mode_requires_organizers_env) ... ok
+test_live_transport_needs_no_model_and_uses_only_env_endpoint (test_gateway_logging.GatewayTests.test_live_transport_needs_no_model_and_uses_only_env_endpoint) ... ok
+test_model_is_optional_and_platform_override_wins (test_gateway_logging.GatewayTests.test_model_is_optional_and_platform_override_wins) ... ok
+test_native_tool_call_then_structured_plan (test_gateway_logging.GatewayTests.test_native_tool_call_then_structured_plan) ... ok
+test_provider_insufficient_credits_stops_retry_without_claiming_team_budget (test_gateway_logging.GatewayTests.test_provider_insufficient_credits_stops_retry_without_claiming_team_budget) ... 2026-10-21T19:58:32.577+00:00 ERROR [unit-run] llm.provider_credits_exhausted call_no=1 status_code=503 reason=insufficient_credits retryable=False team_daily_budget_status=unknown
+2026-10-21T19:58:32.577+00:00 ERROR [unit-run] llm.call_failed call_no=1 code=LLM_PROVIDER_CREDITS_EXHAUSTED message=The LLM provider reported Insufficient credits. Contact the gateway operator to restore provider access; the team's daily balance and reset time are unknown. attempt=1 status_code=503 retryable=False
+2026-10-21T19:58:32.584+00:00 ERROR [unit-run] llm.provider_credits_exhausted call_no=1 status_code=503 reason=insufficient_credits retryable=False team_daily_budget_status=unknown
+2026-10-21T19:58:32.584+00:00 ERROR [unit-run] llm.call_failed call_no=1 code=LLM_PROVIDER_CREDITS_EXHAUSTED message=The LLM provider reported Insufficient credits. Contact the gateway operator to restore provider access; the team's daily balance and reset time are unknown. attempt=1 status_code=503 retryable=False
+ok
+test_secrets_redacted_in_events_and_snapshots (test_gateway_logging.GatewayTests.test_secrets_redacted_in_events_and_snapshots) ... ok
+test_strict_json_rejects_duplicate_keys_and_nan (test_gateway_logging.GatewayTests.test_strict_json_rejects_duplicate_keys_and_nan) ... ok
+test_temporary_503_without_credit_error_can_retry (test_gateway_logging.GatewayTests.test_temporary_503_without_credit_error_can_retry) ... ok
+test_temporary_rate_limit_can_retry (test_gateway_logging.GatewayTests.test_temporary_rate_limit_can_retry) ... ok
+test_backtrack_context_is_from_own_reject_line (test_graph.GraphTests.test_backtrack_context_is_from_own_reject_line) ... 2026-10-21T19:58:33.069+00:00 ERROR [unit-run] contract.failed contract_id=I01 request_id=req-64d81619d2604fbf sender=Orchestrator receiver=GraphService endpoint=LOCAL constraints.check code=CAPABILITY_FORBIDDEN message=Candidate violates branch restrictions retryable=False details={"missing": [], "forbidden": ["feature.target_transform"]} duration_ms=0.7
+2026-10-21T19:58:33.070+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-8da6679626184a90 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=CAPABILITY_FORBIDDEN message=Candidate violates branch restrictions retryable=False details={"missing": [], "forbidden": ["feature.target_transform"]} duration_ms=3.8
+ok
+test_blob_recovery_finishes_a_durable_intent (test_graph.GraphTests.test_blob_recovery_finishes_a_durable_intent) ... 2026-10-21T19:58:33.188+00:00 ERROR [unit-run] contract.failed contract_id=G09 request_id=req-9ec3b30a6fb94632 sender=Orchestrator receiver=GraphService endpoint=LOCAL artifacts.register_staged code=INTERNAL_ERROR message=injected rename crash retryable=False details={} duration_ms=1.8
+ok
+test_branch_limit_rolls_back_both_children (test_graph.GraphTests.test_branch_limit_rolls_back_both_children) ... 2026-10-21T19:58:33.503+00:00 ERROR [unit-run] contract.failed contract_id=G02 request_id=req-2781b0ab37e14ac0 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.fork_decision code=BRANCH_LIMIT message=Both children must fit; a partial fork is forbidden retryable=False details={} duration_ms=1.7
+ok
+test_cached_experiment_adds_a_binding_without_training (test_graph.GraphTests.test_cached_experiment_adds_a_binding_without_training) ... ok
+test_corrupt_pin_blocks_recovery_without_resetting_budget (test_graph.GraphTests.test_corrupt_pin_blocks_recovery_without_resetting_budget) ... ok
+test_dependency_closure_detects_renamed_wrappers (test_graph.GraphTests.test_dependency_closure_detects_renamed_wrappers) ... 2026-10-21T19:58:33.926+00:00 ERROR [unit-run] contract.failed contract_id=I01 request_id=req-863e91b6043641c0 sender=Orchestrator receiver=GraphService endpoint=LOCAL constraints.check code=CAPABILITY_FORBIDDEN message=Candidate violates branch restrictions retryable=False details={"missing": [], "forbidden": ["feature.forbidden"]} duration_ms=0.6
+ok
+test_durable_idempotency_survives_a_new_contract_bus (test_graph.GraphTests.test_durable_idempotency_survives_a_new_contract_bus) ... 2026-10-21T19:58:34.067+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-e679450c5f5042ff sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=IDEMPOTENCY_CONFLICT message=Idempotency key reused with a different payload retryable=False details={} duration_ms=0.8
+ok
+test_expired_order_frees_peer (test_graph.GraphTests.test_expired_order_frees_peer) ... 2026-10-21T19:58:34.194+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-a42d39f07de44d61 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=WORK_ORDER_EXPIRED message=The proposal arrived after its assignment TTL retryable=False details={} duration_ms=1.5
+ok
+test_failed_and_invalid_training_release_the_peer (test_graph.GraphTests.test_failed_and_invalid_training_release_the_peer) ... ok
+test_final_ranking_keeps_ancestors_and_paused_branches (test_graph.GraphTests.test_final_ranking_keeps_ancestors_and_paused_branches) ... ok
+test_fork_is_binary_and_rejects_another_split (test_graph.GraphTests.test_fork_is_binary_and_rejects_another_split) ... 2026-10-21T19:58:35.136+00:00 ERROR [unit-run] contract.failed contract_id=G02 request_id=req-3e3ff41dd6624202 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.fork_decision code=BRANCH_REVISION_CONFLICT message=Branch policy epoch changed retryable=False details={} duration_ms=0.8
+ok
+test_fork_restores_each_peer_and_keeps_global_best (test_graph.GraphTests.test_fork_restores_each_peer_and_keeps_global_best) ... ok
+test_free_code_cannot_claim_a_hard_ban_is_verified (test_graph.GraphTests.test_free_code_cannot_claim_a_hard_ban_is_verified) ... 2026-10-21T19:58:35.899+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-ef5c3c2abd284c63 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=UNVERIFIABLE_CONSTRAINT message=Hard restrictions require the exact owned constructor retryable=False details={} duration_ms=2.5
+ok
+test_history_and_dag_cycles_are_rejected_by_sql (test_graph.GraphTests.test_history_and_dag_cycles_are_rejected_by_sql) ... ok
+test_issued_proposal_is_rejected_after_fork (test_graph.GraphTests.test_issued_proposal_is_rejected_after_fork) ... 2026-10-21T19:58:36.589+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-4c3ce2788bae48ae sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=WORK_ORDER_NOT_ISSUED message=Work order is no longer issued retryable=False details={} duration_ms=1.4
+ok
+test_late_result_keeps_origin_but_can_win_global_selection (test_graph.GraphTests.test_late_result_keeps_origin_but_can_win_global_selection) ... ok
+test_mixed_hyperparameters_do_not_prove_a_feature_effect (test_graph.GraphTests.test_mixed_hyperparameters_do_not_prove_a_feature_effect) ... 2026-10-21T19:58:37.305+00:00 ERROR [unit-run] contract.failed contract_id=G06 request_id=req-c91f787a95634be4 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.register_idea code=INVALID_COMPONENT_DIFF message=Other hyperparameters changed alongside the claimed feature retryable=False details={} duration_ms=1.4
+ok
+test_obsolete_fencing_token_never_produces_evidence (test_graph.GraphTests.test_obsolete_fencing_token_never_produces_evidence) ... ok
+test_only_dispatcher_can_write_graph (test_graph.GraphTests.test_only_dispatcher_can_write_graph) ... 2026-10-21T19:58:37.564+00:00 ERROR [unit-run] contract.failed contract_id=G13 request_id=req-f0ac63d414d34689 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.inspect code=WRITER_THREAD_VIOLATION message=SQLite mutations belong to the dispatcher thread retryable=False details={} duration_ms=1.5
+ok
+test_plateau_uses_distinct_solutions_and_old_best (test_graph.GraphTests.test_plateau_uses_distinct_solutions_and_old_best) ... ok
+test_proposal_cannot_change_its_peer_or_primary_parent (test_graph.GraphTests.test_proposal_cannot_change_its_peer_or_primary_parent) ... 2026-10-21T19:58:38.033+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-30f8b8d9517b46b2 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=WORK_ORDER_MISMATCH message=Future ticket and proposal researcher disagree retryable=False details={} duration_ms=1.1
+2026-10-21T19:58:38.036+00:00 ERROR [unit-run] contract.failed contract_id=I02 request_id=req-4a42ee8675394fa8 sender=Orchestrator receiver=GraphService endpoint=LOCAL lineage.resolve code=LINEAGE_MISMATCH message=Untyped C12 parent_ids must equal the canonical typed parents retryable=False details={} duration_ms=0.7
+2026-10-21T19:58:38.037+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-2cb814dedc5641f7 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=LINEAGE_MISMATCH message=Untyped C12 parent_ids must equal the canonical typed parents retryable=False details={} duration_ms=3.6
+ok
+test_recovery_rehydrates_artifacts_from_sql_locations (test_graph.GraphTests.test_recovery_rehydrates_artifacts_from_sql_locations) ... ok
+test_reverse_completion_keeps_independent_heads (test_graph.GraphTests.test_reverse_completion_keeps_independent_heads) ... ok
+test_seed_replica_is_same_solution_different_experiment (test_graph.GraphTests.test_seed_replica_is_same_solution_different_experiment) ... ok
+test_t4_failure_rolls_back_native_reservation_and_graph (test_graph.GraphTests.test_t4_failure_rolls_back_native_reservation_and_graph) ... 2026-10-21T19:58:38.778+00:00 ERROR [unit-run] contract.failed contract_id=G04 request_id=req-c300f0c540a448e3 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.submit_proposal code=INTERNAL_ERROR message=injected T4 crash retryable=False details={} duration_ms=13.9
+ok
+test_t5_failure_rolls_back_selection_and_peer_cas (test_graph.GraphTests.test_t5_failure_rolls_back_selection_and_peer_cas) ... 2026-10-21T19:58:38.947+00:00 ERROR [unit-run] contract.failed contract_id=G05 request_id=req-4dda978c1c1b4583 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.commit_evaluation code=INTERNAL_ERROR message=injected T5 crash retryable=False details={} duration_ms=1.8
+ok
+test_real_training_confirms_transfer_forks_and_backtracks (test_graph_end_to_end.GraphEndToEndTests.test_real_training_confirms_transfer_forks_and_backtracks) ... ok
+test_spawn_failure_after_baseline_closes_assignments_and_retains_csv (test_graph_end_to_end.GraphEndToEndTests.test_spawn_failure_after_baseline_closes_assignments_and_retains_csv) ... ok
+test_catalog_rejects_integer_disguised_as_boolean (test_graph_features.GraphFeatureTests.test_catalog_rejects_integer_disguised_as_boolean) ... ok
+test_explicit_agent_stop_is_persisted_as_a_proposal (test_graph_features.GraphFeatureTests.test_explicit_agent_stop_is_persisted_as_a_proposal) ... ok
+test_full_request_guard_includes_added_schema (test_graph_features.GraphFeatureTests.test_full_request_guard_includes_added_schema) ... ok
+test_nested_fork_inherits_the_previous_ban (test_graph_features.GraphFeatureTests.test_nested_fork_inherits_the_previous_ban) ... ok
+test_numeric_interactions_help_a_quadratic_and_are_bounded (test_graph_features.GraphFeatureTests.test_numeric_interactions_help_a_quadratic_and_are_bounded) ... ok
+test_oversized_mandatory_context_is_an_explicit_error_and_releases_peer (test_graph_features.GraphFeatureTests.test_oversized_mandatory_context_is_an_explicit_error_and_releases_peer) ... 2026-10-21T19:59:22.730+00:00 ERROR [unit-run] contract.failed contract_id=C08 request_id=req-7f1a833100b446c7 sender=Orchestrator receiver=ContextBuilder endpoint=POST /v1/contexts code=CONTEXT_TOO_LARGE message=Mandatory branch identity, base code, recipe and task contract do not fit retryable=False details={} duration_ms=3.5
+2026-10-21T19:59:22.732+00:00 ERROR [unit-run] contract.failed contract_id=G03 request_id=req-be6232c5702043a7 sender=Orchestrator receiver=GraphService endpoint=LOCAL graph.issue_work code=CONTEXT_TOO_LARGE message=Mandatory branch identity, base code, recipe and task contract do not fit retryable=False details={} duration_ms=15.5
+ok
+test_plateau_backtracking_is_selected_from_persisted_evidence (test_graph_features.GraphFeatureTests.test_plateau_backtracking_is_selected_from_persisted_evidence) ... ok
+test_recovery_applies_a_trusted_evaluation_committed_before_graph_projection (test_graph_features.GraphFeatureTests.test_recovery_applies_a_trusted_evaluation_committed_before_graph_projection) ... ok
+test_recovery_closes_unstarted_submitted_work_without_retraining (test_graph_features.GraphFeatureTests.test_recovery_closes_unstarted_submitted_work_without_retraining) ... ok
+test_repeated_initialization_does_not_rewrite_pinned_files (test_graph_features.GraphFeatureTests.test_repeated_initialization_does_not_rewrite_pinned_files) ... ok
+test_replayed_submission_uses_current_state_instead_of_its_historical_queued_reply (test_graph_features.GraphFeatureTests.test_replayed_submission_uses_current_state_instead_of_its_historical_queued_reply) ... ok
+test_changed_official_requirements_are_rejected (test_packaging.PackagingTests.test_changed_official_requirements_are_rejected) ... ok
+test_flat_archive_is_reproducible_and_contains_only_owned_runtime (test_packaging.PackagingTests.test_flat_archive_is_reproducible_and_contains_only_owned_runtime) ... ok
+test_invalid_build_preserves_previous_archive (test_packaging.PackagingTests.test_invalid_build_preserves_previous_archive) ... ok
+test_cancel_stops_parent_and_grandchild_before_release (test_processes.ProcessTests.test_cancel_stops_parent_and_grandchild_before_release) ... ok
+test_cleanup_failure_keeps_lease_and_does_not_report_completion (test_processes.ProcessTests.test_cleanup_failure_keeps_lease_and_does_not_report_completion) ... ok
+test_completed_worker_cleanup_does_not_hide_failure_or_missing_result (test_processes.ProcessTests.test_completed_worker_cleanup_does_not_hide_failure_or_missing_result) ... 2026-10-21T19:59:24.442+00:00 ERROR [unit-run] job.finished job_id=job-test-1 experiment_id=exp-f7098e0410dc phase=train state=failed duration_seconds=0.0413 peak_memory_mb=6.28 exit_code=1 error={"code": "WORKER_FAILED", "message": "synthetic worker error", "retryable": false, "retry_after_seconds": null, "details": {"exit_code": 1}} stderr_log_path=/tmp/tmp52yy8neo/run/job-test-1/stderr.log
+2026-10-21T19:59:24.491+00:00 ERROR [unit-run] job.finished job_id=job-test-2 experiment_id=exp-f120ee28885a phase=train state=failed duration_seconds=0.0424 peak_memory_mb=6.28 exit_code=0 error={"code": "WORKER_FAILED", "message": "Worker exited without a successful result", "retryable": false, "retry_after_seconds": null, "details": {"exit_code": 0}} stderr_log_path=/tmp/tmp52yy8neo/run/job-test-2/stderr.log
+2026-10-21T19:59:24.540+00:00 ERROR [unit-run] job.finished job_id=job-test-3 experiment_id=exp-161e106fd787 phase=train state=failed duration_seconds=0.0429 peak_memory_mb=6.27 exit_code=1 error={"code": "WORKER_FAILED", "message": "synthetic worker error", "retryable": false, "retry_after_seconds": null, "details": {"exit_code": 1}} stderr_log_path=/tmp/tmp52yy8neo/run/job-test-3/stderr.log
+ok
+test_completed_worker_with_live_helper_keeps_success_and_releases_resources (test_processes.ProcessTests.test_completed_worker_with_live_helper_keeps_success_and_releases_resources) ... ok
+test_failed_spawn_releases_unstarted_lease (test_processes.ProcessTests.test_failed_spawn_releases_unstarted_lease) ... 2026-10-21T19:59:24.658+00:00 ERROR [unit-run] contract.failed contract_id=C14 request_id=req-e00a0e4d12e142de sender=Orchestrator receiver=Runner endpoint=POST /v1/jobs/train code=INTERNAL_ERROR message=simulated spawn failure retryable=False details={} duration_ms=3.1
+ok
+test_timeout_routes_through_cancel_event_and_resource_release (test_processes.ProcessTests.test_timeout_routes_through_cancel_event_and_resource_release) ... 2026-10-21T19:59:26.739+00:00 ERROR [unit-run] job.finished job_id=job-test-1 experiment_id=exp-128791f70827 phase=train state=timed_out duration_seconds=2.0531 peak_memory_mb=6.26 exit_code=-15 error={"code": "JOB_TIMEOUT", "message": "Job or run deadline reached", "retryable": false, "retry_after_seconds": null, "details": {}} stderr_log_path=/tmp/tmpsjxnuorb/run/job-test-1/stderr.log
+ok
+test_training_environment_does_not_receive_api_credentials (test_processes.ProcessTests.test_training_environment_does_not_receive_api_credentials) ... ok
+test_worker_has_its_own_memory_watchdog (test_processes.ProcessTests.test_worker_has_its_own_memory_watchdog) ... ok
+test_incomplete_tool_arguments_at_cap_retry_without_executing_tool (test_research_improvements.AdaptiveGatewayTests.test_incomplete_tool_arguments_at_cap_retry_without_executing_tool) ... ok
+test_missing_usage_is_charged_conservatively_without_fabricating_usage (test_research_improvements.AdaptiveGatewayTests.test_missing_usage_is_charged_conservatively_without_fabricating_usage) ... ok
+test_per_request_timeout_is_distinct_from_operation_budget (test_research_improvements.AdaptiveGatewayTests.test_per_request_timeout_is_distinct_from_operation_budget) ... ok
+test_slow_api_emits_progress_without_extra_requests (test_research_improvements.AdaptiveGatewayTests.test_slow_api_emits_progress_without_extra_requests) ... ok
+test_token_reservations_prevent_parallel_overcommit (test_research_improvements.AdaptiveGatewayTests.test_token_reservations_prevent_parallel_overcommit) ... ok
+test_truncation_at_ceiling_is_not_repeated (test_research_improvements.AdaptiveGatewayTests.test_truncation_at_ceiling_is_not_repeated) ... ok
+test_truncation_grows_budget_and_preserves_actual_usage (test_research_improvements.AdaptiveGatewayTests.test_truncation_grows_budget_and_preserves_actual_usage) ... ok
+test_archive_analysis_detects_censored_output_without_reading_csv (test_research_improvements.RecipeAndLoggingTests.test_archive_analysis_detects_censored_output_without_reading_csv) ... ok
+test_catalog_assignments_use_incumbent_and_different_families (test_research_improvements.RecipeAndLoggingTests.test_catalog_assignments_use_incumbent_and_different_families) ... ok
+test_configure_preserves_credentials_unknown_settings_and_supports_dry_run (test_research_improvements.RecipeAndLoggingTests.test_configure_preserves_credentials_unknown_settings_and_supports_dry_run) ... ok
+test_console_shows_state_parameters_tokens_and_redacts_secrets (test_research_improvements.RecipeAndLoggingTests.test_console_shows_state_parameters_tokens_and_redacts_secrets) ... ok
+test_extra_trees_nested_thread_limit_is_enforced (test_research_improvements.RecipeAndLoggingTests.test_extra_trees_nested_thread_limit_is_enforced) ... ok
+test_histogram_recipe_has_valid_parameters_and_runs (test_research_improvements.RecipeAndLoggingTests.test_histogram_recipe_has_valid_parameters_and_runs) ... ok
+test_invalid_nested_estimator_is_rejected_before_fit (test_research_improvements.RecipeAndLoggingTests.test_invalid_nested_estimator_is_rejected_before_fit) ... ok
+test_json_console_preserves_all_structured_fields (test_research_improvements.RecipeAndLoggingTests.test_json_console_preserves_all_structured_fields) ... ok
+test_target_transform_uses_fit_labels_and_returns_original_units (test_research_improvements.RecipeAndLoggingTests.test_target_transform_uses_fit_labels_and_returns_original_units) ... ok
+test_comparison_rejects_different_protocol (test_store.StoreTests.test_comparison_rejects_different_protocol) ... ok
+test_duplicate_and_stale_job_events (test_store.StoreTests.test_duplicate_and_stale_job_events) ... ok
+test_duplicate_plan_ignores_researcher_and_plan_id (test_store.StoreTests.test_duplicate_plan_ignores_researcher_and_plan_id) ... ok
+test_maximize_selection_does_not_regress (test_store.StoreTests.test_maximize_selection_does_not_regress) ... ok
+test_minimize_and_tie_policy (test_store.StoreTests.test_minimize_and_tie_policy) ... ok
+test_missing_parent_rejected (test_store.StoreTests.test_missing_parent_rejected) ... ok
+test_new_seed_is_distinct (test_store.StoreTests.test_new_seed_is_distinct) ... ok
+test_better_candidate_with_identical_test_predictions_updates_metadata (test_submission.SubmissionTests.test_better_candidate_with_identical_test_predictions_updates_metadata) ... ok
+test_changed_candidate_cannot_be_published (test_submission.SubmissionTests.test_changed_candidate_cannot_be_published) ... ok
+test_journal_recovers_replace_before_database_commit (test_submission.SubmissionTests.test_journal_recovers_replace_before_database_commit) ... ok
+test_leading_zero_ids_and_valid_output (test_submission.SubmissionTests.test_leading_zero_ids_and_valid_output) ... ok
+test_output_order_is_checked (test_submission.SubmissionTests.test_output_order_is_checked) ... ok
+test_version_conflict (test_submission.SubmissionTests.test_version_conflict) ... ok
+test_weaker_late_candidate_does_not_replace_file (test_submission.SubmissionTests.test_weaker_late_candidate_does_not_replace_file) ... ok
+test_adjacent_task_ignores_foreign_sample_submissions (test_tools_budget.ToolsBudgetTests.test_adjacent_task_ignores_foreign_sample_submissions) ... ok
+test_archive_style_wrong_paths_fall_back_only_when_unique (test_tools_budget.ToolsBudgetTests.test_archive_style_wrong_paths_fall_back_only_when_unique) ... ok
+test_budget_caps_and_fencing (test_tools_budget.ToolsBudgetTests.test_budget_caps_and_fencing) ... ok
+test_discovery_skips_generated_runs_and_virtualenv (test_tools_budget.ToolsBudgetTests.test_discovery_skips_generated_runs_and_virtualenv) ... ok
+test_expired_budget_cannot_start_training (test_tools_budget.ToolsBudgetTests.test_expired_budget_cannot_start_training) ... ok
+test_explicit_optional_path_is_respected (test_tools_budget.ToolsBudgetTests.test_explicit_optional_path_is_respected) ... ok
+test_generated_code_policy_and_path (test_tools_budget.ToolsBudgetTests.test_generated_code_policy_and_path) ... ok
+test_invalid_config_is_not_silently_clipped (test_tools_budget.ToolsBudgetTests.test_invalid_config_is_not_silently_clipped) ... ok
+test_llm_profile_is_bounded_and_full_report_is_retained (test_tools_budget.ToolsBudgetTests.test_llm_profile_is_bounded_and_full_report_is_retained) ... ok
+test_na_is_a_category_and_duplicate_header_fails (test_tools_budget.ToolsBudgetTests.test_na_is_a_category_and_duplicate_header_fails) ... ok
+test_no_guessing_ambiguous_dataset_paths (test_tools_budget.ToolsBudgetTests.test_no_guessing_ambiguous_dataset_paths) ... ok
+test_optional_files_follow_selected_dataset (test_tools_budget.ToolsBudgetTests.test_optional_files_follow_selected_dataset) ... ok
+test_group_holdout_keeps_groups_disjoint (test_validation.ValidationTests.test_group_holdout_keeps_groups_disjoint) ... ok
+test_temporal_holdout_preserves_complete_periods (test_validation.ValidationTests.test_temporal_holdout_preserves_complete_periods) ... ok
+
+----------------------------------------------------------------------
+Ran 120 tests in 164.649s
+
+OK

@@ -127,6 +127,38 @@ class GatewayTests(unittest.TestCase):
                     self.assertEqual(caught.exception.details["reset_time_msk"], "03:00")
                 self.assertEqual(len(transport.requests), 1)
 
+    def test_provider_insufficient_credits_stops_retry_without_claiming_team_budget(self):
+        for in_body in (False, True):
+            with self.subTest(in_body=in_body):
+                exc = RuntimeError("upstream failure" if in_body else "OpenrouterException - Insufficient credits")
+                exc.status_code = 503
+                if in_body:
+                    exc.body = {"error": {"message": "OpenrouterException - Insufficient credits"}}
+                transport = FakeTransport([exc])
+                gateway = Gateway(self.h.config, Budget(self.h.config, time.monotonic(), self.h.log),
+                                  self.h.artifacts, self.h.bus, self.h.log, output_schemas(self.h.bus), transport)
+                with patch("agent.llm.gateway.time.sleep") as sleep:
+                    for _ in range(2):
+                        with self.assertRaises(AgentError) as caught:
+                            gateway.complete(self.args())
+                        self.assertEqual(caught.exception.code, "LLM_PROVIDER_CREDITS_EXHAUSTED")
+                        self.assertFalse(caught.exception.retryable)
+                        self.assertEqual(caught.exception.details["team_daily_budget_status"], "unknown")
+                        self.assertIsNone(caught.exception.details["reset_time_msk"])
+                    sleep.assert_not_called()
+                self.assertEqual(len(transport.requests), 1)
+                self.assertFalse(gateway.daily_budget_exhausted.is_set())
+
+    def test_temporary_503_without_credit_error_can_retry(self):
+        exc = RuntimeError("temporary service unavailable")
+        exc.status_code = 503
+        transport = FakeTransport([exc, {"choices": [{"message": {"content": json.dumps(self.final_payload())}}]}])
+        gateway = Gateway(self.h.config, Budget(self.h.config, time.monotonic(), self.h.log),
+                          self.h.artifacts, self.h.bus, self.h.log, output_schemas(self.h.bus), transport)
+        with patch("agent.llm.gateway.time.sleep"):
+            self.assertEqual(gateway.complete(self.args())["attempts_used"], 2)
+        self.assertFalse(gateway.provider_credits_exhausted.is_set())
+
     def test_strict_json_rejects_duplicate_keys_and_nan(self):
         for text in ['{"x":1,"x":2}', '{"x":NaN}', 'prefix {"x":1}']:
             with self.subTest(text=text), self.assertRaises(ValueError):

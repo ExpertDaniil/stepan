@@ -13919,7 +13919,8 @@
             "type": "string",
             "minLength": 1
           },
-          "maxItems": 12
+          "maxItems": 12,
+          "description": "Input features only; never include the target. [] chooses bounded defaults."
         },
         "group_by": {
           "anyOf": [
@@ -13930,10 +13931,12 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "For kind=group, a selected input feature from columns. Otherwise null."
         },
         "include_target": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report."
         }
       },
       "required": [

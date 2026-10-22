@@ -228,6 +228,10 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     graph = controller.graph
     plans, tickets = list(trusted_plans), list(trusted_tickets)
     accepted = 0
+    activity = False
+    controller.research_round_outcomes = []
+    adaptive = bool(getattr(controller, 'local_search', None) and controller.config.research_mode == 'adaptive')
+    calls_before = controller.budget.calls if adaptive else 0
     streaming = graph.policy["max_train_workers"] == 1
     peers = graph.metadata("researcher_ids")
     with ThreadPoolExecutor(max_workers=len(peers), thread_name_prefix="researcher") as pool:
@@ -248,6 +252,30 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     controller.log.event('research.phase_budget_reached', work_order_id=ticket['work_order']['work_order_id'])
                 else:
                     controller.log.exception("research.proposal_failed", exc, work_order_id=ticket["work_order"]["work_order_id"])
+                if adaptive:
+                    work = ticket['work_order']
+                    controller.research_round_outcomes.append('failed')
+                    controller.record_research_feedback(work['researcher_id'], work['branch_id'], 'proposal_failed',
+                        str(exc), code=getattr(exc, 'code', 'UNHANDLED_ERROR'))
+                    # A completed bounded API dialogue can be followed by a new
+                    # decision using the error. Zero-call deterministic failures
+                    # must not become an unbounded retry loop.
+                    can_reason = controller.llm_available()
+                    activity |= (not phase_budget and controller.budget.calls > calls_before and can_reason)
+                    if not can_reason and controller.budget.snapshot()['search_allowed']:
+                        replacement = issue(controller, work['branch_id'], work['researcher_id'], work['action'], work['allowed_donor_experiment_ids'])
+                        plan = local_for_ticket(controller, replacement)
+                        if plan is not None:
+                            activity = True
+                            controller.log.event('search.fallback_started', reason=getattr(exc, 'code', 'UNHANDLED_ERROR'),
+                                                 work_order_id=replacement['work_order']['work_order_id'])
+                            if streaming:
+                                accepted += controller.run_training([plan], [replacement])
+                            else:
+                                plans.append(plan);tickets.append(replacement)
+                        else:
+                            stop_ticket(controller, replacement, 'No affordable catalogue fallback after API failure')
+                    continue
                 if not getattr(controller, "local_search", None) or not controller.budget.snapshot()["search_allowed"]:
                     continue
                 work = ticket["work_order"]
@@ -256,22 +284,38 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
             if getattr(controller, "local_search", None):
                 plan = proposal.get("plan")
                 if proposal['decision'] == 'stop' and controller.config.research_mode == 'adaptive':
+                    controller.research_round_outcomes.append('stop')
                     stop_ticket(controller, ticket, proposal.get('stop_reason') or 'No useful affordable research action')
                     continue
-                reason = ("stopped_proposal" if proposal["decision"] == "stop" else
-                          "duplicate" if controller.local_search.repeated(plan) else
-                          "predicted_duration" if not controller.budget.can_train(plan)["allowed"] else None)
-                if reason:
-                    controller.log.event("search.proposal_replaced", work_order_id=ticket["work_order"]["work_order_id"], reason=reason)
-                    plan = local_for_ticket(controller, ticket)
+                if adaptive:
+                    work = ticket['work_order']
+                    plan = controller.prepare_adaptive_proposal(plan, work['branch_id'], work['constraints'],
+                        ticket['researcher_request']['payload']['assignment'])
+                    controller.research_round_outcomes.append('proposed')
+                    activity = True
                     if plan is None:
-                        stop_ticket(controller, ticket, "No affordable untried catalogue candidate")
+                        stop_ticket(controller, ticket, 'The proposed action has no affordable untried fit; feedback was saved')
                         continue
-                    proposal = {"decision": "propose", "plan": plan}
+                    if plan is proposal['plan']:
+                        ticket['_proposal'] = proposal
+                    else:
+                        plan = bind_trusted(plan, ticket)
+                    proposal = {**proposal, 'plan': plan}
                 else:
-                    work = ticket["work_order"]
-                    controller.authorize_research(plan, work['branch_id'])
-                    ticket["_proposal"] = proposal
+                    reason = ("stopped_proposal" if proposal["decision"] == "stop" else
+                              "duplicate" if controller.local_search.repeated(plan) else
+                              "predicted_duration" if not controller.budget.can_train(plan)["allowed"] else None)
+                    if reason:
+                        controller.log.event("search.proposal_replaced", work_order_id=ticket["work_order"]["work_order_id"], reason=reason)
+                        plan = local_for_ticket(controller, ticket)
+                        if plan is None:
+                            stop_ticket(controller, ticket, "No affordable untried catalogue candidate")
+                            continue
+                        proposal = {"decision": "propose", "plan": plan}
+                    else:
+                        work = ticket["work_order"]
+                        controller.authorize_research(plan, work['branch_id'])
+                        ticket["_proposal"] = proposal
             elif proposal["decision"] != "stop":
                 ticket["_proposal"] = proposal
             if proposal["decision"] == "stop":
@@ -285,7 +329,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     plans.append(proposal["plan"]);tickets.append(ticket)
     if plans:
         accepted += controller.run_training(plans, tickets)
-    return accepted, bool(accepted or plans or trusted_plans or any("_has_plan" in ticket for ticket in llm_tickets))
+    return accepted, bool(activity or accepted or plans or trusted_plans or any("_has_plan" in ticket for ticket in llm_tickets))
 
 
 def run(controller):
@@ -369,15 +413,20 @@ def search(controller):
         attempted, had_plans = research_batch(controller, trusted_plans, trusted_tickets, llm_tickets)
         if not had_plans:
             controller.no_fit_branches.add(branch_id)
+            outcomes = getattr(controller, 'research_round_outcomes', [])
+            reason = ('researchers_stopped' if outcomes and all(o == 'stop' for o in outcomes) else
+                      'research_unavailable' if 'failed' in outcomes else 'no_affordable_candidates')
+            controller.no_fit_reasons[branch_id] = reason
             decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": None})["decision"]
             if decision['action'] == 'REFINE_BEST':
                 continue
             if decision["action"] == "BACKTRACK":
                 branch_id = apply_switch(controller, branch_id, decision)
                 continue
-            stop_reason = "no_affordable_candidates";break
+            stop_reason = reason;break
         if attempted:
             controller.no_fit_branches.clear()
+            controller.no_fit_reasons.clear()
         accepted += attempted
         controller.finalize_best()
     return finish(controller, stop_reason, accepted)

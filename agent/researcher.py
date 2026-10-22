@@ -37,6 +37,9 @@ class Researcher:
             evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
             evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
             evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
+            evidence.update(r['artifact_id'] for r in user.get('analysis_history', []))
+            evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
+            evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
             evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id'))
             if not set(proposed['evidence_ids']) <= evidence:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')

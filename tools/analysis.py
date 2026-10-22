@@ -13,9 +13,11 @@ ANALYSIS_SCHEMA = {
     "type": "object", "properties": {
         "kind": {"enum": ["summary", "association", "group", "compare", "dictionary", "report"]},
         "report_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
-        "columns": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 12},
-        "group_by": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
-        "include_target": {"type": "boolean"}},
+        "columns": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 12,
+                    "description": "Input features only; never include the target. [] chooses bounded defaults."},
+        "group_by": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+                     "description": "For kind=group, a selected input feature from columns. Otherwise null."},
+        "include_target": {"type": "boolean", "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report."}},
     "required": ["kind", "columns", "group_by", "include_target"], "additionalProperties": False}
 
 
@@ -72,7 +74,7 @@ class AnalysisService:
 
     def recent(self):
         with self.lock:
-            return list(self.records[-6:])
+            return deepcopy(self.records[-6:])
 
     def analyze(self, query):
         import numpy as np
@@ -102,14 +104,16 @@ class AnalysisService:
         digest = hashlib.sha256(canonical(query).encode()).hexdigest()
         with self.lock:
             if digest in self.cache:
-                return self.cache[digest]
+                return deepcopy(self.cache[digest])
         target = self.spec['target_column']
         excluded = set(self.spec['excluded_features']) | {target}
         requested = list(dict.fromkeys(query['columns']))
         if not requested:
             requested = [c for c in self.fit if c not in excluded][:8]
         if any(c not in self.fit or c in excluded for c in requested):
-            raise AgentError("INVALID_ANALYSIS", "Select existing input features; request target through include_target")
+            raise AgentError("INVALID_ANALYSIS", "columns must contain existing input features only. Remove the target/excluded columns; use include_target=true for fit-only target summaries.",
+                             details={'invalid_columns': [c for c in requested if c not in self.fit or c in excluded],
+                                      'target_column': target})
         columns = requested + ([target] if query['include_target'] else [])
         # Deterministic, bounded computation; row-level labels never leave this service.
         data = self.fit[columns]
@@ -127,6 +131,10 @@ class AnalysisService:
             result['dictionary'] = (json.loads(dictionary.head(12).to_json(orient='records', force_ascii=False))
                                     if dictionary is not None else [])
         elif query['kind'] == 'compare':
+            missing = [c for c in requested if c not in self.test]
+            if missing:
+                raise AgentError('INVALID_ANALYSIS', 'Selected features are absent from the unlabelled test table',
+                                 details={'missing_test_columns': missing})
             test = self.test[requested]
             if len(test) > 20000:
                 test = test.sample(20000, random_state=42)
@@ -148,8 +156,8 @@ class AnalysisService:
                 raise AgentError("INVALID_ANALYSIS", "group_by must be one of the selected input columns")
             values = data[group]
             if pd.api.types.is_numeric_dtype(values) and values.nunique() > 12:
-                values = pd.qcut(values, 5, duplicates='drop').astype(str)
-            values = values.fillna('__MISSING__').astype(str)
+                values = pd.qcut(values.replace([np.inf, -np.inf], np.nan), 5, duplicates='drop')
+            values = values.astype(object).where(values.notna(), '__MISSING__').astype(str)
             counts = values.value_counts().head(12)
             result['groups'] = []
             for label, count in counts.items():
@@ -176,7 +184,7 @@ class AnalysisService:
         response = {'artifact_id': art['artifact_id'], 'report': reply}
         with self.lock:
             self.cache[digest] = response
-            self.records.append({'artifact_id': art['artifact_id'], 'query': query, 'scope': result['scope']})
+            self.records.append({'artifact_id': art['artifact_id'], 'query': deepcopy(query), 'scope': result['scope']})
         self.log.event('research.analysis_completed', artifact_id=art['artifact_id'], kind=query['kind'],
                        columns=requested, rows=len(data), scope=result['scope'])
-        return response
+        return deepcopy(response)

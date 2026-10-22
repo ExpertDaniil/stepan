@@ -51,10 +51,14 @@ class LocalSearch:
         if self.c.config.research_mode == 'adaptive':
             auth = self.authorizations.get((branch, peer))
             if not auth or time.monotonic() >= auth['deadline']:
-                self.series.pop((branch, peer), None)
+                self.clear_series(peer, branch)
                 return False
         item = self.series.get((branch, peer))
         return bool(item and item[0] > 0 and item[1])
+
+    def clear_series(self, peer, branch):
+        self.series.pop((branch, peer), None)
+        self.authorizations.pop((branch, peer), None)
 
     def refining(self, branch, base):
         if self.c.config.research_mode == 'adaptive':
@@ -117,7 +121,8 @@ class LocalSearch:
             if request['budget_seconds'] <= 0:
                 return
             self.authorizations[(branch, peer)] = {'deadline': time.monotonic()+request['budget_seconds'],
-                                                  'parameters': request['parameters']}
+                'parameters': list(request['parameters']),
+                'fixed_parameters': {k: v for k, v in plan['model']['hyperparameters'].items() if k not in request['parameters']}}
         recipe, params = plan["recipe_id"], plan["model"]["hyperparameters"]
         values = deque((recipe, p) for p in self.variants(recipe, params, numeric_only=self.refining(branch, plan),
                        parameter_names=request['parameters'] if adaptive else None))
@@ -134,8 +139,12 @@ class LocalSearch:
                 continue
             if not graph.head_satisfies({'solution_id': graph.experiment_solution(eid)}, graph.branch(branch)['constraints']):
                 continue
+            authorization = self.authorizations.get((branch, peer), {})
+            if any(exp['plan']['model']['hyperparameters'].get(k) != v
+                   for k, v in authorization.get('fixed_parameters', {}).items()):
+                continue
             phase = graph.refinement()
-            if phase and phase['branch_id'] == branch and any(
+            if self.c.config.research_mode != 'adaptive' and phase and phase['branch_id'] == branch and any(
                     exp['plan']['model']['hyperparameters'].get(name) != fallback.get(name)
                     for name in self.feature_parameters()):
                 continue
@@ -198,7 +207,8 @@ class LocalSearch:
                 if choice:
                     item[0] -= 1
                     return choice
-        self.series.pop((branch, peer), None)
+        self.clear_series(peer, branch)
+        authorized = False
         if adaptive and self.c.llm_available():
             return None  # Let the planner choose another action; no implicit follow-up.
         recipes = [r for r, value in self.c.catalog.recipes.items()

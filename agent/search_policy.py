@@ -402,7 +402,8 @@ class SearchPolicy(RefinementPolicy):
                 alt = alternatives[0]
                 decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="No affordable candidate in this branch; try a saved alternative")
             else:
-                decision.update(action="FINALIZE", parameters={"reason": "no_affordable_candidates"}, reason="no_affordable_candidates")
+                reason = getattr(self.controller, 'no_fit_reasons', {}).get(branch['branch_id'], 'no_affordable_candidates')
+                decision.update(action="FINALIZE", parameters={"reason": reason}, reason=reason)
         artifact = self.files.put_json(decision, "search_decision")
         def mutate():
             self.branch(branch["branch_id"], branch["branch_revision"])

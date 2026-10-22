@@ -8,6 +8,13 @@
 измеренный исход через plan_id/experiment_id. Реальный API-request snapshot учитывает сокращение
 после добавления схем и ответов инструментов. Подробности: [OPEN-RESEARCH.md](OPEN-RESEARCH.md).
 
+Исправления adaptive: `search.tuning_base_reused` означает использование известной базы перед
+новыми разрешёнными испытаниями. `research.feedback_recorded` сохраняет причину ошибки/отказа
+для следующего контекста. `search.fallback_started` явно отмечает резервный каталог после
+недоступности API. `submission.refit_failed` с `retained_output=true` сохраняет проверенный CSV
+и исключает этот кандидат из повторной финализации. `search.finished.stop_reason` различает
+`researchers_stopped`, `research_unavailable` и `no_affordable_candidates`.
+
 Все записи используют UTC ISO-8601. `run_id` разделяет запуски, `trace_id` объединяет переходы запуска, `request_id` определяет попытку вызова, `span_id`/`parent_span_id` связывают вложенные C09 → C10 → C11. `experiment_id`, `job_id`, `submission_job_id` привязывают события к вычислению и публикации.
 
 `ContractBus.call` проверяет запрос, пишет snapshot, вызывает handler, проверяет и сохраняет ответ. Для invalid JSON snapshot имеет суффикс `.invalid.json` с ограниченным текстовым представлением. При повторе успешного idempotency key handler не исполняется снова; одновременные одинаковые вызовы ждут один результат. SQLite mutations выполняются только основным dispatcher-thread.

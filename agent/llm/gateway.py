@@ -254,7 +254,7 @@ class Gateway:
             if self.analysis is None:
                 raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
-                'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. At most 12 columns; [] selects defaults.',
+                'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. columns contains input features only, never the target: use include_target=true for target summaries. For group, group_by must be one of columns. At most 12 columns; [] selects defaults.',
                 'parameters': ANALYSIS_SCHEMA}})
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
@@ -310,7 +310,10 @@ class Gateway:
                         if name == 'write_code' and args.get("researcher_id") != context["metadata"].get("researcher_id"):
                             raise ValueError("Tool call uses another researcher's namespace")
                         prepared.append((call, args))
-                    messages.append({k: message[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in message})
+                    # Provider reasoning is telemetry, not conversation state. Replaying it
+                    # both exhausts the byte cap and relies on nonstandard request fields.
+                    messages.append({"role": "assistant", "content": message.get("content"),
+                                     "tool_calls": message["tool_calls"]})
                     for call, args in prepared:
                         name = call['function']['name']
                         if name == 'write_code':
@@ -349,7 +352,10 @@ class Gateway:
                     messages.append({"role": "user", "content": "Generation was truncated. Return a compact complete final JSON matching the schema; avoid unnecessary code or prose."})
                 else:
                     content = (choice.get("message") or {}).get("content")
-                    if isinstance(content, str) and content.strip():
+                    # A malformed full pipeline can be larger than the next request's
+                    # entire budget. Its raw response is already logged; retain only a
+                    # small invalid reply, with the bounded repair error below.
+                    if isinstance(content, str) and content.strip() and len(content.encode('utf-8')) <= 2000:
                         messages.append({"role": "assistant", "content": content})
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
@@ -366,12 +372,12 @@ class Gateway:
                 user = json.loads(message['content'])
             except (ValueError, TypeError):
                 continue
-            if not isinstance(user, dict) or 'profile_summary' not in user:
+            if not isinstance(user, dict) or not ('profile_summary' in user or 'profile' in user):
                 continue
-            profile = user['profile_summary']
+            profile = user.get('profile_summary', {})
             def refresh():
                 message['content'] = json.dumps(user, ensure_ascii=False)
-            data = profile.get('data', {})
+            data = profile.get('data', user.get('profile', {}))
             for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
                 if size() <= limit:
                     break
@@ -380,7 +386,24 @@ class Gateway:
                 user['facts'].pop();refresh()
             memory = profile.get('measured_search', {})
             while size() > limit and len(memory.get('entries', [])) > 4:
-                memory['entries'].pop();memory['omitted_count'] += 1;refresh()
+                memory['entries'].pop();memory['omitted_count'] = memory.get('omitted_count', 0)+1;refresh()
+        # Older reports remain retrievable by artifact_id. Preserve the latest tool
+        # result and every assistant/tool-call pair so the API dialogue stays valid.
+        tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']
+        for message in tool_messages[:-1]:
+            if size() <= limit:
+                break
+            try:
+                reply = json.loads(message['content'])
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(reply, dict) or not reply.get('artifact_id') or 'report' not in reply:
+                continue
+            report = reply['report']
+            message['content'] = json.dumps({'artifact_id': reply['artifact_id'], 'report': {
+                'scope': report.get('scope'), 'query': report.get('query'), 'details_omitted': True,
+                'detail_hint': 'Earlier report compacted; retrieve by kind=report and report_id or query fewer columns.'}},
+                ensure_ascii=False)
 
     @staticmethod
     def _digest(value):

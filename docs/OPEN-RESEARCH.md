@@ -124,3 +124,21 @@ the organizers' exact pinned environment and public/private benchmark quality re
 measurement. Compare catalogue and adaptive policies under equal time/API budgets, use a
 control split not exposed to the planner, and measure final quality, completion rate, repeats,
 action distribution and wall time. More feature operations alone are not success.
+
+## First-run corrections
+
+- Authorize explicit tuning before deduplicating its starting configuration. A cached starting
+  fit consumes its place in max_trials, but does not cancel the remaining authorized variants.
+- Clear expired/completed authorizations and keep unselected axes fixed when rebasing a series.
+- Do not replay provider reasoning in tool messages. Compact older report bodies by artifact ID;
+  keep the latest tool result and valid assistant/tool-call pairs. Bound malformed repair text.
+- Return actionable target/group query errors; cache replies and history cannot be mutated by callers.
+- An invalid proposal that consumed API attempts can be followed by another decision with bounded
+  failure feedback, while API capacity remains. Zero-call deterministic failures do not spin.
+  Catalogue fallback after API unavailability remains explicit in telemetry. Normal adaptive
+  duplicates are returned through Store/Graph deduplication rather than silently starting tuning.
+- Finalization failures preserve the verified CSV and try the best remaining comparable evaluated
+  candidate. A failed refit is excluded from repeated publication attempts, not from scientific history.
+
+The graph, peer scheduling, refinement policy, validation split and search action set are retained.
+These are execution fixes; no new scientific scheduler, role hierarchy or direction quotas are added.

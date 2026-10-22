@@ -32,6 +32,10 @@ class Orchestrator:
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
         self.no_fit_branches = set()
+        self.no_fit_reasons = {}
+        self.research_feedback = []
+        self.context.research_feedback = self.research_feedback
+        self.failed_refits = set()
         self.degraded = False
         self.graph = None
         if config.graph_enabled:
@@ -112,17 +116,72 @@ class Orchestrator:
                 self.budget.phase_remaining(), self.budget.remaining()-self.budget.reserve_seconds()))))
             self.local_search.start_series(plan['researcher_id'], branch, plan, request=request)
         else:
-            self.local_search.series.pop((branch, plan['researcher_id']), None)
+            self.local_search.clear_series(plan['researcher_id'], branch)
         self.log.event('research.action_admitted', plan_id=plan['plan_id'], action=intent['action'],
                        branch_id=branch, tuning=intent['tuning'], effective_tuning=request, evidence_ids=intent['evidence_ids'])
+        return intent
+
+    def record_research_feedback(self, peer, branch, status, message, *, code=None):
+        """Dispatcher-owned feedback, including failures that created no ExperimentPlan."""
+        record = {'researcher_id': peer, 'branch_id': branch, 'status': status,
+                  'message': self.log.redactor.clean(str(message))[:1200], 'code': code}
+        art = self.artifacts.write_json('research/feedback-'+uuid.uuid4().hex[:12]+'.json', record, 'research_feedback')
+        self.research_feedback.append({**record, 'artifact_id': art['artifact_id']})
+        # This bounds context size, not the number or scientific direction of actions.
+        self.research_feedback[:] = self.research_feedback[-8:]
+        self.log.event('research.feedback_recorded', **record, artifact_id=art['artifact_id'])
+
+    def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
+        """Authorize an action before deduplicating its optional starting fit."""
+        intent = self.authorize_research(plan, branch)
+        repeated = self.local_search.repeated(plan)
+        if intent['action'] == 'tune' and repeated:
+            self.log.event('search.tuning_base_reused', plan_id=plan['plan_id'], branch_id=branch,
+                           researcher_id=plan['researcher_id'], recipe_id=plan['recipe_id'])
+            replacement = self.local_plan(plan['researcher_id'], branch, plan, constraints, assignment)
+            if replacement is None:
+                self.record_research_feedback(plan['researcher_id'], branch, 'tuning_exhausted',
+                    'The base is already recorded and the authorized axes have no affordable untried continuation.')
+            return replacement
+        if repeated:
+            # Store/Graph deduplication will return the recorded result; never
+            # replace an explicit adaptive choice with an unauthorized local series.
+            self.record_research_feedback(plan['researcher_id'], branch, 'duplicate',
+                'This configuration is already recorded. Reuse its result and choose a new action.')
+            return plan
+        if not self.budget.can_train(plan)['allowed']:
+            self.record_research_feedback(plan['researcher_id'], branch, 'not_affordable',
+                json.dumps(self.budget.can_train(plan), ensure_ascii=False))
+            return None
+        return plan
 
     def update_final_reserve(self):
-        best = self.store.best()
+        best = self.final_candidate()
         champion = self.store.champion()
-        if best and (not champion or champion["experiment_id"] != best):
+        if best and best not in self.failed_refits and (not champion or champion["experiment_id"] != best):
             self.budget.set_final_plan(self.store.get(best)["plan"])
         else:
             self.budget.set_final_plan(None)
+
+    def final_candidate(self):
+        """A validation winner that failed refit must not block other candidates."""
+        best = self.store.best()
+        if not best or best not in self.failed_refits:
+            return best
+        from agent.store import comparable, is_better
+        reference = self.store.experiment_evaluation(best)['primary_metric']
+        chosen, metric = None, None
+        for row in self.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated' ORDER BY rowid", (self.store.run_id,)):
+            eid = row[0]
+            if eid in self.failed_refits:
+                continue
+            evaluation = self.store.experiment_evaluation(eid)
+            if not evaluation or not evaluation['valid'] or evaluation['violations']:
+                continue
+            candidate = evaluation['primary_metric']
+            if comparable(candidate, reference) and (metric is None or is_better(candidate, metric)):
+                chosen, metric = eid, candidate
+        return chosen
 
     def submit_plan(self, payload):
         plan = self.catalog.validate_plan(payload["plan"], self.spec, self.validation["validation_id"], self.artifacts)
@@ -293,22 +352,32 @@ class Orchestrator:
                 "feature_steps": self.catalog.feature_steps(params), "code_artifact_id": code["artifact_id"], "resources": self.resources()}
 
     def finalize_best(self):
-        previous = set(self.submission.jobs)
-        try:
-            result = self._finalize_best()
-            if self.graph:
-                self.graph.acknowledge_publications()
-            return result
-        except Exception:
-            for ident in set(self.submission.jobs) - previous:
-                if self.submission.jobs[ident]["state"] not in {"failed", "timed_out", "cancelled", "published", "skipped_not_better"}:
-                    self.submission.change_state(ident, "failed")
-            raise
+        while True:
+            previous = set(self.submission.jobs)
+            candidate = self.final_candidate()
+            try:
+                result = self._finalize_best()
+                if self.graph:
+                    self.graph.acknowledge_publications()
+                return result
+            except Exception as exc:
+                for ident in set(self.submission.jobs) - previous:
+                    if self.submission.jobs[ident]["state"] not in {"failed", "timed_out", "cancelled", "published", "skipped_not_better"}:
+                        self.submission.change_state(ident, "failed")
+                recoverable = {'REFIT_FAILED', 'INVALID_OUTPUT_SCHEMA', 'INVALID_OUTPUT_VALUES', 'ID_ORDER_MISMATCH'}
+                if isinstance(exc, AgentError) and exc.code in recoverable and self.store.champion() and candidate is not None:
+                    self.submission.require_output()
+                    self.failed_refits.add(candidate)
+                    self.degraded = True
+                    self.update_final_reserve()
+                    self.log.exception('submission.refit_failed', exc, experiment_id=candidate, retained_output=True)
+                    continue
+                raise
 
     def _finalize_best(self):
-        ident = self.store.best()
+        ident = self.final_candidate()
         champion = self.store.champion()
-        if not ident or (champion and champion["experiment_id"] == ident):
+        if not ident or ident in self.failed_refits or (champion and champion["experiment_id"] == ident):
             self.budget.set_final_plan(None)
             return
         experiment = self.store.get(ident)
@@ -409,11 +478,15 @@ class Orchestrator:
                 requests.append({"researcher_id": researcher_id, "context_id": context["context_id"], "assignment": assignment,
                                  "base_experiment_ids": [snapshot["best_evaluated_experiment_id"]] if snapshot["best_evaluated_experiment_id"] else [],
                                  "forbidden_fingerprints": snapshot["reserved_fingerprints"], "budget": self.budget.snapshot(), "proposal_limit": 1})
+            retry_research = False
+            outcomes = []
+            calls_before = self.budget.calls
             with ThreadPoolExecutor(max_workers=self.config.max_workers, thread_name_prefix="researcher") as pool:
-                futures = [pool.submit(self.call, "C09", request, self.researcher.propose) for request in requests]
+                futures = {pool.submit(self.call, "C09", request, self.researcher.propose): request for request in requests}
                 for future in as_completed(futures):
                     try:
                         reply = future.result()
+                        outcomes.append(reply['decision'])
                         if reply["decision"] == "stop" and self.config.research_mode != 'adaptive':
                             best = self.store.best()
                             plan = self.local_plan(reply["researcher_id"], base=self.store.get(best)["plan"] if best else None)
@@ -421,7 +494,10 @@ class Orchestrator:
                                 plans.append(plan)
                         if reply["decision"] == "propose":
                             plan = reply["plan"]
-                            if self.local_search.repeated(plan) or not self.budget.can_train(plan)["allowed"]:
+                            if self.config.research_mode == 'adaptive':
+                                plan = self.prepare_adaptive_proposal(plan)
+                                retry_research |= self.llm_available()
+                            elif self.local_search.repeated(plan) or not self.budget.can_train(plan)["allowed"]:
                                 plan = self.local_plan(reply["researcher_id"], base=plan)
                             else:
                                 self.authorize_research(plan)
@@ -430,12 +506,22 @@ class Orchestrator:
                     except AgentError as exc:
                         self.degraded = True
                         self.log.exception("research.proposal_failed", exc)
+                        if self.config.research_mode == 'adaptive':
+                            outcomes.append('failed')
+                            self.record_research_feedback(futures[future]['researcher_id'], 'legacy', 'proposal_failed', str(exc), code=exc.code)
+                            can_reason = self.llm_available()
+                            retry_research |= self.budget.calls > calls_before and can_reason
+                            if can_reason:
+                                continue
                         best = self.store.best()
                         plan = self.local_plan("local-replacement", base=self.store.get(best)["plan"] if best else None)
                         if plan:
                             plans.append(plan)
             if not plans:
-                stop_reason = "no_affordable_candidates"
+                if retry_research and self.budget.snapshot()['search_allowed']:
+                    continue
+                stop_reason = ('researchers_stopped' if outcomes and all(o == 'stop' for o in outcomes) else
+                               'research_unavailable' if 'failed' in outcomes else 'no_affordable_candidates')
                 break
             try:
                 accepted += self.run_training(plans)

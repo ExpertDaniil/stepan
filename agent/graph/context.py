@@ -221,7 +221,8 @@ class WorkService:
                            "task_contract": task_contract, "head": head, "base_code": base_code, "constraints": branch["constraints"],
                            "phase": 'refine' if self.refinement() else 'search',
                            "facts": facts, "recent": recent, "total_recent": total_recent, "donors": binding["allowed_donor_experiment_ids"],
-                           "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None, "observed_recipes": observed_recipes,
+                           "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None,
+                           "response_cost_plan": base_exp['plan'] if base_exp else None, "observed_recipes": observed_recipes,
                            "search_memory": self.search_memory(branch['branch_id'], head),
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
             args = {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"], "tools_catalog_version": p["tools_catalog_version"],

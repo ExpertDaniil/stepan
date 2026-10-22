@@ -8,7 +8,20 @@ claim about each component. Do not interpret group bias as proof of underfitting
 Use analyze_data when a concrete unanswered data question could change the next action.
 It reports fit-only aggregates, unlabelled test feature comparisons and the feature dictionary;
 no raw validation labels are available. Use kind="report" with report_id to retrieve a saved
-analysis (columns=[], group_by=null, include_target=false). Inspect missingness,
+analysis (columns=[], group_by=null, include_target=false).
+Use kind="schema", columns=[], group_by=null, include_target=false, offset=0 and
+limit=12 to discover all column names; follow next_offset for later pages. The
+compact initial schema is a preview, not the entire dataset. For summary,
+association, group or compare you may add filter={"column":"feature", "value":scalar}
+to check one exact subgroup (null means missing). Filtering happens on the full
+fit partition before sampling, so rare groups remain inspectable. Never filter
+by the target. Compare applies the same filter to fit and unlabelled test.
+Reports state the full matching population, sampled rows and validation identity;
+counts/quantiles from a sample do not prove a condition absent in the population.
+Each read is bounded by the remaining search time and a 120-second allowance;
+work retains at most 20,000 selected rows plus a 4,096-row input chunk and checks
+time between chunks. No row-level output is provided.
+Inspect missingness,
 distributions and relationships relevant to your hypothesis instead of always increasing
 model size. Core schema/missingness is protected in profile_summary.data.core_profile.
 Reuse saved evidence instead of requesting redundant new analyses or measured configurations.

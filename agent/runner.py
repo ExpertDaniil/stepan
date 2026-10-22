@@ -156,6 +156,13 @@ class Runner:
         held = self.budget.leases.get(lease["lease_id"])
         if not held or held["lease"]["fencing_token"] != lease["fencing_token"]:
             raise AgentError("STALE_LEASE", "Cannot start without a live lease")
+        owner = experiment["experiment_id"] if phase == "train" else payload["submission_job_id"]
+        if held["owner_id"] != owner or held["phase"] != phase:
+            raise AgentError("STALE_LEASE", "Lease belongs to another owner or phase")
+        for field in ("cpu_threads", "memory_limit_mb", "timeout_seconds"):
+            if lease[field] != held["lease"][field]:
+                raise AgentError("STALE_LEASE", "Lease resources differ from the issued allowance")
+        lease = dict(held["lease"])
         ident = "job-" + uuid.uuid4().hex[:12]
         directory = self.artifacts.safe_path("experiments/" + experiment["experiment_id"] + "/" + ident)
         directory.mkdir(parents=True, exist_ok=False)
@@ -172,6 +179,8 @@ class Runner:
                     "prediction_path": str(prediction_path), "model_path": str(directory / "pipeline.joblib"),
                     "model_snapshot_max_bytes": self.snapshot_allowance(),
                     "result_path": str(directory / "result.json")}
+        if job_spec["guard_generated"]:
+            job_spec["model_snapshot_max_bytes"] = 0
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))

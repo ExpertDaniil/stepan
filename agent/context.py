@@ -41,6 +41,7 @@ class ContextBuilder:
         user = {"task": self.task_text, "task_spec": self.spec, "profile": compact_profile,
                 "recipes": [self.catalog.recipes[key] for key in allowed], "recent_experiments": recent,
                 "assignment": payload["assignment"], "researcher_id": payload["researcher_id"]}
+        user['validation_protocol'] = getattr(self, 'validation_summary', {})
         messages = [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(user, ensure_ascii=False)}]
         # Conservative byte heuristic, not a claim about the provider tokenizer.
         limit = payload["max_input_tokens"] * 3
@@ -118,6 +119,7 @@ class ContextBuilder:
             user['assignment'] = ('Choose the next research action using measured history and missing evidence. '
                 'The exploit/explore hint does not restrict the recipe or number of coordinated pipeline changes. '
                 'During refinement prefer affordable improvements of the measured best, but reassess feature/target choices when evidence warrants it.')
+            user['profile_summary']['validation_protocol'] = getattr(self, 'validation_summary', {})
             if getattr(self, 'analysis', None):
                 user['profile_summary']['analysis_history'] = self.analysis.recent()
         else:
@@ -150,6 +152,7 @@ class ContextBuilder:
             raise AgentError("CONTEXT_TOO_LARGE", "Mandatory branch identity, measured base/history, code, recipe and task contract do not fit")
         metadata = {"schema_id": research_schema(self.catalog.config.research_mode), "researcher_id": payload["researcher_id"],
                     "recipe_ids": allowed, "round_no": self.round_no, "demo_spec": self.demo, "graph_binding": graph["binding"]}
+        metadata['response_cost_plan'] = graph.get('response_cost_plan')
         art = self.artifacts.write_json("contexts/"+graph["context_id"]+".json", self.log.redactor.clean({"messages": messages, "metadata": metadata}), "llm_context", ident=graph["context_id"])
         self.log.event("context.built", context_id=art["artifact_id"], researcher_id=payload["researcher_id"], branch_id=user["branch_id"],
                        work_order_id=user["work_order_id"], assignment=payload["assignment"], base_experiment_id=user["base_experiment_id"],

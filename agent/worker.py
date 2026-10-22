@@ -75,7 +75,7 @@ def watch_job(job, done):
         done.wait(0.1)
 
 
-def execute(job):
+def execute(job, trusted_thread=None):
     import numpy as np
     import pandas as pd
     from threadpoolctl import threadpool_limits
@@ -112,7 +112,7 @@ def execute(job):
     guard = None
     if job.get('guard_generated'):
         from tools.runtime_guard import PipelineGuard
-        guard = PipelineGuard(job['code_path'])
+        guard = PipelineGuard(job['code_path'], trusted_thread=trusted_thread)
         guard.active = True
     try:
         return execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits)
@@ -123,13 +123,14 @@ def execute(job):
 
 
 def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits):
+    from copy import deepcopy
     import numpy as np
     import pandas as pd
     from threadpoolctl import threadpool_limits
     from agent.ml import enforce_threads, validate_estimator
     module_spec.loader.exec_module(module)
     print("AUTOML_WORKER "+json.dumps({"stage": "constructing", "phase": job["phase"], "rows": train_rows, "features": len(fit_x.columns)}),flush=True)
-    model = validate_estimator(enforce_threads(module.make_pipeline(task, params), job["cpu_threads"]))
+    model = validate_estimator(enforce_threads(module.make_pipeline(deepcopy(task), params), job["cpu_threads"]))
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
     started = time.monotonic()
@@ -139,12 +140,12 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             valid_indices = predict_x.index.tolist()
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
-            prediction = np.asarray(model.predict(predict_x)).reshape(-1)
+            prediction = prediction_values(model, predict_x, task)
             frame = pd.DataFrame({"__row_index": valid_indices, "prediction": prediction})
         else:
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
-            prediction = np.asarray(model.predict(predict_x)).reshape(-1)
+            prediction = prediction_values(model, predict_x, task)
             if len(prediction) != len(predict_x):
                 raise ValueError("Model changed prediction row count")
             if guard:
@@ -160,10 +161,22 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False, encoding="utf-8")
     model_path = Path(job["model_path"])
-    snapshot = save_snapshot(model, model_path, job.get("model_snapshot_max_bytes", 16777216))
+    # Pickling calls user-defined __reduce__/__getstate__. Never invoke those
+    # hooks after the guard is disabled. Exact source/params and predictions are
+    # sufficient to reconstruct a custom candidate; its pickle is optional.
+    snapshot = ({"status": "disabled_generated", "size_bytes": 0,
+                 "limit_bytes": job.get("model_snapshot_max_bytes", 16777216)} if guard else
+                save_snapshot(model, model_path, job.get("model_snapshot_max_bytes", 16777216)))
     return {"success": True, "fit_seconds": fit_seconds, "total_seconds": time.monotonic() - started,
             "rows": len(frame), "prediction_path": str(output),
             "model_path": str(model_path) if model_path.is_file() else None, "model_snapshot": snapshot}
+
+
+def prediction_values(model, frame, task):
+    """Finish user conversions before returning to trusted output IO."""
+    import numpy as np
+    values = np.asarray(model.predict(frame)).reshape(-1)
+    return values.astype(float if task["task_kind"] == "regression" else str)
 
 
 def main():
@@ -176,7 +189,7 @@ def main():
     watchdog = threading.Thread(target=watch_job, args=(job, done), daemon=True, name='worker-watchdog')
     watchdog.start()
     try:
-        result = execute(job)
+        result = execute(job, trusted_thread=watchdog)
         result["peak_memory_mb"] = self_peak_mb()
         exit_code = 0
     except BaseException as exc:

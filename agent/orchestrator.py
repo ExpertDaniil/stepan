@@ -17,17 +17,15 @@ def budget_trial_timeout(event, job, plan):
 
 class Orchestrator:
     def __init__(self, *, config, bus, budget, artifacts, store, runner, evaluator, submission, researcher,
-                 spec, validation, catalog, task_text, profile, log, demo=None, task_root=None):
+                 spec, validation, catalog, task_text, profile, log, demo=None, task_root=None, analysis=None):
         self.config, self.bus, self.budget, self.artifacts, self.store = config, bus, budget, artifacts, store
         self.runner, self.evaluator, self.submission, self.researcher = runner, evaluator, submission, researcher
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
         self.researcher.validation_id = validation["validation_id"]
-        if config.research_mode == 'adaptive':
-            from tools.analysis import AnalysisService
-            analysis = AnalysisService(spec, validation, artifacts, budget, log)
+        if analysis is not None:
             self.context.analysis = analysis
-            self.researcher.gateway.analysis = analysis
+        self.context.validation_summary = evaluator.describe_protocol(validation['validation_id'])
         self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes)
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
@@ -331,7 +329,18 @@ class Orchestrator:
         args = {"submission_job_id": subjob, "experiment_id": ident, "task_spec_id": self.spec["task_spec_id"],
                 "code_artifact_id": experiment["plan"]["code_artifact_id"], "lease": lease_reply["lease"], "fit_scope": "all_train",
                 "predict_artifact_id": self.spec["test_artifact_id"], "output_relative_path": "submissions/" + subjob + "/candidate.csv"}
-        result = self.call("C19", args, lambda p: self.runner.start_refit(p, self.spec, experiment), key=subjob)
+        try:
+            result = self.call("C19", args, lambda p: self.runner.start_refit(p, self.spec, experiment), key=subjob)
+        except Exception:
+            lease = lease_reply["lease"]
+            # A partial start that registered a Job must be stopped by cleanup;
+            # only a lease with no process can be released immediately.
+            if not any(job.lease["lease_id"] == lease["lease_id"] for job in self.runner.jobs.values()):
+                self.call("C13", {"operation": "release", "owner_id": subjob, "phase": "refit",
+                                   "requested": self.resources(lease["timeout_seconds"]),
+                                   "lease_id": lease["lease_id"], "fencing_token": lease["fencing_token"]},
+                          self.budget.lease, key="release/" + lease["lease_id"])
+            raise
         job = self.runner.jobs[result["job_id"]]
         job.submission_job_id = subjob
         self.submission.change_state(subjob, "refitting")

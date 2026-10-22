@@ -7,7 +7,7 @@ import time
 import uuid
 
 from agent.errors import AgentError
-from tools.code import write_code
+from agent.research_tools import ResearchTools
 
 DEFAULT_MODEL = "qwen/qwen3.8-27b"  # Permitted by the updated organizers' instructions.
 
@@ -106,7 +106,16 @@ class Gateway:
         self.semaphore = threading.BoundedSemaphore(config.max_workers)
         self.daily_budget_exhausted = threading.Event()
         self.provider_credits_exhausted = threading.Event()
-        self.analysis = None
+        self.tools = ResearchTools(bus, artifacts)
+
+    @property
+    def analysis(self):
+        """Compatibility for explicit v0.6 injection; no data implementation here."""
+        return self.tools.analysis
+
+    @analysis.setter
+    def analysis(self, service):
+        self.tools.analysis = service
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
@@ -230,32 +239,8 @@ class Gateway:
         deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
         phase_limited = False
         if payload['purpose'] == 'research_proposal' and self.budget.phase_deadline:
-            # This is a response deadline only. A received proposal can wait in
-            # the dispatcher without inheriting the API timeout.
-            user = json.loads(context['messages'][1]['content']) if context['metadata'].get('graph_binding') else {}
-            base = user.get('base_result')
-            recipe = next((r for r in user.get('profile_summary', {}).get('recipes', [])
-                           if base and r['id'] == base['recipe_id']), None)
-            after_response = self.budget.reserve_seconds()
-            if recipe:
-                probe = {'recipe_id': recipe['id'], 'model': {'family': recipe['family'], 'hyperparameters': base['hyperparameters']},
-                         'resources': {'cpu_threads': self.config.train_cpu_threads}}
-                after_response = self.budget.duration.estimate(probe)+self.budget.candidate_reserve(probe)
-            phase_deadline = self.budget.phase_deadline-after_response
-            phase_limited = phase_deadline < deadline
-            deadline = min(deadline, phase_deadline)
-        tools = []
-        if "write_code" in payload["tool_schema_ids"]:
-            tools.append({"type": "function", "function": {
-                "name": "write_code", "description": "Save Python source exporting make_pipeline(task_spec, params).",
-                "parameters": expanded(self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"])}})
-        if 'analyze_data' in payload['tool_schema_ids']:
-            from tools.analysis import ANALYSIS_SCHEMA
-            if self.analysis is None:
-                raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
-            tools.append({'type': 'function', 'function': {'name': 'analyze_data',
-                'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. At most 12 columns; [] selects defaults.',
-                'parameters': ANALYSIS_SCHEMA}})
+            deadline, phase_limited = self.budget.response_deadline(deadline, context['metadata'].get('response_cost_plan'))
+        tools = expanded(self.tools.definitions(payload['tool_schema_ids']))
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
@@ -302,26 +287,16 @@ class Gateway:
                     prepared = []
                     for call in message["tool_calls"]:
                         name = call['function']['name']
-                        if name not in payload['tool_schema_ids'] or name not in {'write_code', 'analyze_data'}:
+                        if name not in payload['tool_schema_ids']:
                             raise ValueError("Unexpected model tool call")
                         args = parse_json(call["function"]["arguments"])
-                        schema = (self.bus.schemas.schema['$defs']['C11_Request']['properties']['payload'] if name == 'write_code' else ANALYSIS_SCHEMA)
-                        self.bus.schemas._check(args, schema, "$.tool")
-                        if name == 'write_code' and args.get("researcher_id") != context["metadata"].get("researcher_id"):
-                            raise ValueError("Tool call uses another researcher's namespace")
+                        self.tools.validate(name, args, context)
                         prepared.append((call, args))
                     messages.append({k: message[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in message})
                     for call, args in prepared:
                         name = call['function']['name']
-                        if name == 'write_code':
-                            result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
-                            calls.append({"call_id": call["id"], "name": name, "request_id": result["request_id"]})
-                        else:
-                            try:
-                                result = self.analysis.analyze(args)
-                            except AgentError as error:
-                                result = {'error': error.as_dict()}
-                            calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')})
+                        result, trace = self.tools.execute(name, args)
+                        calls.append({'call_id': call['id'], 'name': name, **trace})
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
                     last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue

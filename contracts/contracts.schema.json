@@ -11902,6 +11902,16 @@
                 "capsule_artifact_id"
               ],
               "additionalProperties": false
+            },
+            "response_cost_plan": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ExperimentPlan"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -13899,7 +13909,8 @@
             "group",
             "compare",
             "dictionary",
-            "report"
+            "report",
+            "schema"
           ]
         },
         "report_id": {
@@ -13934,6 +13945,53 @@
         },
         "include_target": {
           "type": "boolean"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "column",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -13941,6 +13999,32 @@
         "columns",
         "group_by",
         "include_target"
+      ],
+      "additionalProperties": false
+    },
+    "SchemaInspectionQuery": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "enum": [
+            "train",
+            "test"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "table",
+        "offset",
+        "limit"
       ],
       "additionalProperties": false
     }

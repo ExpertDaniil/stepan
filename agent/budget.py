@@ -58,6 +58,16 @@ class Budget:
     def output_limit(self):
         return min(self.config.llm_max_total_output_tokens, self.phase_output_limit if self.phase_output_limit is not None else self.config.llm_max_total_output_tokens)
 
+    def response_deadline(self, operation_deadline, plan=None):
+        """Keep capacity for the dispatcher's supplied measured plan, independent of API formats."""
+        if self.phase_deadline is None:
+            return operation_deadline, False
+        after_response = self.reserve_seconds()
+        if plan:
+            after_response = self.duration.estimate(plan) + self.candidate_reserve(plan)
+        deadline = self.phase_deadline - after_response
+        return min(operation_deadline, deadline), deadline < operation_deadline
+
     def remaining(self):
         return max(0.0, self.deadline - time.monotonic())
 

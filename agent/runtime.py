@@ -65,6 +65,8 @@ def bootstrap(config, started, task_path, run_id, root, log):
         schemas = output_schemas(bus)
         artifacts.write_json("task/agent-output-schemas.json", schemas, "llm_schemas")
         gateway = Gateway(config, budget, artifacts, bus, log, schemas)
+        from agent.research_tools import SchemaInspection
+        gateway.tools.inspector = SchemaInspection(artifacts.read_json(profile['profile_artifact_id']))
         demo = demo_metadata(task["task_text"]) if config.llm_mode == "mock" else None
 
         interpreter = TaskInterpreter(config, artifacts, bus, gateway, task, profile, demo)
@@ -83,11 +85,16 @@ def bootstrap(config, started, task_path, run_id, root, log):
         evaluator = Evaluator(spec, artifacts, store, log)
         proposal = interpreter.choose_validation(spec)
         validation = bus.call("C05", {"task_spec_id": spec["task_spec_id"], "dataset_id": spec["dataset_id"], "proposal": proposal}, evaluator.create_protocol)["data"]
+        analysis = None
+        if config.research_mode == 'adaptive':
+            from tools.analysis import AnalysisService
+            analysis = AnalysisService(spec, validation, artifacts, budget, log, schemas=bus.schemas)
+            gateway.tools.analysis = analysis
         submission = Submission(spec, artifacts, store, log)
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log)
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,
                                   evaluator=evaluator, submission=submission, researcher=researcher, spec=spec,
-                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"])
+                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"], analysis=analysis)
         try:
             controller.run()
         except Exception as exc:

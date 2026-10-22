@@ -252,10 +252,10 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     continue
                 work = ticket["work_order"]
                 ticket = issue(controller, work["branch_id"], work["researcher_id"], work["action"], work["allowed_donor_experiment_ids"])
-                proposal = {"decision": "stop", "plan": None}
+                proposal = {"decision": "stop", "plan": None, "_failed_proposal": True}
             if getattr(controller, "local_search", None):
                 plan = proposal.get("plan")
-                if proposal['decision'] == 'stop' and controller.config.research_mode == 'adaptive':
+                if proposal['decision'] == 'stop' and controller.config.research_mode == 'adaptive' and not proposal.get('_failed_proposal'):
                     stop_ticket(controller, ticket, proposal.get('stop_reason') or 'No useful affordable research action')
                     continue
                 reason = ("stopped_proposal" if proposal["decision"] == "stop" else

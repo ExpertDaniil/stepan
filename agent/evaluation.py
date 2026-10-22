@@ -130,6 +130,16 @@ class Evaluator:
                 "valid_rows_artifact_id": valid_art["artifact_id"], "labels_visibility": "evaluator_only",
                 "metric": self.spec["metric"], "protocol_sha256": sha}
 
+    def describe_protocol(self, validation_id):
+        """Public research view: rationale and sizes, never validation labels or indices."""
+        from copy import deepcopy
+        protocol = self.protocols[validation_id]
+        return {'validation_id': validation_id,
+                'protocol_sha256': hashlib.sha256(canonical(protocol).encode()).hexdigest(),
+                'proposal': deepcopy(protocol['proposal']), 'fit_rows': len(protocol['train_indices']),
+                'validation_rows': len(protocol['valid_indices']),
+                'rule': 'Frozen before research; scores from another split are not comparable. No holdout labels are exposed.'}
+
     def evaluate(self, payload):
         import numpy as np
         import pandas as pd

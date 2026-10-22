@@ -16,7 +16,7 @@ class TaskInterpreter:
         context = self.artifacts.write_json("contexts/bootstrap-" + uuid.uuid4().hex[:10] + ".json",
                     self.gateway.log.redactor.clean({"messages": messages, "metadata": {"schema_id": schema_id, "demo_spec": self.demo}}), "llm_context")
         return self.bus.call("C10", {"purpose": purpose, "context_artifact_id": context["artifact_id"],
-                                     "response_schema_id": schema_id, "tool_schema_ids": [],
+                                     "response_schema_id": schema_id, "tool_schema_ids": ['inspect_schema'] if getattr(self.gateway, 'tools', None) and self.gateway.tools.inspector is not None else [],
                                      "max_output_tokens": self.config.llm_bootstrap_output_tokens,
                                      "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 3}, self.gateway.complete)["data"]["parsed_payload"]
 

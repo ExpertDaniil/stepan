@@ -179,7 +179,16 @@ class EndToEndTests(unittest.TestCase):
                         finally:override.remove(id(budget))
                     return lease(budget,payload)
                 settings={**self.env(),'GRAPH_ENABLED':str(int(graph)),'GRAPH_REFINEMENT_ENABLED':'0','TIME_BUDGET_SECONDS':'90'}
-                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),redirect_stderr(io.StringIO()) as stderr:
+                spawn = subprocess.Popen
+                def slow_research(command, **kwargs):
+                    if 'agent.worker' in command:
+                        job = json.loads(Path(command[-1]).read_text())
+                        if job['phase'] == 'train' and 'dummy-' not in Path(job['code_path']).read_text():
+                            # Guarantee an actual deadline crossing even on a fast machine.
+                            wrapper = "import time,runpy,sys; time.sleep(2); sys.argv=['agent.worker',sys.argv[1]]; runpy.run_module('agent.worker',run_name='__main__')"
+                            command = [command[0], '-u', '-c', wrapper, command[-1]]
+                    return spawn(command, **kwargs)
+                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),patch('agent.runner.subprocess.Popen',side_effect=slow_research),redirect_stderr(io.StringIO()) as stderr:
                     code=main([str(task),'--work-dir',str(Path(temp)/'runs')])
                 self.assertEqual(code,0,stderr.getvalue()[-3000:])
                 run=next((Path(temp)/'runs').glob('run-*'))
@@ -187,7 +196,7 @@ class EndToEndTests(unittest.TestCase):
                 self.assertTrue(clipped)
                 self.assertTrue(any(e['event']=='search.budget_trial_timed_out' for e in events))
                 self.assertTrue((task.parent/'submission.csv').is_file())
-                self.assertIn('State: completed',(run/'summary.md').read_text())
+                self.assertIn('State: completed',(run/'summary.md').read_text(), stderr.getvalue()[-8000:])
 
     def test_flat_platform_copy_runs_research_without_repository_path(self):
         with tempfile.TemporaryDirectory() as temp:

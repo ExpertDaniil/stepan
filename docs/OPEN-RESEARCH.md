@@ -73,7 +73,13 @@ created controlled branches can still reject unverifiable custom code under hard
 Generated pipelines run in the existing watched worker with sanitized environment, thread
 limits and the same timeout/RSS controls. A worker IO audit guard denies raw artifact/dataset
 opens, network, subprocesses and file mutations during construction/fit/predict. Installed
-code remains importable. Joblib uses threads inside these workers. The guard is disabled only
+code remains importable from the active interpreter's installation directories, including
+venv site-packages outside sys.base_prefix. The worker validates the source and preloads its
+declared allowed imports before applying threadpool limits and activating the guard. This
+allows normal native-library initialization without granting generated code arbitrary ctypes
+loading. Missing packages are not installed; required missing imports still fail. Preloading
+does not execute the generated module. File-denial errors include the blocked path.
+Joblib uses threads inside these workers. After activation, the guard is disabled only
 for trusted output writing/snapshot code. AST checks and the Python audit guard are defense
 in depth, **not an OS sandbox or a proof of arbitrary Python semantics**. Estimators requiring
 extra files/processes may fail; the verified incumbent is preserved. No packages are installed

@@ -104,15 +104,17 @@ def execute(job):
     module_spec = importlib.util.spec_from_file_location(module_name, job["code_path"])
     module = importlib.util.module_from_spec(module_spec)
     sys.modules[module_name] = module
+    guard = None
+    if job.get('guard_generated'):
+        from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
+        prepare_pipeline_imports(job['code_path'])
+        guard = PipelineGuard(job['code_path'])
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))
     if job.get('guard_generated'):
         from joblib import parallel_backend
         limits.enter_context(parallel_backend('threading', n_jobs=job['cpu_threads']))
-    guard = None
-    if job.get('guard_generated'):
-        from tools.runtime_guard import PipelineGuard
-        guard = PipelineGuard(job['code_path'])
+    if guard:
         guard.active = True
     try:
         return execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits)

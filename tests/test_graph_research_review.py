@@ -162,8 +162,8 @@ class GraphResearchReviewTests(unittest.TestCase):
             self.assertEqual(decision['action'], 'CONTINUE')
             h.issue(decision['parameters']['researcher_id'])
             second = self.decide(h)
-            self.assertEqual(second['action'], 'FINALIZE')
-            self.assertEqual(second['parameters']['reason'], 'llm_call_limit')
+            self.assertEqual(second['action'], 'CONTINUE')
+            self.assertIn('llm_call_limit', second['reason'])
         finally:
             h.close()
 
@@ -177,7 +177,8 @@ class GraphResearchReviewTests(unittest.TestCase):
             event = h.train_event(reply, state='failed')
             event['error'] = AgentError('SYNTHETIC_FAILURE', 'A failed attempt still consumes the experiment ceiling').as_dict()
             h.g.store.apply_event(event, 'train')
-            decision = self.decide(h, accept['branch_id'])
+            with patch.object(h.g.budget, 'research_capacity', return_value=1):
+                decision = self.decide(h, accept['branch_id'])
             self.assertEqual(decision['action'], 'BACKTRACK')
             self.assertEqual(decision['parameters']['target_branch_id'], out['reject_branch']['branch_id'])
         finally:
@@ -188,17 +189,18 @@ class GraphResearchReviewTests(unittest.TestCase):
         try:
             h.make_fork()
             self.assertEqual(h.g.attempted_research_count(), 4)
-            self.assertEqual(self.decide(h)['action'], 'CONTINUE')
+            with patch.object(h.g.budget, 'research_capacity', return_value=1):
+                self.assertEqual(self.decide(h)['action'], 'CONTINUE')
             self.assertEqual(h.g.db.execute('SELECT count(*) FROM g_branches').fetchone()[0], 1)
         finally:
             h.close()
 
-    def test_output_quota_exhaustion_is_a_clean_search_stop(self):
+    def test_output_quota_exhaustion_switches_to_local_search(self):
         h = GraphHarness(llm_max_total_output_tokens=1024)
         try:
             decision = self.decide(h)
-            self.assertEqual(decision['action'], 'FINALIZE')
-            self.assertEqual(decision['parameters']['reason'], 'llm_output_budget')
+            self.assertEqual(decision['action'], 'CONTINUE')
+            self.assertIn('llm_output_budget', decision['reason'])
             self.assertEqual(h.g.budget.calls, 0)
         finally:
             h.close()
@@ -296,7 +298,7 @@ class GraphResearchReviewTests(unittest.TestCase):
             self.assertEqual(path.read_text(), original)
             configure(path, apply=True, profile='extended')
             text = path.read_text()
-            for line in ['OPENAI_API_KEY=synthetic-placeholder', 'WORK_DIR=custom', 'TIME_BUDGET_SECONDS=10800', 'LLM_MAX_TOTAL_OUTPUT_TOKENS=64000', 'MAX_RESEARCH_EXPERIMENTS=100', 'LLM_MAX_CALLS=96']:
+            for line in ['OPENAI_API_KEY=synthetic-placeholder', 'WORK_DIR=custom', 'TIME_BUDGET_SECONDS=10800', 'LLM_MAX_TOTAL_OUTPUT_TOKENS=64000', 'MAX_RESEARCH_EXPERIMENTS=12', 'RESEARCH_SERIES_SIZE=4', 'LLM_MAX_CALLS=96']:
                 self.assertIn(line, text)
 
 

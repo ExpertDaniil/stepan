@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
+import math
 import time
 import uuid
 
@@ -18,6 +19,10 @@ class Orchestrator:
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
         self.researcher.validation_id = validation["validation_id"]
+        self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes)
+        from agent.local_search import LocalSearch
+        self.local_search = LocalSearch(self)
+        self.no_fit_branches = set()
         self.degraded = False
         self.graph = None
         if config.graph_enabled:
@@ -48,6 +53,43 @@ class Orchestrator:
     def resources(self, timeout=None):
         return {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                 "timeout_seconds": timeout or self.config.experiment_timeout_seconds}
+
+    def admit_training(self, plan, owner):
+        decision = self.budget.admit(owner, plan)
+        self.log.event("search.admission", experiment_id=owner, recipe_id=plan["recipe_id"],
+                       hyperparameters=plan["model"]["hyperparameters"], **decision)
+        return decision["allowed"]
+
+    def llm_available(self, pending=0):
+        if self.budget.snapshot()["llm_calls_remaining"] <= pending:
+            return False
+        if self.budget.token_snapshot()["output_available"] < (pending + 1) * self.config.llm_max_output_tokens:
+            return False
+        try:
+            self.researcher.gateway.check_availability()
+        except AgentError:
+            return False
+        return self.budget.snapshot()["search_allowed"]
+
+    def local_plan(self, peer, branch="legacy", base=None, constraints=None):
+        choice = self.local_search.next_choice(peer, branch, base, constraints)
+        if choice is None:
+            return None
+        plan = self.warmup_plan(*choice)
+        plan.update(researcher_id=peer, parent_ids=[self.store.best()] if self.store.best() else [],
+                    hypothesis="Related local catalogue trial: vary checked parameters on the fixed validation.",
+                    expected_effect="Measure against the recorded base; improvement is not assumed.")
+        self.log.event("search.local_trial", researcher_id=peer, branch_id=branch, recipe_id=plan["recipe_id"],
+                       hyperparameters=plan["model"]["hyperparameters"])
+        return plan
+
+    def update_final_reserve(self):
+        best = self.store.best()
+        champion = self.store.champion()
+        if best and (not champion or champion["experiment_id"] != best):
+            self.budget.set_final_plan(self.store.get(best)["plan"])
+        else:
+            self.budget.set_final_plan(None)
 
     def submit_plan(self, payload):
         plan = self.catalog.validate_plan(payload["plan"], self.spec, self.validation["validation_id"], self.artifacts)
@@ -110,6 +152,16 @@ class Orchestrator:
                 pending.remove(job)
                 if job.phase == "train":
                     self.budget.last_train_duration = max(self.budget.last_train_duration, event["duration_seconds"])
+                plan = self.store.get(job.experiment_id)["plan"]
+                try:
+                    result = json.loads((job.directory / "result.json").read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    result = {}
+                self.budget.observe(plan, job.phase, event, result.get("fit_seconds"))
+                self.log.event("search.duration_observed", experiment_id=job.experiment_id,
+                               family=plan["model"]["family"], phase=job.phase, state=event["state"],
+                               duration_seconds=event["duration_seconds"], fit_seconds=result.get("fit_seconds"),
+                               hyperparameters=plan["model"]["hyperparameters"])
             if pending:
                 time.sleep(0.1)
         return results
@@ -125,7 +177,18 @@ class Orchestrator:
                 self.log.event("experiment.duplicate_skipped", experiment_id=record["experiment_id"])
                 continue
             ident = record["experiment_id"]
-            lease_reply = self.lease(ident, "train", plan["resources"])
+            if not self.admit_training(plan, ident):
+                with self.store.transaction():
+                    self.store.db.execute("UPDATE experiments SET state='cancelled',error=? WHERE experiment_id=?", ("Predicted duration exceeds remaining search time", ident))
+                continue
+            try:
+                lease_reply = self.lease(ident, "train", plan["resources"])
+            except AgentError as exc:
+                if exc.code != "BUDGET_EXHAUSTED":
+                    raise
+                with self.store.transaction():
+                    self.store.db.execute("UPDATE experiments SET state='cancelled',error=? WHERE experiment_id=?", (str(exc), ident))
+                continue
             if not lease_reply["granted"]:
                 raise AgentError("RESOURCE_BUSY", "Batch exceeds available execution slots")
             lease = lease_reply["lease"]
@@ -161,6 +224,7 @@ class Orchestrator:
                 self.call("C17", {"evaluation_id": result["evaluation"]["evaluation_id"], "experiment_id": job.experiment_id,
                                    "selection_policy_id": "same-protocol-primary-v1"}, self.store.commit_evaluation,
                           key=result["evaluation"]["evaluation_id"])
+                self.update_final_reserve()
             except AgentError as exc:
                 self.store.invalidate(job.experiment_id, str(exc))
                 self.degraded = True
@@ -209,6 +273,14 @@ class Orchestrator:
         ident = self.store.best()
         champion = self.store.champion()
         if not ident or (champion and champion["experiment_id"] == ident):
+            self.budget.set_final_plan(None)
+            return
+        experiment = self.store.get(ident)
+        self.budget.set_final_plan(experiment["plan"])
+        predicted = self.budget.duration.estimate(experiment["plan"], "refit")
+        if champion and self.budget.remaining() < predicted + self.budget.output_reserve():
+            self.log.event("submission.refit_deferred", experiment_id=ident, estimated_seconds=predicted,
+                           remaining_seconds=self.budget.remaining())
             return
         evaluation = self.store.experiment_evaluation(ident)
         prepared = self.call("C18", {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"],
@@ -216,7 +288,7 @@ class Orchestrator:
                                      "expected_champion_version": champion["champion_version"] if champion else 0}, self.submission.prepare,
                              key="prepare/" + ident)
         subjob = prepared["submission_job_id"]
-        lease_reply = self.lease(subjob, "refit", self.resources(max(self.config.experiment_timeout_seconds, int(self.budget.last_train_duration * 3 + 10))))
+        lease_reply = self.lease(subjob, "refit", self.resources(max(self.config.experiment_timeout_seconds, math.ceil(predicted))))
         if not lease_reply["granted"]:
             raise AgentError("RESOURCE_BUSY", "Cannot refit while other jobs hold resources")
         experiment = self.store.get(ident)
@@ -243,6 +315,7 @@ class Orchestrator:
                            "expected_champion_version": current["champion_version"] if current else 0}, self.submission.publish,
                   key="publish/" + ident + "/" + report["candidate_sha256"])
         self.submission.change_state(subjob, "skipped_not_better" if publication["disposition"] == "skipped_not_better" else "published")
+        self.update_final_reserve()
 
     def control(self, payload):
         self.budget.search_stopped = True
@@ -266,7 +339,7 @@ class Orchestrator:
         self.submission.require_output()
         self.store.set_run_state("searching")
         accepted = 0
-        choices = self.catalog.warmup_choices()[:min(self.config.catalog_warmup_experiments, self.config.max_research_experiments)]
+        choices = self.catalog.warmup_choices()[:self.config.catalog_warmup_experiments]
         for start in range(0, len(choices), self.config.max_workers):
             if not self.budget.snapshot()["search_allowed"]:
                 break
@@ -274,20 +347,25 @@ class Orchestrator:
             self.log.event("search.catalog_warmup", configurations=[{"recipe_id": key, "hyperparameters": params} for key, params in batch])
             accepted += self.run_training([self.warmup_plan(key, params) for key, params in batch])
             self.finalize_best()
-        stop_reason = "round_limit"
-        for round_no in range(self.config.max_research_experiments + 2):
-            if accepted >= self.config.max_research_experiments or not self.budget.snapshot()["search_allowed"]:
-                stop_reason = "experiment_limit" if accepted >= self.config.max_research_experiments else "time_reserve"
-                break
+        stop_reason, round_no = "time_reserve", 0
+        while self.budget.snapshot()["search_allowed"]:
             self.log.event("search.round_started", round_no=round_no+1, attempted_experiments=accepted,
-                           experiment_limit=self.config.max_research_experiments, budget=self.budget.snapshot(),
+                           budget=self.budget.snapshot(),
                            token_budget=self.budget.token_snapshot())
             self.context.round_no = round_no
+            round_no += 1
             snapshot = self.call("C07", {"task_spec_id": self.spec["task_spec_id"], "validation_id": self.validation["validation_id"],
                                          "limit_recent": 6, "limit_best": 3}, lambda p: self.store.snapshot(p, self.artifacts))
-            requests = []
-            for index in range(min(self.config.max_workers, self.config.max_research_experiments - accepted)):
+            requests, plans = [], []
+            for index in range(self.config.max_workers):
                 researcher_id = "researcher-" + str(index + 1)
+                base_id = self.store.best()
+                base = self.store.get(base_id)["plan"] if base_id else None
+                if self.local_search.has_series(researcher_id, "legacy") or not self.llm_available(len(requests)):
+                    plan = self.local_plan(researcher_id, base=base)
+                    if plan:
+                        plans.append(plan)
+                    continue
                 assignment = "exploit_incumbent" if index == 0 else "explore_alternative"
                 context = self.call("C08", {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"],
                                             "tools_catalog_version": "tools-v1", "researcher_id": researcher_id,
@@ -295,19 +373,33 @@ class Orchestrator:
                 requests.append({"researcher_id": researcher_id, "context_id": context["context_id"], "assignment": assignment,
                                  "base_experiment_ids": [snapshot["best_evaluated_experiment_id"]] if snapshot["best_evaluated_experiment_id"] else [],
                                  "forbidden_fingerprints": snapshot["reserved_fingerprints"], "budget": self.budget.snapshot(), "proposal_limit": 1})
-            plans = []
             with ThreadPoolExecutor(max_workers=self.config.max_workers, thread_name_prefix="researcher") as pool:
                 futures = [pool.submit(self.call, "C09", request, self.researcher.propose) for request in requests]
                 for future in as_completed(futures):
                     try:
                         reply = future.result()
+                        if reply["decision"] == "stop":
+                            best = self.store.best()
+                            plan = self.local_plan(reply["researcher_id"], base=self.store.get(best)["plan"] if best else None)
+                            if plan:
+                                plans.append(plan)
                         if reply["decision"] == "propose":
-                            plans.append(reply["plan"])
+                            plan = reply["plan"]
+                            if self.local_search.repeated(plan) or not self.budget.can_train(plan)["allowed"]:
+                                plan = self.local_plan(reply["researcher_id"], base=plan)
+                            else:
+                                self.local_search.start_series(plan["researcher_id"], "legacy", plan)
+                            if plan:
+                                plans.append(plan)
                     except AgentError as exc:
                         self.degraded = True
                         self.log.exception("research.proposal_failed", exc)
+                        best = self.store.best()
+                        plan = self.local_plan("local-replacement", base=self.store.get(best)["plan"] if best else None)
+                        if plan:
+                            plans.append(plan)
             if not plans:
-                stop_reason = "no_valid_proposals"
+                stop_reason = "no_affordable_candidates"
                 break
             try:
                 accepted += self.run_training(plans)
@@ -315,10 +407,11 @@ class Orchestrator:
             except AgentError as exc:
                 self.degraded = True
                 self.log.exception("research.round_failed", exc)
-                stop_reason = "round_failed"
-                break
+                if not self.budget.snapshot()["search_allowed"]:
+                    break
+        self.finalize_best()
         self.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted,
-                       experiment_limit=self.config.max_research_experiments, budget=self.budget.snapshot())
+                       budget=self.budget.snapshot())
         self.call("C22", {"action": "stop_search", "reason": stop_reason,
                            "wall_seconds_remaining": int(self.budget.remaining()), "cancel_job_ids": []}, self.control)
         self.cleanup()

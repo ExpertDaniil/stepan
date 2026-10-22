@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import time
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from agent.catalog import Catalog
 from agent.llm.gateway import MockTransport
 from agent.runtime import main
 from agent.runner import Runner
+from agent.orchestrator import Orchestrator
 from agent.errors import AgentError
 from scripts.make_demo import make_demo
 from scripts.reconstruct_solution import reconstruct
@@ -32,10 +34,15 @@ class GraphEndToEndTests(unittest.TestCase):
             def warmups(catalog):
                 return [('linear-regressor-v1', catalog.normalize('linear-regressor-v1', {'alpha': a, 'target_transform': t}))
                         for t in ['identity','shifted_log1p'] for a in [1.,3.]]
+            original_update=Orchestrator.update_final_reserve
+            def finish_after_measured_fork(controller):
+                original_update(controller)
+                if controller.graph.db.execute('SELECT count(*) FROM g_branches').fetchone()[0] == 3:
+                    controller.budget.deadline=time.monotonic()+controller.budget.reserve_seconds()+.5
             settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'120','MAX_RESEARCH_EXPERIMENTS':'6',
                 'CATALOG_WARMUP_EXPERIMENTS':'4','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog',
                 'GRAPH_MIN_FREE_DISK_BYTES':'0','MODEL_SNAPSHOT_MAX_BYTES':'0'}
-            with patch.dict(os.environ,settings),patch.object(Catalog,'warmup_choices',warmups),redirect_stderr(io.StringIO()) as stderr:
+            with patch.dict(os.environ,settings),patch.object(Catalog,'warmup_choices',warmups),patch.object(Orchestrator,'update_final_reserve',finish_after_measured_fork),redirect_stderr(io.StringIO()) as stderr:
                 code=main([str(task),'--llm-mode','mock','--work-dir',str(root/'runs')])
             self.assertEqual(code,0,stderr.getvalue()[-4000:])
             run=next((root/'runs').glob('run-*'))
@@ -55,7 +62,7 @@ class GraphEndToEndTests(unittest.TestCase):
     def test_no_research_api_quota_finishes_cleanly_with_the_verified_baseline(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);task=make_demo(root/'task')
-            settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'90','MAX_RESEARCH_EXPERIMENTS':'3',
+            settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'20','MAX_RESEARCH_EXPERIMENTS':'3',
                 'CATALOG_WARMUP_EXPERIMENTS':'0','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog','GRAPH_MIN_FREE_DISK_BYTES':'0',
                 'MODEL_SNAPSHOT_MAX_BYTES':'0'}
             with patch.dict(os.environ,settings),redirect_stderr(io.StringIO()) as stderr:
@@ -65,7 +72,8 @@ class GraphEndToEndTests(unittest.TestCase):
             self.assertIn('State: completed',(run/'summary.md').read_text())
             events=[json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
             finish=next(e for e in events if e['event']=='search.finished')
-            self.assertEqual(finish['stop_reason'],'llm_call_limit')
+            self.assertIn(finish['stop_reason'], {'time_reserve','no_affordable_candidates'})
+            self.assertTrue(any(e['event']=='search.local_trial' for e in events))
             self.assertFalse(any(e['event']=='research.proposal_failed' for e in events))
             self.assertFalse(list(run.rglob('*.joblib')))
             self.assertTrue(any(e['event']=='job.model_snapshot' and e['status']=='disabled' for e in events))
@@ -74,8 +82,12 @@ class GraphEndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);task=make_demo(root/'task')
             original=Runner.start_train
+            failures=[]
             def fail_research(runner,payload,spec,experiment):
                 if payload['plan']['model']['family']!='dummy':
+                    failures.append(experiment['experiment_id'])
+                    if len(failures)>=2:
+                        runner.budget.deadline=time.monotonic()+runner.budget.reserve_seconds()+.5
                     raise AgentError('SPAWN_FAILED','Synthetic graph spawn failure')
                 return original(runner,payload,spec,experiment)
             settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'90','MAX_RESEARCH_EXPERIMENTS':'2',
@@ -101,6 +113,13 @@ class GraphEndToEndTests(unittest.TestCase):
                 if name=='train.csv':frame['label']=np.exp(2*x)
                 frame.to_csv(task.parent/name,index=False)
             original=MockTransport.complete
+            original_update=Orchestrator.update_final_reserve
+            def finish_after_backtrack(controller):
+                original_update(controller)
+                graph=controller.graph
+                active=graph.db.execute("SELECT branch_id FROM g_branches WHERE state='active' AND decision='reject'").fetchone()
+                if active and graph.branch_trial_count(active[0])>0:
+                    controller.budget.deadline=time.monotonic()+controller.budget.reserve_seconds()+.5
             def response(transport,request,timeout,context):
                 if context['metadata']['schema_id']!='ResearchChoice-v1':
                     return original(transport,request,timeout,context)
@@ -122,7 +141,7 @@ class GraphEndToEndTests(unittest.TestCase):
                 'CATALOG_WARMUP_EXPERIMENTS':'2','MAX_WORKERS':'2','GRAPH_PEERS':'2','GRAPH_TRAIN_WORKERS':'1',
                 'GRAPH_PLATEAU_WINDOW':'1','GRAPH_PLATEAU_SECONDS':'0','GRAPH_MIN_FREE_DISK_BYTES':'0',
                 'GRAPH_MIN_EFFECT':'0.001','LOG_LEVEL':'ERROR','EXPERIMENT_TIMEOUT_SECONDS':'30','RESEARCH_MODE':'catalog'}
-            with patch.dict(os.environ,settings),patch.object(MockTransport,'complete',response),patch.object(Catalog,'warmup_choices',warmups),patch.object(Catalog,'assignment_recipes',return_value=['linear-regressor-v1']),redirect_stderr(io.StringIO())as stderr:
+            with patch.dict(os.environ,settings),patch.object(MockTransport,'complete',response),patch.object(Catalog,'warmup_choices',warmups),patch.object(Catalog,'assignment_recipes',return_value=['linear-regressor-v1']),patch.object(Orchestrator,'update_final_reserve',finish_after_backtrack),redirect_stderr(io.StringIO())as stderr:
                 code=main([str(task),'--llm-mode','mock','--work-dir',str(root/'runs')])
             self.assertEqual(code,0,stderr.getvalue()[-8000:])
             run=next((root/'runs').glob('run-*'))

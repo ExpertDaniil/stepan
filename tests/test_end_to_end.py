@@ -24,7 +24,7 @@ from scripts.package_solution import build
 
 class EndToEndTests(unittest.TestCase):
     def env(self, experiments="2"):
-        return {**os.environ, "LLM_MODE": "mock", "TIME_BUDGET_SECONDS": "90", "MAX_RESEARCH_EXPERIMENTS": experiments,
+        return {**os.environ, "LLM_MODE": "mock", "TIME_BUDGET_SECONDS": "35", "MAX_RESEARCH_EXPERIMENTS": experiments,
                 "LOG_LEVEL": "ERROR", "MAX_WORKERS": "2", "TRAIN_MEMORY_MB": "10240", "EXPERIMENT_TIMEOUT_SECONDS": "30",
                 "RESEARCH_MODE": "catalog", "CATALOG_WARMUP_EXPERIMENTS": "0"}
 
@@ -110,7 +110,7 @@ class EndToEndTests(unittest.TestCase):
             research = next(i for i, e in enumerate(events) if e["event"] == "research.hypothesis_proposed")
             self.assertLess(warmup, research)
             self.assertTrue(any(e["event"] == "experiment.evaluated" for e in events[warmup:research]))
-            self.assertLessEqual(sum(e["event"] == "job.started" and e.get("phase") == "train" for e in events), 7)
+            self.assertGreaterEqual(sum(e["event"] == "job.started" and e.get("phase") == "train" for e in events), 5)
             choices = [json.loads(p.read_text())["payload"] for p in next((Path(temp)/"runs").glob("run-*")).glob("messages/*.request.json")]
             self.assertTrue(any(p.get("response_schema_id") == "ResearchChoice-v1" and p["tool_schema_ids"] == [] for p in choices))
             cleanups = [e for e in events if e["event"] == "job.descendants_cleanup_completed"]

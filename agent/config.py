@@ -43,7 +43,8 @@ class Config:
     train_cpu_threads: int = 3
     train_memory_mb: int = 10240
     experiment_timeout_seconds: int = 600
-    max_research_experiments: int = 12
+    max_research_experiments: int = 12  # Legacy configuration metadata, never a stopping condition.
+    research_series_size: int = 4
     catalog_warmup_experiments: int = 4
     research_mode: str = "catalog"
     llm_max_calls: int = 32
@@ -91,6 +92,7 @@ class Config:
             train_memory_mb=integer("TRAIN_MEMORY_MB", 10240, 256, 10240),
             experiment_timeout_seconds=integer("EXPERIMENT_TIMEOUT_SECONDS", 600, 1, 3600),
             max_research_experiments=integer("MAX_RESEARCH_EXPERIMENTS", 12, 0, 100),
+            research_series_size=integer("RESEARCH_SERIES_SIZE", 4, 1, 16),
             catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
             research_mode=os.environ.get("RESEARCH_MODE", "catalog"),
             llm_max_calls=integer("LLM_MAX_CALLS", 32, 1, 1000),

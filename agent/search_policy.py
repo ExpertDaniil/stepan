@@ -299,16 +299,16 @@ class SearchPolicy:
                     alt = next((x for x in alternatives if x["parent_branch_id"] == branch["parent_branch_id"]), alternatives[0])
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Measured plateau; resume a saved alternative", evidence_ids=[assessment["assessment_id"]])
             attempted = self.attempted_research_count()
-            remaining = max(0, self.config.max_research_experiments-attempted)
+            remaining = self.budget.research_capacity()
             if decision["action"] == "CONTINUE":
-                # A small run must not spend its entire trial cap before examining its saved alternative.
-                threshold = max(1, int(self.config.max_research_experiments*self.policy["scheduling"]["preferred_branch_share"]))
+                # Share the estimated remaining time with saved alternatives.
+                threshold = max(1, int((attempted+remaining)*self.policy["scheduling"]["preferred_branch_share"]))
                 current_trials = self.branch_trial_count(branch["branch_id"])
                 alternatives = self.pending_alternatives(branch)
                 reserve = sum(deficit for _, deficit in alternatives)
                 if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold and current_trials >= self.policy["plateau"]["window_full_evaluations"]) or remaining <= reserve):
                     alt = alternatives[0][0]
-                    decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve a counterfactual trial before the experiment cap")
+                    decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve time for a counterfactual trial")
             if decision["action"] == "CONTINUE":
                 for row in self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? ORDER BY rowid DESC", (self.run_id,)):
                     idea = json.loads(row[0]);origin = self.checkpoint_record(idea["fork_checkpoint_id"])
@@ -335,20 +335,26 @@ class SearchPolicy:
                 # Assignments are issued before the parallel API calls start. Account for them now.
                 pending = self.db.execute("SELECT count(*) FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND (order_json IS NULL OR json_extract(order_json,'$.action') NOT IN ('baseline','transfer'))", (self.run_id,)).fetchone()[0]
                 stop_reason = None
-                if remaining <= 0:
-                    stop_reason = "experiment_limit"
-                elif self.budget.snapshot()["llm_calls_remaining"] <= pending:
+                if self.budget.snapshot()["llm_calls_remaining"] <= pending:
                     stop_reason = "llm_call_limit"
                 elif self.budget.token_snapshot()["output_available"] < (pending+1)*self.config.llm_max_output_tokens:
                     stop_reason = "llm_output_budget"
-                gateway = getattr(self.controller, "gateway", None)
+                gateway = getattr(getattr(self.controller, "researcher", None), "gateway", None)
                 if gateway is not None:
                     try:
                         gateway.check_availability()
                     except AgentError as exc:
                         stop_reason = exc.code.lower()
                 if stop_reason:
-                    decision.update(action="FINALIZE", parameters={"reason": stop_reason}, reason=stop_reason)
+                    decision.update(reason="Local catalogue search: " + stop_reason)
+        if branch["branch_id"] in getattr(self.controller, "no_fit_branches", set()) and self.budget.snapshot()["search_allowed"]:
+            closed = self.controller.no_fit_branches
+            alternatives = [self.branch(row[0]) for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' ORDER BY rowid DESC", (self.run_id,)) if row[0] not in closed]
+            if alternatives:
+                alt = alternatives[0]
+                decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="No affordable candidate in this branch; try a saved alternative")
+            else:
+                decision.update(action="FINALIZE", parameters={"reason": "no_affordable_candidates"}, reason="no_affordable_candidates")
         artifact = self.files.put_json(decision, "search_decision")
         def mutate():
             self.branch(branch["branch_id"], branch["branch_revision"])

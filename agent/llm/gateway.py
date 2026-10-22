@@ -218,7 +218,8 @@ class Gateway:
                 return {k: expanded(v) for k, v in value.items()}
             return [expanded(v) for v in value] if isinstance(value, list) else value
         messages.insert(1, {"role": "system", "content": "Final output JSON schema:\n" + json.dumps(expanded(expected), ensure_ascii=False)})
-        deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - 0.5)
+        reserve = self.budget.reserve_seconds() + 1 if payload["purpose"] == "research_proposal" else .5
+        deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
         tools = []
         if "write_code" in payload["tool_schema_ids"]:
             tools.append({"type": "function", "function": {

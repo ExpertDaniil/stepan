@@ -16,14 +16,14 @@ def recommended_settings(profile="standard"):
     if profile not in {"standard", "extended"}:
         raise ValueError("Unknown research profile")
     config = Config()
-    keys = ("research_mode", "catalog_warmup_experiments", "max_research_experiments", "llm_max_calls",
+    keys = ("research_mode", "catalog_warmup_experiments", "research_series_size", "llm_max_calls",
             "llm_timeout_seconds", "llm_operation_timeout_seconds", "llm_bootstrap_output_tokens",
             "llm_max_output_tokens", "llm_max_output_tokens_limit", "llm_max_total_output_tokens", "llm_progress_seconds",
             "graph_plateau_window", "graph_plateau_seconds", "graph_plateau_absolute_epsilon", "graph_plateau_relative_epsilon", "graph_exploit_steps",
             "model_snapshot_max_bytes", "model_snapshot_total_bytes", "worker_log_max_bytes")
     settings = {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":"human", "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
     if profile == "extended":
-        settings.update(MAX_RESEARCH_EXPERIMENTS="100", LLM_MAX_CALLS="96")
+        settings.update(LLM_MAX_CALLS="96")
     return settings
 
 
@@ -67,7 +67,7 @@ def configure(path, apply=False, profile="standard"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--env-file',type=Path,default=Path('.env'))
-    parser.add_argument('--profile', choices=['standard','extended'], default='standard', help='Extended raises the trial/call ceilings while preserving the total output-token cap and configured time budget')
+    parser.add_argument('--profile', choices=['standard','extended'], default='standard', help='Extended raises only the LLM call ceiling; both profiles search by available time')
     parser.add_argument('--apply',action='store_true',help='Write settings atomically; otherwise show only proposed non-secret values')
     args = parser.parse_args()
     settings = configure(args.env_file,args.apply,args.profile)

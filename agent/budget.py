@@ -2,8 +2,10 @@ from datetime import datetime, timedelta, timezone
 import threading
 import time
 import uuid
+import math
 
 from agent.errors import AgentError
+from agent.duration import DurationModel
 
 
 class Budget:
@@ -19,6 +21,9 @@ class Budget:
         self.cached_tokens_reported = 0
         self.pending_llm_tokens = {}
         self.last_train_duration = 0.0
+        self.duration = DurationModel(config)
+        self.final_plan = None
+        self.admissions = {}
         self.search_stopped = False
         self.lock = threading.RLock()
 
@@ -26,9 +31,48 @@ class Budget:
         return max(0.0, self.deadline - time.monotonic())
 
     def reserve_seconds(self):
-        # Adapt to observed training. Small synthetic demos have smaller reserves.
-        floor = min(60, max(2, self.config.time_budget_seconds * 0.05))
-        return min(self.config.time_budget_seconds * 0.35, max(floor, self.last_train_duration * 2.5 + 5))
+        with self.lock:
+            floor = self.output_reserve()
+            plans = ([self.final_plan] if self.final_plan else []) + [item["plan"] for item in self.leases.values() if item.get("plan")]
+            return floor + max((self.duration.estimate(plan, "refit") for plan in plans), default=0)
+
+    def output_reserve(self):
+        return min(60, max(2, self.config.time_budget_seconds * .03))
+
+    def candidate_reserve(self, plan):
+        return max(self.reserve_seconds(), self.output_reserve() + self.duration.estimate(plan, "refit"))
+
+    def can_train(self, plan):
+        with self.lock:
+            estimate = self.duration.estimate(plan)
+            reserve = self.candidate_reserve(plan)
+            allowed = (not self.search_stopped and estimate <= self.config.experiment_timeout_seconds
+                       and self.remaining() >= estimate + reserve + 1)
+            return {"allowed": allowed, "estimated_seconds": estimate, "reserve_seconds": reserve,
+                    "remaining_seconds": self.remaining(), "family": plan["model"]["family"]}
+
+    def admit(self, owner, plan):
+        with self.lock:
+            decision = self.can_train(plan)
+            if decision["allowed"]:
+                from copy import deepcopy
+                self.admissions[owner] = deepcopy(plan)
+            return decision
+
+    def set_final_plan(self, plan):
+        with self.lock:
+            self.final_plan = plan
+
+    def observe(self, plan, phase, event, fit_seconds=None):
+        with self.lock:
+            self.duration.observe(plan, phase, event["duration_seconds"], fit_seconds=fit_seconds, state=event["state"])
+
+    def research_capacity(self, plans=None):
+        """Approximate trials that fit; used to share time between saved branches, not a run cap."""
+        with self.lock:
+            plans = plans or ([self.final_plan] if self.final_plan else [])
+            cost = min((self.duration.estimate(p) for p in plans), default=max(1, self.last_train_duration))
+            return max(0, math.floor((self.remaining() - self.reserve_seconds() - 1) / cost))
 
     def snapshot(self):
         with self.lock:
@@ -37,7 +81,7 @@ class Budget:
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
                     "cpu_threads_available": max(0, 6 - cpu), "memory_mb_available": max(0, 20480 - memory),
                     "llm_calls_remaining": max(0, self.config.llm_max_calls - self.calls),
-                    "search_allowed": not self.search_stopped and self.remaining() > self.reserve_seconds()}
+                    "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
     def llm_call(self):
         with self.lock:
@@ -97,9 +141,13 @@ class Budget:
                 return {"granted": True, "lease": dict(item["lease"]), "retry_after_seconds": None, "budget": self.snapshot()}
             req = payload["requested"]
             snapshot = self.snapshot()
-            phase_remaining = self.remaining() if payload["phase"] == "refit" else self.remaining() - self.reserve_seconds()
+            plan = self.admissions.pop(payload["owner_id"], None)
+            reserve = self.candidate_reserve(plan) if plan else self.reserve_seconds()
+            phase_remaining = self.remaining() - (self.output_reserve() if payload["phase"] == "refit" else reserve)
             if phase_remaining < 1:
                 raise AgentError("BUDGET_EXHAUSTED", "Insufficient time for this phase")
+            if plan and (not self.can_train(plan)["allowed"]):
+                raise AgentError("BUDGET_EXHAUSTED", "Predicted training and finalization no longer fit")
             if req["cpu_threads"] > 3 or req["memory_limit_mb"] > 10240:
                 raise AgentError("INVALID_PLAN", "Per-job resource limit exceeded")
             train_busy = payload["phase"] == "train" and sum(item["phase"] == "train" for item in self.leases.values()) >= getattr(self, "train_worker_limit", self.config.max_workers)
@@ -112,5 +160,6 @@ class Budget:
                      "heartbeat_interval_seconds": 10,
                      "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat()}
             self.leases[lease["lease_id"]] = {"owner_id": payload["owner_id"], "phase": payload["phase"],
-                                             "heartbeat_deadline": time.monotonic() + 30, "lease": lease}
+                                             "heartbeat_deadline": time.monotonic() + 30, "lease": lease,
+                                             "plan": plan}
             return {"granted": True, "lease": dict(lease), "retry_after_seconds": None, "budget": self.snapshot()}

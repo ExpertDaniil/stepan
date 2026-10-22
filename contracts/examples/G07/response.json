@@ -25,7 +25,11 @@
       "recommended_action": "pause_and_resume_sibling",
       "reasons": [
         "window_gain_below_epsilon"
-      ]
+      ],
+      "peer_trials_since_progress": {
+        "researcher-1": 4,
+        "researcher-2": 4
+      }
     },
     "artifact": {
       "artifact_id": "artifact-assessment",

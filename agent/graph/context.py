@@ -8,6 +8,26 @@ from agent.graph.identity import dependency_closure
 
 
 class WorkService:
+    def required_donors(self, branch):
+        """Only explicit ancestor sources compatible with every inherited ban."""
+        required = set(branch['constraints']['required_capability_ids'])
+        forbidden = set(branch['constraints']['forbidden_capability_ids'])
+        donors = []
+        current = branch
+        while current and required:
+            if current['decision_idea_id']:
+                row = self.db.execute('SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?',
+                                      (self.run_id, current['decision_idea_id'])).fetchone()
+                idea = json.loads(row[0]) if row else None
+                if idea and required.intersection(idea['capability_ids']):
+                    eid = idea['source_experiment_id']
+                    caps, _ = dependency_closure(self.manifest(self.experiment_solution(eid))['core']['components'])
+                    if not forbidden.intersection(caps):
+                        donors.append(eid)
+                        required.difference_update(caps)
+            current = self.branch(current['parent_branch_id']) if current['parent_branch_id'] else None
+        return list(dict.fromkeys(donors))
+
     def lineage_cuts(self, branch_id):
         seen = set()
         cut = self.cut()
@@ -87,6 +107,39 @@ class WorkService:
         ids = list(dict.fromkeys(([head["experiment_id"]] if head["experiment_id"] else []) + list(donors) + history))
         return [self.memory_record(eid, head) for eid in ids[:max(1, self.policy["context"]["max_related_records"])]], len(ids)
 
+    def search_memory(self, branch_id, head, limit=24):
+        """Keep old model proposals visible after cheap local trials fill recent facts."""
+        ids = self.visible_history(branch_id, head['researcher_id'])
+        base = self.store.get(head['experiment_id'])['plan'] if head['experiment_id'] else None
+        proposal_ids = set()
+        for line, cut in self.lineage_cuts(branch_id):
+            rows = self.db.execute("SELECT b.experiment_id FROM g_proposals p JOIN g_work_orders w USING(run_id,work_order_id) JOIN g_bindings b USING(run_id,work_order_id) WHERE p.run_id=? AND w.branch_id=? AND w.researcher_id=? AND p.proposal_id NOT LIKE 'trusted-%' AND EXISTS(SELECT 1 FROM g_events e WHERE e.run_id=w.run_id AND e.event_seq<=? AND json_extract(e.record_json,'$.entity_id')=w.work_order_id AND json_extract(e.record_json,'$.operation')='G04')",
+                                   (self.run_id, line, head['researcher_id'], cut))
+            proposal_ids.update(row[0] for row in rows)
+        best = {}
+        records = {}
+        for eid in ids:
+            exp = self.store.get(eid);plan = exp['plan']
+            ev = self.store.experiment_evaluation(eid)
+            valid = ev and ev['valid'] and not ev['violations'] and exp['state'] == 'evaluated'
+            params = plan['model']['hyperparameters']
+            record = {'experiment_id': eid, 'recipe_id': plan['recipe_id'], 'state': exp['state'],
+                      'score': ev['primary_metric']['value'] if valid else None}
+            if base and plan['recipe_id'] == base['recipe_id']:
+                record['changes_from_base'] = {k: v for k, v in params.items() if v != base['model']['hyperparameters'].get(k)}
+            else:
+                record['hyperparameters'] = params
+            records[eid] = record
+            if valid:
+                value = ev['primary_metric']['value'] * (1 if ev['primary_metric']['direction'] == 'maximize' else -1)
+                if plan['recipe_id'] not in best or value > best[plan['recipe_id']][0]:
+                    best[plan['recipe_id']] = (value, eid)
+        priority = list(dict.fromkeys([eid for eid in ids if eid in proposal_ids] + [pair[1] for pair in best.values()] + ids))
+        selected = priority[:limit]
+        return {'base_experiment_id': head['experiment_id'], 'entries': [records[eid] for eid in selected],
+                'omitted_count': len(priority)-len(selected),
+                'instruction': 'Measured trials on your own visible lineage. changes_from_base overrides the current base parameters. Do not repeat a tested configuration; use its measured score, including old regressions.'}
+
     def expire_work(self):
         expired = self.db.execute("SELECT work_order_id,order_json FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, self.elapsed())).fetchall()
         if not expired:
@@ -139,7 +192,9 @@ class WorkService:
                 self.files.resolve(base_exp["plan"]["code_artifact_id"])
                 base_code = self.artifacts.resolve(base_exp["plan"]["code_artifact_id"]).read_text(encoding="utf-8")
             task_contract = self.artifacts.read_json(self.metadata("task_contract_artifact_id"))
-            facts = [{"kind": "result" if r["metric"] else "failure", "source_id": r["experiment_id"], "summary": canonical(r),
+            # The base has full diagnostics separately. Historical facts retain
+            # parameters/scores without duplicating large group summaries.
+            facts = [{"kind": "result" if r["metric"] else "failure", "source_id": r["experiment_id"], "summary": canonical({**r, 'diagnostics': {}}),
                       "artifact_ids": [self.store.get(r["experiment_id"])["plan"]["code_artifact_id"]]} for r in recent]
             rejected = self.rejection_facts(branch["branch_id"], p["researcher_id"])
             protected_ids = {head["experiment_id"], *binding["allowed_donor_experiment_ids"]}
@@ -155,6 +210,7 @@ class WorkService:
                            "phase": 'refine' if self.refinement() else 'search',
                            "facts": facts, "recent": recent, "total_recent": total_recent, "donors": binding["allowed_donor_experiment_ids"],
                            "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None, "observed_recipes": observed_recipes,
+                           "search_memory": self.search_memory(branch['branch_id'], head),
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
             args = {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"], "tools_catalog_version": p["tools_catalog_version"],
                     "researcher_id": p["researcher_id"], "assignment": assignment, "max_input_tokens": self.policy["context"]["max_input_tokens"]}

@@ -113,3 +113,9 @@ WORKER_LOG_MAX_BYTES=1048576 ограничивает каждый stdout/stderr
 API snapshots и журнал — разные категории. scripts/analyze_run.py показывает total_bytes,
 by_category и десять крупнейших файлов, читая только metadata/размеры без загрузки pickle/CSV.
 Это ограничения отдельных категорий, а не обещание полного фиксированного размера каталога runs.
+
+## Согласованность v0.5.2
+
+graph.plateau_assessed и GPlateau включают peer_trials_since_progress; причина продолжения показывает, когда одному peer ещё не хватает разных завершённых проверок. search.admission включает phase_seconds_remaining. search.phase_changed.reason может быть next_research_batch_would_cross_phase_boundary: допуск очередной партии учитывает прогноз LLM и fit.
+
+Компактная память находится в контексте profile_summary.measured_search: base_experiment_id, entries с измеренными score и изменениями относительно базы, omitted_count. Старые запросы LLM имеют приоритет над свежими локальными соседями. Текстовые предположения остаются гипотезами; authoritative метрика — только оценщик.

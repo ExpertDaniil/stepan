@@ -19,7 +19,9 @@ def issue(controller, branch_id, peer, action="improve", donors=None):
     graph = controller.graph;branch = graph.branch(branch_id)
     return graph.invoke("G03", {"branch_id": branch_id, "expected_branch_revision": branch["branch_revision"], "researcher_id": peer,
                                "action": action, "allowed_donor_experiment_ids": donors or [], "tools_catalog_version": "tools-v1",
-                               "ttl_seconds": max(1, min(controller.config.llm_operation_timeout_seconds+30, int(controller.budget.remaining())))}, key="assign/"+uuid.uuid4().hex)
+                               # C10 owns the response timeout. The assignment also
+                               # covers dispatcher/training queue time after receipt.
+                               "ttl_seconds": max(1, int(controller.budget.remaining()))}, key="assign/"+uuid.uuid4().hex)
 
 
 def bind_trusted(plan, ticket):
@@ -41,7 +43,8 @@ def stop_ticket(controller, ticket, reason):
 def local_for_ticket(controller, ticket):
     work = ticket["work_order"]
     base = controller.store.get(work["base_experiment_id"])["plan"] if work["base_experiment_id"] else None
-    plan = controller.local_plan(work["researcher_id"], work["branch_id"], base, work["constraints"])
+    plan = controller.local_plan(work["researcher_id"], work["branch_id"], base, work["constraints"],
+                                 ticket["researcher_request"]["payload"]["assignment"])
     ticket.pop("_proposal", None)
     return bind_trusted(plan, ticket) if plan else None
 
@@ -149,6 +152,10 @@ def train(controller, plans, tickets):
             except AgentError as exc:
                 controller.degraded = True
                 controller.log.exception("graph.component_gate_failed", exc, experiment_id=job.experiment_id)
+        # Publish a measured improvement before waiting for another peer/fit.
+        # wait_jobs has already released this batch's process leases.
+        if jobs:
+            controller.finalize_best()
     return accepted
 
 
@@ -191,8 +198,7 @@ def apply_switch(controller, branch_id, decision):
         return result["accept_branch"]["branch_id"]
     target = graph.branch(decision["parameters"]["target_branch_id"])
     current = graph.branch(branch_id)
-    live = graph.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (graph.run_id,)).fetchone()[0]
-    graph.invoke("G08", {"branch_id": branch_id, "expected_branch_revision": current["branch_revision"], "action": "archive" if live >= graph.policy["max_live_branches"] else "pause", "reason": decision["reason"]}, key="backtrack-from/"+decision["decision_id"])
+    graph.invoke("G08", {"branch_id": branch_id, "expected_branch_revision": current["branch_revision"], "action": "pause", "reason": decision["reason"]}, key="backtrack-from/"+decision["decision_id"])
     graph.invoke("G08", {"branch_id": target["branch_id"], "expected_branch_revision": target["branch_revision"], "action": "resume", "reason": decision["reason"]}, key="backtrack-to/"+decision["decision_id"])
     return target["branch_id"]
 
@@ -345,10 +351,7 @@ def search(controller):
                 plan, ticket = transfer_ticket(controller, decision);trusted_plans.append(plan);trusted_tickets.append(ticket)
             elif decision["action"] == "CONTINUE":
                 peer = decision["parameters"]["researcher_id"]
-                donors = []
-                if branch["decision_idea_id"] and branch["constraints"]["required_capability_ids"]:
-                    idea_row = graph.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?", (graph.run_id, branch["decision_idea_id"])).fetchone()
-                    donors = [json.loads(idea_row[0])["source_experiment_id"]]
+                donors = graph.required_donors(branch)
                 ticket = issue(controller, branch_id, peer, decision["parameters"]["action"], donors)
                 if controller.local_search.has_series(peer, branch_id) or not controller.llm_available(len(llm_tickets)):
                     plan = local_for_ticket(controller, ticket)

@@ -31,7 +31,9 @@ class Researcher:
         if catalog_mode and context['metadata'].get('graph_binding'):
             branch_user = json.loads(context['messages'][1]['content'])
             base = branch_user.get('base_result')
-            if branch_user.get('research_phase') == 'refine' and base and base['recipe_id'] == proposed['recipe_id']:
+            if (base and base['recipe_id'] == proposed['recipe_id']
+                    and (branch_user.get('research_phase') == 'refine'
+                         or branch_user.get('research_strategy') == 'exploit_incumbent')):
                 submitted_params = {**base['hyperparameters'], **submitted_params}
         params = self.catalog.normalize(proposed["recipe_id"], submitted_params)
         constraint_changes = {}

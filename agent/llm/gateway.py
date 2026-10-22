@@ -155,6 +155,8 @@ class Gateway:
                            destination=self._destination(), token_budget=self.budget.token_snapshot())
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
+            if payload['purpose'] == 'research_proposal':
+                self.budget.observe_llm(time.monotonic()-started)
             token_data = response.get("usage") or {}
             self.budget.finish_llm_call(call_no, token_data)
             settled = True
@@ -220,6 +222,22 @@ class Gateway:
         messages.insert(1, {"role": "system", "content": "Final output JSON schema:\n" + json.dumps(expanded(expected), ensure_ascii=False)})
         reserve = self.budget.reserve_seconds() + 1 if payload["purpose"] == "research_proposal" else .5
         deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
+        phase_limited = False
+        if payload['purpose'] == 'research_proposal' and self.budget.phase_deadline:
+            # This is a response deadline only. A received proposal can wait in
+            # the dispatcher without inheriting the API timeout.
+            user = json.loads(context['messages'][1]['content']) if context['metadata'].get('graph_binding') else {}
+            base = user.get('base_result')
+            recipe = next((r for r in user.get('profile_summary', {}).get('recipes', [])
+                           if base and r['id'] == base['recipe_id']), None)
+            after_response = self.budget.reserve_seconds()
+            if recipe:
+                probe = {'recipe_id': recipe['id'], 'model': {'family': recipe['family'], 'hyperparameters': base['hyperparameters']},
+                         'resources': {'cpu_threads': self.config.train_cpu_threads}}
+                after_response = self.budget.duration.estimate(probe)+self.budget.candidate_reserve(probe)
+            phase_deadline = self.budget.phase_deadline-after_response
+            phase_limited = phase_deadline < deadline
+            deadline = min(deadline, phase_deadline)
         tools = []
         if "write_code" in payload["tool_schema_ids"]:
             tools.append({"type": "function", "function": {
@@ -233,7 +251,8 @@ class Gateway:
             self.check_availability()
             left = deadline-time.monotonic()
             if left < 1:
-                raise AgentError("LLM_OPERATION_TIMEOUT", "LLM operation deadline reached before a new attempt")
+                raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase_limited else 'LLM_OPERATION_TIMEOUT',
+                                 "LLM operation deadline reached before a new attempt")
             if not self.semaphore.acquire(timeout=left):
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
@@ -242,6 +261,8 @@ class Gateway:
                     request.update(tools=tools, parallel_tool_calls=False)
                 response, call_no = self._request(request, context, payload, attempt, deadline)
             except AgentError as exc:
+                if phase_limited and time.monotonic() >= deadline:
+                    raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Response window ended with time reserved for training and publication') from exc
                 if not exc.retryable or attempt == payload["attempt_limit"]:
                     raise
                 last_error = exc

@@ -223,6 +223,7 @@ class GraphTests(unittest.TestCase):
     def test_plateau_uses_distinct_solutions_and_old_best(self):
         self.h.result('researcher-1',{'alpha':1},10)
         for a in [2,3,4,5]:self.h.result('researcher-1',{'alpha':a},11+a)
+        for a in [6,7,8,9]:self.h.result('researcher-2',{'alpha':a},11+a)
         out=self.g.invoke('G07',{'branch_id':self.h.root,'expected_branch_revision':0})['assessment']
         self.assertEqual(out['status'],'plateau');self.assertEqual(out['utility_gain'],0)
         self.assertEqual(out['distinct_solution_count'],4)

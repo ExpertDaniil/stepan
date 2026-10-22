@@ -18,6 +18,7 @@ class LocalSearch:
         self.seen = set()
         self.selected = set()
         self.coverage = Counter()
+        self.parameter_turn = Counter()
         self.rowid = 0
 
     @staticmethod
@@ -53,13 +54,24 @@ class LocalSearch:
         phase = graph.refinement() if graph else None
         return bool(phase and phase['branch_id'] == branch and base and base['model']['family'] != 'dummy')
 
-    def variants(self, recipe, params, *, numeric_only=False):
-        """One parameter at a time; cheap alternatives precede heavier trials."""
-        for name, domain in self.c.catalog.recipes[recipe]["parameters"].items():
+    def feature_parameters(self):
+        graph = getattr(self.c, 'graph', None)
+        if graph:
+            return {feature['parameter'] for feature in graph.constructor.registry['features'].values()}
+        return {'target_transform', 'numeric_interactions', 'class_weight'}
+
+    def variants(self, recipe, params, *, numeric_only=False, offset=0, fine=False):
+        """Interleave axes; do not spend an entire series on the first parameter."""
+        axes = []
+        locked = self.feature_parameters() if numeric_only else set()
+        domains = list(self.c.catalog.recipes[recipe]['parameters'].items())
+        domains = [(name, domain) for name, domain in domains if name not in locked]
+        if domains:
+            offset %= len(domains)
+            domains = domains[offset:] + domains[:offset]
+        for name, domain in domains:
             current = params[name]
             if "enum" in domain:
-                if numeric_only:
-                    continue
                 values = domain["enum"]
             else:
                 lo, hi = domain["min"], domain["max"]
@@ -67,32 +79,69 @@ class LocalSearch:
                 if current == 0:
                     values += [(hi - lo) * .05]
                 if domain["type"] == "int":
-                    values += [current - 1, current + 1]
+                    if fine or current <= 16:
+                        values += [current - 1, current + 1]
                     values = [int(round(max(lo, min(hi, v)))) for v in values]
                 else:
                     values = [float(f"{max(lo, min(hi, v)):.8g}") for v in values]
+            axis = []
+            seen = set()
             for value in values:
                 if type(value) == type(current) and value == current:
                     continue
-                yield {**params, name: value}
+                key = canonical(value)
+                if key not in seen:
+                    axis.append({**params, name: value});seen.add(key)
+            axes.append(axis)
+        for index in range(max((len(axis) for axis in axes), default=0)):
+            for axis in axes:
+                if index < len(axis):
+                    yield axis[index]
 
     def start_series(self, peer, branch, plan):
         recipe, params = plan["recipe_id"], plan["model"]["hyperparameters"]
         values = deque((recipe, p) for p in self.variants(recipe, params, numeric_only=self.refining(branch, plan)))
-        self.series[(branch, peer)] = [self.c.config.research_series_size - 1, values]
+        self.series[(branch, peer)] = [self.c.config.research_series_size - 1, values, recipe, params]
+
+    def measured_base(self, peer, branch, recipe, fallback):
+        graph = getattr(self.c, 'graph', None)
+        if not graph:
+            return fallback
+        best, chosen = None, fallback
+        for eid in graph.visible_history(branch, peer):
+            exp = self.c.store.get(eid)
+            if exp['state'] != 'evaluated' or exp['plan']['recipe_id'] != recipe:
+                continue
+            if not graph.head_satisfies({'solution_id': graph.experiment_solution(eid)}, graph.branch(branch)['constraints']):
+                continue
+            phase = graph.refinement()
+            if phase and phase['branch_id'] == branch and any(
+                    exp['plan']['model']['hyperparameters'].get(name) != fallback.get(name)
+                    for name in self.feature_parameters()):
+                continue
+            ev = self.c.store.experiment_evaluation(eid)
+            if not ev or not ev['valid'] or ev['violations']:
+                continue
+            metric = ev['primary_metric']
+            value = metric['value'] * (1 if metric['direction'] == 'maximize' else -1)
+            if best is None or value > best:
+                best, chosen = value, exp['plan']['model']['hyperparameters']
+        return chosen
 
     def _probe(self, recipe, params):
         return {"recipe_id": recipe, "model": {"family": self.c.catalog.recipes[recipe]["family"], "hyperparameters": params},
                 "resources": self.c.resources()}
 
-    def next_choice(self, peer, branch, base=None, constraints=None):
+    def next_choice(self, peer, branch, base=None, constraints=None, *, assignment=None):
         self.refresh()
         constraints = constraints or {"required_capability_ids": [], "forbidden_capability_ids": []}
         tried = set()
         final = self.refining(branch, base)
-        feature_parameters = set()
-        if final:
-            feature_parameters = {feature['parameter'] for feature in self.c.graph.constructor.registry['features'].values()}
+        feature_parameters = self.feature_parameters() if final else set()
+
+        def variants(recipe, params):
+            return self.variants(recipe, params, numeric_only=final,
+                                 offset=self.parameter_turn[(branch, peer, recipe)], fine=final)
 
         def allowed(recipe, params):
             if final and params == base['model']['hyperparameters']:
@@ -110,10 +159,16 @@ class LocalSearch:
             if not self.c.budget.can_train(self._probe(recipe, params))["allowed"]:
                 return None
             self.selected.add(key)
+            self.parameter_turn[(branch, peer, recipe)] += 1
             return recipe, params
 
         item = self.series.get((branch, peer))
         if item and item[0] > 0:
+            # Rebase every continuation on this peer's measured family best.
+            # A regressed LLM proposal must not anchor three more blind trials.
+            recipe = item[2]
+            params = self.measured_base(peer, branch, recipe, item[3])
+            item[1] = deque((recipe, p) for p in variants(recipe, params))
             while item[1]:
                 recipe, params = item[1].popleft()
                 choice = allowed(recipe, params)
@@ -126,12 +181,17 @@ class LocalSearch:
         recipes.sort(key=lambda r: self.coverage[r])
         turn = self.sequence[(branch, peer)]
         self.sequence[(branch, peer)] += 1
-        if base and base["recipe_id"] in recipes and turn % 2 == 0:
+        exploit = self.c.config.graph_exploit_steps
+        keep_base = final or (assignment != 'explore_alternative' and turn % (exploit+1) < exploit)
+        if base and base["recipe_id"] in recipes and keep_base:
             recipes.remove(base["recipe_id"])
             recipes.insert(0, base["recipe_id"])
+        elif base and len(recipes) > 1:
+            recipes = [recipe for recipe in recipes if recipe != base['recipe_id']]
         for recipe in recipes:
-            params = self.c.catalog.normalize(recipe, base["model"]["hyperparameters"] if base and base["recipe_id"] == recipe else {})
-            for candidate in [params, *self.variants(recipe, params, numeric_only=final)]:
+            fallback = base['model']['hyperparameters'] if base and base['recipe_id'] == recipe else {}
+            params = self.c.catalog.normalize(recipe, self.measured_base(peer, branch, recipe, fallback))
+            for candidate in [params, *variants(recipe, params)]:
                 choice = allowed(recipe, candidate)
                 if choice:
                     self.start_series(peer, branch, self._probe(*choice))
@@ -141,7 +201,7 @@ class LocalSearch:
             recipe = rng.choice(recipes)
             params = self.c.catalog.normalize(recipe, base['model']['hyperparameters'] if final else {})
             domains = self.c.catalog.recipes[recipe]["parameters"]
-            names = [name for name in domains if not final or 'enum' not in domains[name]]
+            names = [name for name in domains if not final or name not in feature_parameters]
             if not names:
                 return None
             name = rng.choice(names)

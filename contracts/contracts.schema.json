@@ -6852,6 +6852,13 @@
               "type": "null"
             }
           ]
+        },
+        "peer_trials_since_progress": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "required": [

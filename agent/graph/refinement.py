@@ -25,7 +25,10 @@ class RefinementPolicy:
     def apply_phase_caps(self):
         if self.refinement_enabled() and not self.refinement():
             limits = self.phase_limits()
-            self.budget.set_phase_caps(calls=limits['call_limit'], output_tokens=limits['output_limit'])
+            # Fixed wall boundary: a changing estimate of final refit must not
+            # move the 85/15 transition back and forth during research.
+            deadline = self.budget.started + (self.config.time_budget_seconds-self.budget.output_reserve())*limits['search_fraction']
+            self.budget.set_phase_caps(calls=limits['call_limit'], output_tokens=limits['output_limit'], deadline=deadline)
         else:
             self.budget.set_phase_caps()
 
@@ -33,9 +36,20 @@ class RefinementPolicy:
         if not self.refinement_enabled() or self.refinement():
             return None
         limits = self.phase_limits()
-        usable = max(0, self.config.time_budget_seconds-self.budget.reserve_seconds())
-        if self.elapsed()/1000 >= usable*limits['search_fraction']:
+        left = (self.config.time_budget_seconds-self.budget.output_reserve())*limits['search_fraction']-self.elapsed()/1000
+        if left <= 1:
             return 'search_time_share_reached'
+        if not pending:
+            heads = [h for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='active'", (self.run_id,))
+                     for h in self.heads(row[0]) if h['experiment_id']]
+            costs = [self.budget.duration.estimate(self.store.get(h['experiment_id'])['plan']) for h in heads]
+            train = sum(costs)/self.policy['max_train_workers'] if costs else 1
+            publication = max((self.budget.candidate_reserve(self.store.get(h['experiment_id'])['plan']) for h in heads),
+                              default=self.budget.reserve_seconds())
+            api = self.budget.snapshot()['llm_calls_remaining'] > 0 and self.budget.token_snapshot()['output_available'] >= self.config.llm_max_output_tokens
+            reason = self.budget.reasoning_estimate() if api else 0
+            if left <= train+reason+publication+1:
+                return 'next_research_batch_would_cross_phase_boundary'
         return None
 
     def best_origin(self, experiment_id):

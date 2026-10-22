@@ -75,8 +75,8 @@ class Orchestrator:
             return False
         return self.budget.snapshot()["search_allowed"]
 
-    def local_plan(self, peer, branch="legacy", base=None, constraints=None):
-        choice = self.local_search.next_choice(peer, branch, base, constraints)
+    def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
+        choice = self.local_search.next_choice(peer, branch, base, constraints, assignment=assignment)
         if choice is None:
             return None
         plan = self.warmup_plan(*choice)

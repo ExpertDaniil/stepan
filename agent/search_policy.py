@@ -15,6 +15,23 @@ def utility(evaluation):
 
 
 class SearchPolicy(RefinementPolicy):
+    def fork_victims(self, parent_branch_id):
+        live = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (self.run_id,)).fetchone()[0]
+        needed = max(0, live+1-self.policy['max_live_branches'])
+        if not needed:
+            return []
+        candidates = []
+        for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' AND branch_id<>? ORDER BY created_event_seq", (self.run_id, parent_branch_id)):
+            bid = row[0]
+            if (self.branch_trial_count(bid) < self.policy['scheduling']['minimum_alternative_trials']
+                    and bid not in getattr(self.controller, 'no_fit_branches', set())):
+                continue
+            scores = [utility(self.store.experiment_evaluation(h['experiment_id'])) for h in self.heads(bid)
+                      if h['experiment_id'] and self.store.experiment_evaluation(h['experiment_id'])]
+            owns_best = any(h['experiment_id'] == self.store.best() for h in self.heads(bid))
+            candidates.append((owns_best, max(scores, default=float('-inf')), bid))
+        return [item[2] for item in sorted(candidates)[:needed]] if len(candidates) >= needed else None
+
     def attempted_research_count(self):
         return self.db.execute("SELECT count(*) FROM experiments WHERE run_id=? AND attempt_no>0 AND json_extract(plan,'$.model.family')<>'dummy'", (self.run_id,)).fetchone()[0]
 
@@ -192,29 +209,42 @@ class SearchPolicy(RefinementPolicy):
         def tolerance(value):
             return max(params["absolute_epsilon"], params["relative_epsilon"]*max(abs(value), 1e-12))
         anchor = max((utility(e) for e in seed), default=None)
-        best, last_gain, streak = anchor, 0, 0
+        best, last_gain, last_gain_seq, streak = anchor, 0, 0, 0
         for row, ev in distinct:
             value = utility(ev)
             if best is None:
-                best = anchor = value;last_gain = row["elapsed_ms"]
+                best = anchor = value;last_gain = row["elapsed_ms"];last_gain_seq = row['event_seq']
                 continue
             best = max(best, value)
             # Accumulate small improvements against a fixed anchor. Updating the
             # anchor after every tiny gain would hide meaningful gradual progress.
             if best-anchor > tolerance(anchor):
-                anchor = best;last_gain = row["elapsed_ms"];streak = 0
+                anchor = best;last_gain = row["elapsed_ms"];last_gain_seq = row['event_seq'];streak = 0
             else:
                 streak += 1
         epsilon = tolerance(utility(before_best) if before_best else anchor if anchor is not None else 0)
         active = self.db.execute("SELECT record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.entity_id')=? AND json_extract(record_json,'$.record_schema')='GBranch' AND json_extract(record_json,'$.record.state')='active' ORDER BY event_seq DESC LIMIT 1", (self.run_id, branch["branch_id"])).fetchone()
         activated_ms = json.loads(active[0])["elapsed_ms"] if active else 0
         elapsed = max(0, (self.elapsed()-max(last_gain, activated_ms))//1000)
+        peer_trials = {peer: 0 for peer in self.metadata('researcher_ids')}
+        progress_cut = max(last_gain_seq, json.loads(active[0])['event_seq'] if active else 0,
+                           refinement['started_event_seq'] if final_phase else 0)
+        for row, _ in distinct:
+            if row['event_seq'] <= progress_cut:
+                continue
+            event = self.db.execute('SELECT record_json FROM g_events WHERE run_id=? AND event_seq=?', (self.run_id, row['event_seq'])).fetchone()
+            peer = json.loads(event[0])['record'].get('researcher_id') if event else None
+            if peer in peer_trials:
+                peer_trials[peer] += 1
+        fair_trials = all(count >= params['window_full_evaluations'] for count in peer_trials.values())
         gain = utility(after_best)-utility(before_best) if before_best and after_best else None
         reasons = []
         if not self.budget.snapshot()["search_allowed"]:
             status, action = "budget_stop", "stop_search"
         elif len(window) < params["window_full_evaluations"] or len(distinct) < params["min_distinct_solutions"] or before_best is None:
             status, action = "insufficient_evidence", "continue";reasons.append("need_distinct_full_solutions_and_a_before_reference")
+        elif not fair_trials:
+            status, action = 'searching', 'continue';reasons.append('each_peer_needs_completed_distinct_trials_since_progress_or_resume')
         elif streak >= params["window_full_evaluations"] and elapsed >= params["min_elapsed_seconds"] and gain <= epsilon:
             status, action = "plateau", "pause_and_resume_sibling"
         else:
@@ -224,6 +254,7 @@ class SearchPolicy(RefinementPolicy):
         result = {"assessment_id": "plateau-"+uuid.uuid4().hex[:16], "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
                   "status": status, "evaluation_ids": [e["evaluation_id"] for _, e in window], "distinct_solution_count": len(window), "elapsed_seconds": elapsed,
                   "consecutive_no_gain": streak, "required_no_gain": params["window_full_evaluations"],
+                  "peer_trials_since_progress": peer_trials,
                   "cumulative_gain_since_reset": best-anchor if best is not None else None,
                   "best_before_evaluation_id": before_best["evaluation_id"] if before_best else None, "best_after_evaluation_id": after_best["evaluation_id"] if after_best else None,
                   "utility_gain": gain, "epsilon": epsilon, "recommended_action": action, "reasons": reasons}
@@ -237,7 +268,7 @@ class SearchPolicy(RefinementPolicy):
         self.log.event("graph.plateau_assessed", branch_id=branch["branch_id"], status=result["assessment"]["status"],
                        distinct_solution_count=result["assessment"]["distinct_solution_count"],
                        elapsed_seconds=result["assessment"]["elapsed_seconds"], utility_gain=result["assessment"]["utility_gain"], epsilon=epsilon,
-                       consecutive_no_gain=streak, required_no_gain=params["window_full_evaluations"])
+                       consecutive_no_gain=streak, required_no_gain=params["window_full_evaluations"], peer_trials_since_progress=peer_trials)
         return result
 
     def _compatible_pilot(self, offer):
@@ -331,9 +362,8 @@ class SearchPolicy(RefinementPolicy):
                 for row in self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? ORDER BY rowid DESC", (self.run_id,)):
                     idea = json.loads(row[0]);origin = self.checkpoint_record(idea["fork_checkpoint_id"])
                     already = self.db.execute("SELECT 1 FROM g_branches WHERE run_id=? AND decision_idea_id=?", (self.run_id, idea["idea_id"])).fetchone()
-                    live = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (self.run_id,)).fetchone()[0]
                     total = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=?", (self.run_id,)).fetchone()[0]
-                    if idea["status"] == "confirmed" and origin["branch_id"] == branch["branch_id"] and origin["branch_revision"] == branch["branch_revision"] and not already and live+1 <= self.policy["max_live_branches"] and total+2 <= self.policy["max_total_branches"] and remaining >= 2*self.policy["scheduling"]["minimum_alternative_trials"]:
+                    if idea["status"] == "confirmed" and origin["branch_id"] == branch["branch_id"] and origin["branch_revision"] == branch["branch_revision"] and not already and self.fork_victims(branch['branch_id']) is not None and total+2 <= self.policy["max_total_branches"] and remaining >= 2*self.policy["scheduling"]["minimum_alternative_trials"]:
                         decision.update(action="FORK", parameters={"parent_branch_id": branch["branch_id"], "expected_branch_revision": branch["branch_revision"], "checkpoint_id": idea["fork_checkpoint_id"], "idea_id": idea["idea_id"]}, reason="A controlled component and recipient pilot passed the transfer gate", evidence_ids=[idea["idea_id"]]);break
             if decision["action"] == "CONTINUE" and not final_phase:
                 acceptance = self._acceptance_transfer(branch, free)

@@ -70,6 +70,7 @@ class GraphFeatureTests(unittest.TestCase):
             # First establish an eligible measured reference inside the required-feature branch.
             h.result('researcher-1',{'alpha':1,'target_transform':'shifted_log1p'},8,branch=accept)
             for alpha in [3,4,5,6]:h.result('researcher-1',{'alpha':alpha,'target_transform':'shifted_log1p'},20+alpha,branch=accept)
+            for alpha in [7,8,9,10]:h.result('researcher-2',{'alpha':alpha,'target_transform':'shifted_log1p'},20+alpha,branch=accept)
             assessment=h.g.invoke('G07',{'branch_id':accept,'expected_branch_revision':0})['assessment']
             self.assertEqual(assessment['status'],'plateau')
             cp=h.g.invoke('G01',{'branch_id':accept,'expected_branch_revision':0,'reason':'manual'})['checkpoint']

@@ -321,6 +321,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if set(idea["capability_ids"]) & (required | forbidden):
             raise AgentError("CONSTRAINT_CONFLICT", "Fork must introduce a new unconstrained capability")
         children = {kind: ident("branch-"+kind) for kind in ("accept", "reject")}
+        archived = []
         # The causal checkpoint remains immutable. Explicit seeds carry this peer's
         # later measured knowledge into a child, rather than throwing warmups away.
         selection_cut = self.cut()
@@ -354,10 +355,15 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             current = self.branch(parent["branch_id"], parent["branch_revision"])
             if current["state"] != "active":
                 raise AgentError("INVALID_BRANCH_STATE", "Only an active branch can fork")
-            live = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (self.run_id,)).fetchone()[0]
             total = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=?", (self.run_id,)).fetchone()[0]
-            if live+1 > self.policy["max_live_branches"] or total+2 > self.policy["max_total_branches"]:
+            victims = self.fork_victims(parent['branch_id'])
+            if victims is None or total+2 > self.policy["max_total_branches"]:
                 raise AgentError("BRANCH_LIMIT", "Both children must fit; a partial fork is forbidden")
+            for bid in victims:
+                self.db.execute("UPDATE g_branches SET state='archived',revision=revision+1 WHERE run_id=? AND branch_id=?", (self.run_id, bid))
+                self._revoke_tx(bid)
+                self.event('G02', 'branch', bid, 'GBranch', self.branch(bid))
+                archived.append(bid)
             self.db.execute("UPDATE g_branches SET state='sealed',revision=revision+1 WHERE run_id=? AND branch_id=?", (self.run_id, parent["branch_id"]))
             revoked, jobs = self._revoke_tx(parent["branch_id"])
             for kind, child in children.items():
@@ -375,6 +381,8 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             return {"parent_branch": self.branch(parent["branch_id"]), "accept_branch": self.branch(children["accept"]), "reject_branch": self.branch(children["reject"]),
                     "revoked_work_order_ids": revoked, "origin_running_job_ids": jobs, "graph_revision": 0}
         result = self.commit("G02", p, key, mutate)
+        for bid in archived:
+            self.log.event('graph.branch_state_changed', branch_id=bid, action='archive', reason='Make room for a complete pair of decision children', state='archived')
         self.log.event("graph.branch_forked", parent_branch_id=parent["branch_id"], idea_id=idea["idea_id"],
                        checkpoint_id=cp["checkpoint_id"], accept_branch_id=result["accept_branch"]["branch_id"],
                        reject_branch_id=result["reject_branch"]["branch_id"], capability_ids=idea["capability_ids"])

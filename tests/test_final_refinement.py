@@ -29,9 +29,11 @@ class FinalRefinementTests(unittest.TestCase):
         h = self.harness(time_budget_seconds=10800, max_research_experiments=100, llm_max_calls=96)
         try:
             h.result('researcher-1', {'alpha': 1}, 10)
-            cutoff = (10800-h.g.budget.reserve_seconds())*.85
-            with patch.object(h.g, 'elapsed', return_value=int((cutoff-1)*1000)):
+            cutoff = (10800-h.g.budget.output_reserve())*.85
+            with patch.object(h.g, 'elapsed', return_value=int((cutoff-300)*1000)):
                 self.assertIsNone(h.g.refinement_due())
+            with patch.object(h.g, 'elapsed', return_value=int((cutoff-1.5)*1000)):
+                self.assertEqual(h.g.refinement_due(), 'next_research_batch_would_cross_phase_boundary')
             with patch.object(h.g, 'elapsed', return_value=int((cutoff+1)*1000)):
                 decision = self.decide(h)
             self.assertEqual(decision['action'], 'REFINE_BEST')
@@ -57,7 +59,7 @@ class FinalRefinementTests(unittest.TestCase):
             first = self.decide(h)
             self.assertEqual(first['parameters']['researcher_id'], 'researcher-1')
             h.result('researcher-1', {'alpha': 1}, 10)
-            cutoff=(h.g.config.time_budget_seconds-h.g.budget.reserve_seconds())*.85
+            cutoff=(h.g.config.time_budget_seconds-h.g.budget.output_reserve())*.85
             with patch.object(h.g,'elapsed',return_value=int((cutoff+1)*1000)):
                 self.assertEqual(self.decide(h)['action'], 'REFINE_BEST')
             self.start(h)
@@ -184,6 +186,7 @@ class FinalRefinementTests(unittest.TestCase):
         try:
             h.result('researcher-1', {'alpha': 1}, 10);self.start(h)
             for alpha in range(2, 6): h.result('researcher-1', {'alpha': alpha}, 11)
+            for alpha in range(6, 10): h.result('researcher-2', {'alpha': alpha}, 11)
             report = h.g.invoke('G07', {'branch_id': h.root, 'expected_branch_revision': h.g.branch(h.root)['branch_revision']})['assessment']
             self.assertEqual(report['status'], 'plateau')
             self.assertEqual(report['recommended_action'], 'continue')

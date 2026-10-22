@@ -99,7 +99,7 @@ class SearchRunReviewTests(unittest.TestCase):
             h.close()
 
     def test_four_consecutive_distinct_trials_required_for_plateau(self):
-        h = GraphHarness()
+        h = GraphHarness(graph_peers=1)
         try:
             h.result('researcher-1', {'alpha': 1}, 100)
             for alpha in [2, 3, 4]:
@@ -144,7 +144,7 @@ class SearchRunReviewTests(unittest.TestCase):
             h.close()
 
     def test_classification_uses_the_same_streak_with_maximizing_scores(self):
-        h = GraphHarness('classification')
+        h = GraphHarness('classification', graph_peers=1)
         try:
             h.result('researcher-1', {'C': 1}, .8)
             for i in range(2, 6):

@@ -3,6 +3,7 @@ import threading
 import time
 import uuid
 import math
+from collections import deque
 
 from agent.errors import AgentError
 from agent.duration import DurationModel
@@ -28,11 +29,28 @@ class Budget:
         self.lock = threading.RLock()
         self.phase_call_limit = None
         self.phase_output_limit = None
+        self.phase_deadline = None
+        self.llm_durations = deque(maxlen=32)
 
-    def set_phase_caps(self, *, calls=None, output_tokens=None):
+    def set_phase_caps(self, *, calls=None, output_tokens=None, deadline=None):
         with self.lock:
             self.phase_call_limit = calls
             self.phase_output_limit = output_tokens
+            self.phase_deadline = deadline
+
+    def phase_remaining(self):
+        with self.lock:
+            return max(0.0, (self.phase_deadline or self.deadline) - time.monotonic())
+
+    def observe_llm(self, seconds):
+        with self.lock:
+            self.llm_durations.append(seconds)
+
+    def reasoning_estimate(self):
+        with self.lock:
+            values = sorted(self.llm_durations)
+            return (values[math.ceil(.75*len(values))-1]*1.5 if values else
+                    min(self.config.llm_operation_timeout_seconds, max(1, self.config.time_budget_seconds*.01)))
 
     def call_limit(self):
         return min(self.config.llm_max_calls, self.phase_call_limit if self.phase_call_limit is not None else self.config.llm_max_calls)
@@ -60,9 +78,11 @@ class Budget:
             estimate = self.duration.estimate(plan)
             reserve = self.candidate_reserve(plan)
             allowed = (not self.search_stopped and estimate <= self.config.experiment_timeout_seconds
-                       and self.remaining() >= estimate + reserve + 1)
+                       and self.remaining() >= estimate + reserve + 1
+                       and (self.phase_deadline is None or self.phase_remaining() >= estimate + reserve + 1))
             return {"allowed": allowed, "estimated_seconds": estimate, "reserve_seconds": reserve,
-                    "remaining_seconds": self.remaining(), "family": plan["model"]["family"]}
+                    "remaining_seconds": self.remaining(), "phase_seconds_remaining": self.phase_remaining(),
+                    "family": plan["model"]["family"]}
 
     def admit(self, owner, plan):
         with self.lock:
@@ -98,6 +118,8 @@ class Budget:
 
     def llm_call(self):
         with self.lock:
+            if self.phase_deadline and self.phase_remaining() < 1:
+                raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Branch exploration reached its time boundary')
             if self.calls >= self.config.llm_max_calls or self.remaining() < 1:
                 raise AgentError("BUDGET_EXHAUSTED", "LLM budget exhausted")
             if self.calls >= self.call_limit():

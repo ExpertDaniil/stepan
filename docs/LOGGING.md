@@ -1,5 +1,11 @@
 # Наблюдаемость
 
+В adaptive `llm.request_budget_checked` содержит `limit_bytes=null` и
+`input_limit_owner=provider`: локальная отсечка входного контекста отключена.
+`llm.final_decision_requested` отмечает последний ход диалога без инструментов.
+`research.context_failed` фиксирует ошибку сборки одного поручения без прерывания всей партии;
+если ни один peer не смог начать работу, причина остановки — `context_unavailable`.
+
 В adaptive-режиме `research.analysis_completed` связывает запрос со scope, числом строк и полным
 артефактом отчёта; недоступные метки holdout не журналируются. `research.action_proposed` и
 `research.action_admitted` фиксируют тип действия, evidence IDs и явный бюджет локальной серии.

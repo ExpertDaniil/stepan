@@ -130,17 +130,18 @@ class Gateway:
     def _request(self, request, context, payload, attempt, deadline):
         from contextvars import copy_context
         request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8"))
-        byte_limit = self.config.max_context_tokens * 3
-        if context["metadata"].get("graph_binding"):
+        byte_limit = None if self.config.research_mode == 'adaptive' else self.config.max_context_tokens * 3
+        if byte_limit is not None and context["metadata"].get("graph_binding"):
             user = json.loads(context["messages"][1]["content"])
             byte_limit = min(byte_limit, self.config.graph_context_bytes, user["profile_summary"]["context_budget"]["max_api_request_bytes"])
-        if request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
+        if byte_limit is not None and request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
             self._compact_research_request(request, byte_limit)
             request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
-        if request_bytes > byte_limit:
+        if byte_limit is not None and request_bytes > byte_limit:
             raise AgentError("CONTEXT_TOO_LARGE", "Complete API request including schema/tools/repair exceeds the byte budget",
                              details={"request_bytes": request_bytes, "limit_bytes": byte_limit})
-        self.log.event("llm.request_budget_checked", level="DEBUG", request_bytes=request_bytes, limit_bytes=byte_limit)
+        self.log.event("llm.request_budget_checked", level="DEBUG", request_bytes=request_bytes, limit_bytes=byte_limit,
+                       input_limit_owner='provider' if byte_limit is None else 'client')
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
@@ -270,7 +271,13 @@ class Gateway:
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
                 request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
-                if tools:
+                terminal = bool(tools and attempt == payload['attempt_limit'])
+                if terminal:
+                    request['messages'].append({'role': 'user', 'content':
+                        'The analysis/tool phase is complete. Return one final JSON object matching the output schema '
+                        'using the evidence already available. No tools are available on this final turn.'})
+                    self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'])
+                elif tools:
                     request.update(tools=tools, parallel_tool_calls=False)
                 response, call_no = self._request(request, context, payload, attempt, deadline)
             except AgentError as exc:
@@ -299,6 +306,8 @@ class Gateway:
                     raise ValueError("Generation reached the output token limit")
                 message = choice["message"]
                 if message.get("tool_calls"):
+                    if terminal:
+                        raise ValueError('The provider returned a tool call although no tools were offered on the final decision turn')
                     prepared = []
                     for call in message["tool_calls"]:
                         name = call['function']['name']

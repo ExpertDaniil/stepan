@@ -390,6 +390,7 @@ def search(controller):
         if decision["action"] in {"FORK", "BACKTRACK"}:
             branch_id = apply_switch(controller, branch_id, decision);continue
         llm_tickets, trusted_plans, trusted_tickets = [], [], []
+        context_failures = []
         slots = graph.research_slots(branch, max(1, controller.budget.research_capacity()))
         for slot in range(slots):
             if slot:
@@ -399,7 +400,17 @@ def search(controller):
             elif decision["action"] == "CONTINUE":
                 peer = decision["parameters"]["researcher_id"]
                 donors = graph.required_donors(branch)
-                ticket = issue(controller, branch_id, peer, decision["parameters"]["action"], donors)
+                try:
+                    ticket = issue(controller, branch_id, peer, decision["parameters"]["action"], donors)
+                except AgentError as exc:
+                    if exc.code != 'CONTEXT_TOO_LARGE':
+                        raise
+                    controller.degraded = True
+                    context_failures.append(peer)
+                    controller.log.exception('research.context_failed', exc, researcher_id=peer, branch_id=branch_id)
+                    controller.record_research_feedback(peer, branch_id, 'context_unavailable',
+                        str(exc)+' '+json.dumps(exc.details), code=exc.code)
+                    continue
                 if controller.local_search.has_series(peer, branch_id) or not controller.llm_available(len(llm_tickets)):
                     plan = local_for_ticket(controller, ticket)
                     if plan:
@@ -414,7 +425,8 @@ def search(controller):
         if not had_plans:
             controller.no_fit_branches.add(branch_id)
             outcomes = getattr(controller, 'research_round_outcomes', [])
-            reason = ('researchers_stopped' if outcomes and all(o == 'stop' for o in outcomes) else
+            reason = ('context_unavailable' if context_failures else
+                      'researchers_stopped' if outcomes and all(o == 'stop' for o in outcomes) else
                       'research_unavailable' if 'failed' in outcomes else 'no_affordable_candidates')
             controller.no_fit_reasons[branch_id] = reason
             decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": None})["decision"]

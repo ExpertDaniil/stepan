@@ -94,6 +94,18 @@ class Catalog:
         recipes = []
         for recipe_id in recipe_ids:
             recipe = deepcopy(self.recipes[recipe_id])
+            if self.config.research_mode == 'adaptive':
+                family = recipe['family']
+                if family == 'custom':
+                    description = 'Preprocessing is defined by the supplied make_pipeline source.'
+                elif family == 'dummy':
+                    description = 'Dummy estimator; no learned feature preprocessing.'
+                elif family == 'catboost':
+                    description = 'Numeric NaN reaches CatBoost; categorical missing values become __MISSING__ strings.'
+                else:
+                    encoding = 'one-hot encoding and numeric scaling' if family == 'linear' else 'ordinal categorical encoding'
+                    description = 'Fit-only median numeric imputation (no missing indicators), then '+encoding+'. Numeric NaN does not reach the estimator.'
+                recipe['preprocessing'] = description
             for capability, feature in features.items():
                 domain = recipe["parameters"].get(feature["parameter"])
                 required = capability in constraints["required_capability_ids"]

@@ -29,10 +29,12 @@ deduplication and publication. A rationale is not proof that a research directio
 ## Protected context and on-demand analysis
 
 `profile_summary.data.core_profile` packs column name, dtype and train/test missingness together.
-The core, task contract and measured base remain mandatory when verbose profile fields and
-redundant history are removed. Schemas and tool replies also count against the API request cap;
-the Gateway can compact duplicate profile/history without removing the core or base source.
-An oversized mandatory core fails explicitly instead of silently losing all data information.
+In adaptive mode, ContextBuilder and Gateway do not truncate or reject input using the local
+byte/token heuristics. MAX_CONTEXT_TOKENS and GRAPH_CONTEXT_BYTES retain their legacy meaning
+in catalog/code mode, but do not cap adaptive requests, including bootstrap. The actual Qwen
+service context window still applies; this change does not enlarge the model's physical window.
+The request retains task contract, measured base, history, schemas and tool replies without
+client byte-budget compaction. Global deadline, API call and output-token budgets remain enforced.
 The compact core includes at most 128 columns and reports omissions; larger schemas are
 inspectable by explicit column names through the analysis tool.
 
@@ -92,6 +94,14 @@ In adaptive mode an ordinary catalogue/custom proposal creates no implicit tunin
 owned catalogue fallback remains possible and is logged; it never runs generated code silently.
 A voluntary adaptive `stop` is respected. Two peers may propose different actions and see
 compact measured results from their shared visible lineage.
+
+The last attempt of a dialogue with tools offers no tools and requests the final action JSON.
+This uses the existing attempt allowance (at most seven tool rounds then one decision with
+the current eight-attempt setting), rather than executing a last tool call with no return turn.
+The controller cannot guarantee that the model produces valid JSON or that the API remains
+available. A provider tool call on this final turn is rejected without executing it.
+Recipe metadata describes the owned preprocessing so estimator capabilities are not confused
+with transformations that precede it, such as median imputation before HistGradientBoosting.
 
 Successful empirical transformations do not automatically trigger G14 component transfer or
 an accept/reject fork in adaptive mode. A solution remains available in history without making

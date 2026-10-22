@@ -25,9 +25,12 @@ class WorkService:
         """Only observations made on this line before each ancestor's fork cut."""
         history = []
         for branch_id, cut in self.lineage_cuts(branch_id):
-            for row in self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND event_seq<=? AND json_extract(record_json,'$.record_schema') IN ('GHeadResult','GBranchSeed','Error') ORDER BY event_seq DESC", (self.run_id, cut)):
+            for row in self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND event_seq<=? AND json_extract(record_json,'$.record_schema') IN ('GHeadResult','GBranchSeed','GRefinement','Error') ORDER BY event_seq DESC", (self.run_id, cut)):
                 event = json.loads(row["record_json"]);record = event["record"]
-                if event["record_schema"] == "GBranchSeed":
+                if event['record_schema'] == 'GRefinement':
+                    if record['branch_id'] == branch_id:
+                        history.append((row['event_seq'], record['source_experiment_id']))
+                elif event["record_schema"] == "GBranchSeed":
                     if record["branch_id"] == branch_id and (not researcher_id or record["head"]["researcher_id"] == researcher_id) and record["head"]["experiment_id"]:
                         history.append((row["event_seq"], record["head"]["experiment_id"]))
                 elif event["record_schema"] == "GHeadResult":
@@ -67,6 +70,9 @@ class WorkService:
                 "diagnostics": diagnostics}
 
     def research_assignment(self, branch_id, researcher_id):
+        refinement = self.refinement()
+        if refinement and refinement['branch_id'] == branch_id:
+            return 'exploit_incumbent'
         # Count this peer's completed proposals, not loop iterations spent forking
         # or backtracking. Both equal peers get the same exploit/explore ratio.
         trials = 0
@@ -93,6 +99,9 @@ class WorkService:
             self.db.execute("UPDATE g_runs SET graph_revision=graph_revision+1 WHERE run_id=?", (self.run_id,))
 
     def issue_work(self, p, key):
+        refinement = self.refinement()
+        if refinement and p['branch_id'] != refinement['branch_id']:
+            raise AgentError('FINAL_REFINEMENT_ONLY', 'All final work belongs to the selected best branch')
         branch = self.branch(p["branch_id"], p["expected_branch_revision"])
         if branch["state"] != "active" or not self.budget.snapshot()["search_allowed"] or not self.db.execute("SELECT search_allowed FROM g_runs WHERE run_id=?", (self.run_id,)).fetchone()[0]:
             raise AgentError("SEARCH_CLOSED", "Work can only be issued to an active branch with remaining search time")
@@ -143,6 +152,7 @@ class WorkService:
             graph_input = {"binding": {"work_order_id": order_id, "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
                                         "head_revision": head["head_revision"], "capsule_artifact_id": capsule_id},
                            "task_contract": task_contract, "head": head, "base_code": base_code, "constraints": branch["constraints"],
+                           "phase": 'refine' if self.refinement() else 'search',
                            "facts": facts, "recent": recent, "total_recent": total_recent, "donors": binding["allowed_donor_experiment_ids"],
                            "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None, "observed_recipes": observed_recipes,
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}

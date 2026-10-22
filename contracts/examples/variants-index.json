@@ -33,5 +33,10 @@
     "contract_id": "G02",
     "file": "examples/G02/seed-record.json",
     "schema": "GBranchSeed"
+  },
+  {
+    "file": "examples/G14/response-refine-best.json",
+    "schema": "G14_Response",
+    "contract_id": "G14"
   }
 ]

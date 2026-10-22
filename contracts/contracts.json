@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.1",
   "created_at": "2026-10-21",
   "status": "implemented_graph_extension",
   "description": "Предлагаемые внутренние контракты AutoML-агента. Не API платформы; все примеры синтетические.",
@@ -2356,7 +2356,9 @@
         "UNVERIFIABLE_COMPONENT",
         "LINEAGE_MISMATCH",
         "IDEMPOTENCY_CONFLICT",
-        "FIRST_BASELINE_FULL_REQUIRED"
+        "FIRST_BASELINE_FULL_REQUIRED",
+        "REFINEMENT_FAMILY_CHANGED",
+        "REFINEMENT_COMPONENT_CHANGED"
       ],
       "request_example": {
         "schema_version": "1.0",
@@ -3869,9 +3871,10 @@
       ],
       "rules": [
         "Стратегия — обычный код, не LLM. Читает согласованный checkpoint, допустимые действия каталога, full evaluations и реальный budget.",
-        "CONTINUE→G03; FORK→G02 confirmed idea; BACKTRACK→G08 resume сохранённого reject; TRANSFER_COMPONENT→G03 action=transfer; FINALIZE→C22.",
+        "CONTINUE→G03; FORK→G02 confirmed idea; BACKTRACK→G08 resume сохранённого reject; TRANSFER_COMPONENT→G03 action=transfer; REFINE_BEST→G15; FINALIZE→C22.",
         "Сохранить decision/evidence в graph journal до исполнения. CAS каждого исполняемого действия повторно проверяется его собственным контрактом.",
-        "G14 не гарантирует, что действие ещё доступно через секунду. При конфликте строится новый checkpoint и новое решение; старое не переписывается."
+        "G14 не гарантирует, что действие ещё доступно через секунду. При конфликте строится новый checkpoint и новое решение; старое не переписывается.",
+        "Доля времени предлагает REFINE_BEST; фазовые API/output caps оставляют поиск на локальных сериях до временной границы. В refine только CONTINUE/FINALIZE; числового предела обучений нет."
       ],
       "errors": [
         "CHECKPOINT_NOT_FOUND",
@@ -3948,6 +3951,121 @@
       },
       "request_schema_name": "G14_Request",
       "response_schema_name": "G14_Response"
+    },
+    {
+      "id": "G15",
+      "python_call": "GraphService.start_refinement",
+      "title": "Начать финальную доработку лучшего решения",
+      "owner": "A",
+      "transaction": "T15",
+      "timeout_seconds": 10,
+      "lead_contracts": [
+        "C07",
+        "C17",
+        "C22"
+      ],
+      "rules": [
+        "Односторонний переход search→refine после завершения всех issued/submitted work orders, pending API reservations и train jobs. Ничего не отменять на границе фаз.",
+        "Проверить expected_graph_revision и равенство source_experiment_id текущему trusted comparable full global best.",
+        "Атомарно архивировать остальные active/paused ветви, активировать записанную совместимую origin branch даже из sealed/archived, передать измеренный best обоим peer через GRefinement.seed_heads и поднять ревизии. Бинарное дерево не менять.",
+        "GRefinement и GBranch записать в g_events; refinement metadata — в ту же транзакцию. Снять только фазовые caps, глобальные бюджеты и учёт расходов не сбрасывать.",
+        "После перехода G03 выдаёт только exploit_incumbent выбранной ветви; G02 запрещён; G07 может показать плато, но G14 продолжает доводку. Новый score побеждает только после прежнего C16/C17 и C18–C21.",
+        "Повтор того же idempotency_key возвращает сохранённый ответ, не откатывая более поздний прогресс."
+      ],
+      "errors": [
+        "REFINEMENT_DISABLED",
+        "REFINEMENT_ALREADY_STARTED",
+        "GRAPH_REVISION_CONFLICT",
+        "BEST_CHANGED",
+        "INVALID_REFINEMENT_SOURCE",
+        "PEER_BUSY",
+        "SEARCH_CLOSED"
+      ],
+      "request_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g15",
+        "run_id": "run-demo-001",
+        "idempotency_key": "key-g15",
+        "payload": {
+          "source_experiment_id": "exp-best",
+          "expected_graph_revision": 100,
+          "reason": "search_time_share_reached"
+        }
+      },
+      "response_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g15",
+        "run_id": "run-demo-001",
+        "ok": true,
+        "data": {
+          "refinement": {
+            "phase": "refine",
+            "branch_id": "branch-root",
+            "source_experiment_id": "exp-best",
+            "source_solution_id": "sol-best",
+            "prior_heads": [],
+            "seed_heads": [
+              {
+                "researcher_id": "researcher-1",
+                "solution_id": "sol-best",
+                "experiment_id": "exp-best",
+                "head_revision": 3
+              }
+            ],
+            "started_elapsed_ms": 9000000,
+            "started_event_seq": 101,
+            "reason": "search_time_share_reached",
+            "phase_limits": {
+              "search_fraction": 0.85,
+              "call_limit": 27,
+              "output_limit": 222822
+            }
+          },
+          "branch": {
+            "branch_id": "branch-root",
+            "parent_branch_id": null,
+            "fork_checkpoint_id": null,
+            "decision_idea_id": null,
+            "decision": "root",
+            "state": "active",
+            "branch_revision": 2,
+            "constraints": {
+              "required_capability_ids": [],
+              "forbidden_capability_ids": []
+            },
+            "created_event_seq": 1
+          },
+          "graph_revision": 101
+        },
+        "error": null
+      },
+      "error_example": {
+        "schema_version": "1.0",
+        "request_id": "req-g15",
+        "run_id": "run-demo-001",
+        "ok": false,
+        "data": null,
+        "error": {
+          "code": "PEER_BUSY",
+          "message": "Finish reasoning and training before refinement",
+          "retryable": false,
+          "retry_after_seconds": null,
+          "details": {}
+        }
+      },
+      "from": "Orchestrator",
+      "to": "GraphService",
+      "endpoint": "LOCAL graph.start_refinement",
+      "transport": "in_process_or_local_queue",
+      "request_schema": {
+        "$ref": "#/$defs/G15_Request"
+      },
+      "response_schema": {
+        "$ref": "#/$defs/G15_Response"
+      },
+      "request_schema_name": "G15_Request",
+      "response_schema_name": "G15_Response",
+      "phase": "refinement"
     }
   ],
   "shared_definitions": [

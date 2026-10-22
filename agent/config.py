@@ -67,7 +67,9 @@ class Config:
     graph_max_live_branches: int = 3
     graph_max_total_branches: int = 15
     graph_plateau_window: int = 4
-    graph_plateau_seconds: int = 300
+    graph_plateau_seconds: int = 900
+    graph_refinement_enabled: bool = True
+    graph_search_fraction: float = 0.85
     graph_plateau_absolute_epsilon: float = 0.001
     graph_plateau_relative_epsilon: float = 0.001
     graph_exploit_steps: int = 3
@@ -115,7 +117,9 @@ class Config:
             graph_max_live_branches=integer("GRAPH_MAX_LIVE_BRANCHES", 3, 1, 31),
             graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
             graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 4, 1, 20),
-            graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 300, 0, 10800),
+            graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 900, 0, 10800),
+            graph_refinement_enabled=boolean("GRAPH_REFINEMENT_ENABLED", True),
+            graph_search_fraction=real("GRAPH_SEARCH_FRACTION", 0.85, 0.8, 0.9),
             graph_plateau_absolute_epsilon=real("GRAPH_PLATEAU_ABSOLUTE_EPSILON", 0.001, 0, 1000000),
             graph_plateau_relative_epsilon=real("GRAPH_PLATEAU_RELATIVE_EPSILON", 0.001, 0, 1),
             graph_exploit_steps=integer("GRAPH_EXPLOIT_STEPS", 3, 1, 8),

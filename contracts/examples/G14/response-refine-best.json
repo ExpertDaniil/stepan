@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g14",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "decision": {
+      "decision_id": "decision-001",
+      "checkpoint_id": "checkpoint-001",
+      "evidence_ids": [
+        "exp-best"
+      ],
+      "reason": "search_time_share_reached",
+      "action": "REFINE_BEST",
+      "parameters": {
+        "source_experiment_id": "exp-best",
+        "source_branch_id": "branch-root"
+      }
+    },
+    "decision_artifact_id": "artifact-decision-001",
+    "graph_revision": 15
+  },
+  "error": null
+}

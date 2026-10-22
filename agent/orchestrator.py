@@ -11,6 +11,10 @@ from agent.errors import AgentError
 from tools.code import write_code
 
 
+def budget_trial_timeout(event, job, plan):
+    return event['state'] == 'timed_out' and job.lease['timeout_seconds'] < plan['resources']['timeout_seconds']
+
+
 class Orchestrator:
     def __init__(self, *, config, bus, budget, artifacts, store, runner, evaluator, submission, researcher,
                  spec, validation, catalog, task_text, profile, log, demo=None, task_root=None):
@@ -210,7 +214,10 @@ class Orchestrator:
         for job in jobs:
             event = events[job.job_id]
             if event["state"] != "succeeded":
-                self.degraded = True
+                if budget_trial_timeout(event, job, self.store.get(job.experiment_id)['plan']) and self.store.champion():
+                    self.log.event('search.budget_trial_timed_out', experiment_id=job.experiment_id, retained_output=True)
+                else:
+                    self.degraded = True
                 continue
             predictions = next((a for a in event["output_artifact_ids"] if self.artifacts.meta(a)["kind"] == "validation_predictions"), None)
             if not predictions:

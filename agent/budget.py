@@ -26,6 +26,19 @@ class Budget:
         self.admissions = {}
         self.search_stopped = False
         self.lock = threading.RLock()
+        self.phase_call_limit = None
+        self.phase_output_limit = None
+
+    def set_phase_caps(self, *, calls=None, output_tokens=None):
+        with self.lock:
+            self.phase_call_limit = calls
+            self.phase_output_limit = output_tokens
+
+    def call_limit(self):
+        return min(self.config.llm_max_calls, self.phase_call_limit if self.phase_call_limit is not None else self.config.llm_max_calls)
+
+    def output_limit(self):
+        return min(self.config.llm_max_total_output_tokens, self.phase_output_limit if self.phase_output_limit is not None else self.config.llm_max_total_output_tokens)
 
     def remaining(self):
         return max(0.0, self.deadline - time.monotonic())
@@ -80,13 +93,15 @@ class Budget:
             memory = sum(v["lease"]["memory_limit_mb"] for v in self.leases.values())
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
                     "cpu_threads_available": max(0, 6 - cpu), "memory_mb_available": max(0, 20480 - memory),
-                    "llm_calls_remaining": max(0, self.config.llm_max_calls - self.calls),
+                    "llm_calls_remaining": max(0, self.call_limit() - self.calls),
                     "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
     def llm_call(self):
         with self.lock:
             if self.calls >= self.config.llm_max_calls or self.remaining() < 1:
                 raise AgentError("BUDGET_EXHAUSTED", "LLM budget exhausted")
+            if self.calls >= self.call_limit():
+                raise AgentError("SEARCH_PHASE_BUDGET_EXHAUSTED", "Reserved API attempts belong to final refinement")
             self.calls += 1
             return self.calls
 
@@ -97,6 +112,10 @@ class Budget:
             if max_tokens > available:
                 raise AgentError("BUDGET_EXHAUSTED", "Per-run output token budget cannot reserve this request",
                                  details={"requested": max_tokens, "available": max(0, available)})
+            phase_available = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())
+            if max_tokens > phase_available:
+                raise AgentError("SEARCH_PHASE_BUDGET_EXHAUSTED", "Reserved output tokens belong to final refinement",
+                                 details={"requested": max_tokens, "available": max(0, phase_available)})
             call_no = self.llm_call()
             self.pending_llm_tokens[call_no] = max_tokens
             return call_no
@@ -120,7 +139,9 @@ class Budget:
             reserved = sum(self.pending_llm_tokens.values())
             return {"output_limit": self.config.llm_max_total_output_tokens, "output_charged": self.output_tokens_charged,
                     "output_reported": self.output_tokens_reported, "output_reserved": reserved,
-                    "output_available": max(0, self.config.llm_max_total_output_tokens - self.output_tokens_charged - reserved),
+                    "output_available": max(0, self.output_limit() - self.output_tokens_charged - reserved),
+                    "output_available_global": max(0, self.config.llm_max_total_output_tokens - self.output_tokens_charged - reserved),
+                    "phase_call_limit": self.phase_call_limit, "phase_output_limit": self.phase_output_limit,
                     "input_reported": self.input_tokens_reported, "cached_input_reported": self.cached_tokens_reported}
 
     def lease(self, payload):

@@ -48,11 +48,18 @@ class LocalSearch:
         item = self.series.get((branch, peer))
         return bool(item and item[0] > 0 and item[1])
 
-    def variants(self, recipe, params):
+    def refining(self, branch, base):
+        graph = getattr(self.c, 'graph', None)
+        phase = graph.refinement() if graph else None
+        return bool(phase and phase['branch_id'] == branch and base and base['model']['family'] != 'dummy')
+
+    def variants(self, recipe, params, *, numeric_only=False):
         """One parameter at a time; cheap alternatives precede heavier trials."""
         for name, domain in self.c.catalog.recipes[recipe]["parameters"].items():
             current = params[name]
             if "enum" in domain:
+                if numeric_only:
+                    continue
                 values = domain["enum"]
             else:
                 lo, hi = domain["min"], domain["max"]
@@ -71,7 +78,7 @@ class LocalSearch:
 
     def start_series(self, peer, branch, plan):
         recipe, params = plan["recipe_id"], plan["model"]["hyperparameters"]
-        values = deque((recipe, p) for p in self.variants(recipe, params))
+        values = deque((recipe, p) for p in self.variants(recipe, params, numeric_only=self.refining(branch, plan)))
         self.series[(branch, peer)] = [self.c.config.research_series_size - 1, values]
 
     def _probe(self, recipe, params):
@@ -82,8 +89,16 @@ class LocalSearch:
         self.refresh()
         constraints = constraints or {"required_capability_ids": [], "forbidden_capability_ids": []}
         tried = set()
+        final = self.refining(branch, base)
+        feature_parameters = set()
+        if final:
+            feature_parameters = {feature['parameter'] for feature in self.c.graph.constructor.registry['features'].values()}
 
         def allowed(recipe, params):
+            if final and params == base['model']['hyperparameters']:
+                return None
+            if final and (recipe != base['recipe_id'] or any(params.get(name) != base['model']['hyperparameters'].get(name) for name in feature_parameters)):
+                return None
             try:
                 params = self.c.catalog.constrain_params(recipe, params, constraints)
             except AgentError:
@@ -107,7 +122,7 @@ class LocalSearch:
                     return choice
         self.series.pop((branch, peer), None)
         recipes = [r for r, value in self.c.catalog.recipes.items()
-                   if value["family"] != "dummy" and self.c.catalog.allows_constraints(r, constraints)]
+                   if value["family"] != "dummy" and (not final or r == base['recipe_id']) and self.c.catalog.allows_constraints(r, constraints)]
         recipes.sort(key=lambda r: self.coverage[r])
         turn = self.sequence[(branch, peer)]
         self.sequence[(branch, peer)] += 1
@@ -116,7 +131,7 @@ class LocalSearch:
             recipes.insert(0, base["recipe_id"])
         for recipe in recipes:
             params = self.c.catalog.normalize(recipe, base["model"]["hyperparameters"] if base and base["recipe_id"] == recipe else {})
-            for candidate in [params, *self.variants(recipe, params)]:
+            for candidate in [params, *self.variants(recipe, params, numeric_only=final)]:
                 choice = allowed(recipe, candidate)
                 if choice:
                     self.start_series(peer, branch, self._probe(*choice))
@@ -124,12 +139,19 @@ class LocalSearch:
         rng = random.Random(hashlib.sha256(f"{self.c.config.seed}/{branch}/{peer}/{turn}".encode()).digest())
         for _ in range(128 if recipes else 0):
             recipe = rng.choice(recipes)
-            params = self.c.catalog.normalize(recipe, {})
+            params = self.c.catalog.normalize(recipe, base['model']['hyperparameters'] if final else {})
             domains = self.c.catalog.recipes[recipe]["parameters"]
-            name = rng.choice(list(domains))
+            names = [name for name in domains if not final or 'enum' not in domains[name]]
+            if not names:
+                return None
+            name = rng.choice(names)
             domain = domains[name]
             if "enum" in domain:
                 params[name] = rng.choice(domain["enum"])
+            elif final:
+                value = params[name]*rng.uniform(.8, 1.25)
+                value = max(domain['min'], min(domain['max'], value))
+                params[name] = int(round(value)) if domain['type'] == 'int' else float(f'{value:.8g}')
             elif domain["type"] == "int":
                 params[name] = rng.randint(domain["min"], domain["max"])
             else:

@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g15",
+  "run_id": "run-demo-001",
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "PEER_BUSY",
+    "message": "Finish reasoning and training before refinement",
+    "retryable": false,
+    "retry_after_seconds": null,
+    "details": {}
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "version": "graph-1.0-implemented",
+  "version": "graph-1.0-v0.5.1",
   "base_commit": "3b6d7d84879fffbe76d111d05a9d58816b009e77",
   "modules": [
     {
@@ -141,6 +141,16 @@
           "response_schema": "../contracts/contracts.schema.json#/$defs/I03_Response"
         }
       ]
+    },
+    {
+      "path": "agent/graph/refinement.py",
+      "contracts": [
+        {
+          "id": "G15",
+          "request_schema": "../contracts/contracts.schema.json#/$defs/G15_Request",
+          "response_schema": "../contracts/contracts.schema.json#/$defs/G15_Response"
+        }
+      ]
     }
   ],
   "artifact_formats": [
@@ -258,5 +268,33 @@
     "GExperimentMemory.diagnostics": "optional bounded evaluator aggregates; emitted by memory_record and consumed in C10 context",
     "GPolicy.scheduling.exploit_steps": "optional integer 1..8, default3; equal per-peer completed-work schedule",
     "compatibility": "All 100 non-G schema definitions and C00-C24 envelopes unchanged"
+  },
+  "additions_v051": {
+    "base_commit": "2fa62970194f38403b7ea2d130a6cca729d172e0",
+    "records": [
+      "GRefinement"
+    ],
+    "operation": "G15",
+    "decision": "REFINE_BEST",
+    "context_optional": [
+      "research_phase"
+    ],
+    "export_optional": [
+      "refinement"
+    ],
+    "policy_optional": [
+      "scheduling.refinement_enabled",
+      "scheduling.search_fraction"
+    ],
+    "storage": {
+      "g_metadata.refinement": "GRefinement JSON; same transaction as G15 events and branch/head revisions",
+      "g_events": "G15 GRefinement and affected GBranch snapshots; original tree topology preserved"
+    },
+    "defaults": {
+      "GRAPH_PLATEAU_SECONDS": 900,
+      "GRAPH_REFINEMENT_ENABLED": true,
+      "GRAPH_SEARCH_FRACTION": 0.85
+    },
+    "native_C00_C24_changed": false
   }
 }

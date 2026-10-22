@@ -24,14 +24,16 @@
   "plateau": {
     "window_full_evaluations": 4,
     "min_distinct_solutions": 4,
-    "min_elapsed_seconds": 300,
+    "min_elapsed_seconds": 900,
     "absolute_epsilon": 0.001,
     "relative_epsilon": 0.001
   },
   "scheduling": {
     "preferred_branch_share": 0.7,
     "minimum_alternative_trials": 1,
-    "exploit_steps": 3
+    "exploit_steps": 3,
+    "refinement_enabled": true,
+    "search_fraction": 0.85
   },
   "retention": {
     "max_artifact_bytes": 8000000000,

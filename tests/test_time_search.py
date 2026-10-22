@@ -68,6 +68,12 @@ class DurationTests(unittest.TestCase):
         model.defaults["random-forest-regressor-v1"] = {"n_estimators": 100, "max_depth": 16}
         self.assertGreater(model.estimate(cost_plan("random_forest", n_estimators=1, max_depth=2)), 2)
 
+    def test_unseen_family_uses_measured_baseline_startup_instead_of_two_seconds(self):
+        model=self.model()
+        dummy={'recipe_id':'dummy-regressor-v1','model':{'family':'dummy','hyperparameters':{}},'resources':{'cpu_threads':3}}
+        model.observe(dummy,'train',12,fit_seconds=2)
+        self.assertGreaterEqual(model.estimate(cost_plan('linear',alpha=1)),13.5)
+
     def test_timeout_is_a_lower_bound_not_a_completed_fast_fit(self):
         model = self.model()
         plan = cost_plan(iterations=100, depth=4)
@@ -258,7 +264,9 @@ class ContinuedSearchTests(unittest.TestCase):
                     raise AgentError("SPAWN_FAILED", "One injected start failure")
                 return original_start(runner, payload, spec, experiment)
 
-            settings = {"LLM_MODE": "mock", "GRAPH_ENABLED": str(int(graph)), "TIME_BUDGET_SECONDS": "90",
+            # Stop after fourteen measured fits above; this ceiling must leave
+            # enough room for process startup on slower CI machines.
+            settings = {"LLM_MODE": "mock", "GRAPH_ENABLED": str(int(graph)), "TIME_BUDGET_SECONDS": "600",
                         "LLM_MAX_CALLS": str(calls), "CATALOG_WARMUP_EXPERIMENTS": "0", "MAX_RESEARCH_EXPERIMENTS": "1",
                         "RESEARCH_SERIES_SIZE": "1" if duplicate else "4", "MAX_WORKERS": "1", "GRAPH_PEERS": "1",
                         "GRAPH_MIN_FREE_DISK_BYTES": "0", "LOG_LEVEL": "ERROR"}

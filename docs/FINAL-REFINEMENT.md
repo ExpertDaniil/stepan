@@ -1,0 +1,122 @@
+# Поиск ветвей и финальная доводка · v0.5.1
+
+Основа: `2fa62970194f38403b7ea2d130a6cca729d172e0` (v0.5.0), с сохранением измеренных баз v0.4.3. C00–C24 и интерфейс платформы сохранены.
+
+По умолчанию система исследует ветви в течение 85% доступного времени поиска, затем возвращает
+оба равноправных peer к **измеренному global best** и оставляет их на доводке до общего лимита.
+Плато в доводке видно в журнале, но оно больше не вызывает уход в альтернативу. Любое настоящее
+улучшение, включая меньшее plateau epsilon, проходит прежний evaluator и Publisher. Если улучшения
+нет, последний проверенный лучший CSV остаётся ответом.
+
+## Время и квоты
+
+`GRAPH_SEARCH_FRACTION=0.85`, допустимый диапазон 0.80–0.90. Для времени проверяется
+`elapsed >= fraction × (TIME_BUDGET_SECONDS − current_finalization_reserve)`.
+Резерв на refit/публикацию по-прежнему зависит от длительности fit. Например, при общем бюджете
+180 минут и резерве 1 минута переход планируется около 152:09 от старта, затем около 26:51
+доступно на доводку и 1 минута остаётся резервом. Фактический резерв может быть больше.
+
+Это **мягкая граница между партиями**: начатые LLM-операции и обучения не отменяются ради 85%.
+Если партия пересекла границу, переход происходит после неё. Внешний общий deadline остаётся
+жёстким; гарантировать ровно 15% полезной работы при произвольно долгом fit нельзя.
+
+Та же доля ограничивает поисковые API/output квоты, чтобы сохранить вызовы для доводки.
+Для целочисленного общего лимита `N` поисковый cap равен `N − ceil(N × (1 − fraction))`.
+Минимум API cap — два bootstrap вызова; output cap — два bootstrap output cap, но не выше
+соответствующего глобального лимита. При 96 API-попытках резерв равен 15 вызовам, поисковый
+cap — 81, включая bootstrap/retry. При 262144 output tokens поисковый cap — 222822.
+
+**Достижение фазового cap не завершает исследование и не меняет ветвь на доводку раньше времени.**
+До временной границы продолжаются допустимые локальные серии. В G15 открывается зарезервированный
+остаток API; при полном исчерпании API обе фазы всё равно могут подбирать параметры локально.
+Числового предела обучений нет: MAX_RESEARCH_EXPERIMENTS — только legacy metadata.
+Допуск каждого обучения учитывает прогноз fit/refit и время на вывод через DurationModel.
+Поиск может завершиться раньше, если не осталось доступных непроверенных конфигураций,
+но исчерпание LLM-квоты само по себе его не останавливает. Основа: [TIME-SEARCH.md](TIME-SEARCH.md).
+
+`Budget` применяет caps атомарно под lock, включая одновременные запросы и retry.
+`SEARCH_PHASE_BUDGET_EXHAUSTED` закрывает поисковое поручение без degraded и без внешнего API-запроса;
+оркестратор заменяет его допустимой локальной попыткой. Переход G15 выполняется по времени и снимает только фазовые caps:
+глобальные счётчики расходов, deadline и лимиты не обнуляются.
+
+`token_snapshot.output_available` — доступный остаток текущей фазы;
+`output_available_global` — глобальный остаток. `output_limit` остаётся глобальным лимитом;
+`phase_call_limit` / `phase_output_limit` показывают временные caps или null после перехода.
+
+## Переход и JSON I/O
+
+| Блок | Вход | Выход и действие |
+|---|---|---|
+| `SearchPolicy.decide`, G14 | `G14_Request`: checkpoint, реальный budget, plateau assessment | `GSearchDecision.action=REFINE_BEST`, parameters `{source_experiment_id, source_branch_id}`, reason с причиной перехода |
+| Оркестратор | REFINE_BEST после завершения партии | `G15_Request.payload={source_experiment_id, expected_graph_revision, reason}`; стабильный idempotency key `start-final-refinement` |
+| `RefinementPolicy.start_refinement`, G15 | Текущий global best и CAS graph revision | `G15_Response.data={refinement:GRefinement, branch:GBranch, graph_revision}` |
+| `WorkService`, G03 | Выбранная ветвь и собственная новая head revision | Обычный `G03_Response`, вложенный C09; GContextUser дополнен `research_phase=refine`, `research_strategy=exploit_incumbent` |
+| Исследователь → G04 | План от измеренной базы с тем же recipe | Прежний G04/C11/C12 путь; смена learned family отвергается с REFINEMENT_FAMILY_CHANGED |
+| G07/G14 | Новые full результаты доводки | Плато можно зафиксировать; `recommended_action=continue`, без FORK/BACKTRACK/TRANSFER_COMPONENT |
+| G11 | Прежний final scope | `GGraphExport.refinement` и полный typed event log; ranking всех сопоставимых результатов, включая предков |
+
+Точные закрытые схемы: `contracts/contracts.schema.json`, примеры request/success/error —
+`contracts/examples/G15/`; карта модулей — `docs/graph-io.json`.
+
+G15 требует valid full evaluation без violations, совпадение dataset/validation/metric/direction,
+состояние experiment=evaluated и записанную origin ветвь с совместимыми constraints. Сначала
+завершаются preparing/issued/submitted work orders, pending output reservations и train jobs;
+иначе PEER_BUSY. Проверяются BEST_CHANGED и GRAPH_REVISION_CONFLICT.
+
+В одной dispatcher-транзакции:
+
+1. Остальные active/paused ветви архивируются, их ревизии увеличиваются.
+2. Существующая origin ветвь best активируется, включая sealed предка или archived ветвь.
+3. Обе головы явно получают source solution/experiment с увеличением head revisions.
+4. Записываются GRefinement, affected GBranch events, metadata и idempotent response.
+
+Новые дети для этого не создаются: бинарная топология остаётся прежней. Обычный G08 всё ещё
+не может открыть sealed ветвь; специальное восстановление допускает только G15 для доводки,
+после которого G02 запрещён. Constraints origin ветви сохраняются.
+
+## Хранение и контекст
+
+Отдельная БД или бесконечная переписка не добавляются. `state.sqlite` остаётся authority:
+
+- `g_metadata`, name=`refinement`: JSON GRefinement;
+- `g_events`: операция G15, typed GRefinement и затронутые GBranch snapshots;
+- прежние `g_heads`, `g_branches`, work orders, evaluations, solutions и bindings;
+- `exports/final-*/graph.json`: optional refinement; `graph-events.jsonl` содержит полный переход.
+
+GRefinement содержит `phase`, `branch_id`, `source_experiment_id`, `source_solution_id`,
+`prior_heads`, `seed_heads`, `started_elapsed_ms`, `started_event_seq`, `reason`, `phase_limits`.
+Повтор того же G15 ключа возвращает исходный ответ и не откатывает последующий прогресс.
+
+Каждый peer получает свежий ограниченный контекст: задача, branch constraints, точный code/config
+измеренного best, его метрика и диагностика, собственная история и явные разрешённые ссылки.
+GRefinement делает общий старт явным исключением из обычной изоляции, а не загрузкой чужой ветви
+целиком. После старта головы снова развиваются независимо; глобальный best сравнивается всегда.
+Подсказки предлагают небольшие изменения 1–2 численных параметров в разных направлениях.
+Повтор точной конфигурации использует прежний cache. Старые локальные очереди очищаются в G15; локальный подбор в доводке сохраняет recipe и feature switches измеренной базы, меняя численные параметры. Неполный ответ LLM накладывается на фактические параметры базы, а не на recipe defaults. Явная смена feature отклоняется с REFINEMENT_COMPONENT_CHANGED. Dummy как единственный best допускает
+первое создание нормальной learned модели вместо бессмысленного тюнинга константы.
+
+G07 отсчитывает попытки доводки после `started_event_seq` и использует `seed_heads` как новую
+точку отсчёта. Старые плохие попытки до возврата не создают мгновенное новое плато.
+Сам переход REFINE_BEST не расходует ход peer: следующую попытку получает следующий исследователь.
+
+## Плато и обновление настроек
+
+В исследовании по умолчанию нужны четыре разные full solution подряд без накопленного gain
+выше epsilon **и не менее 900 секунд** после существенного gain/активации. Это не лимит жизни
+ветви и не отмена работы через 15 минут. Ошибки, exact cache и другой seed той же solution
+не заменяют четыре новые оценки. В доводке эти измерения остаются диагностикой.
+
+Существующий `.env` имеет приоритет над новыми defaults. Применение настроек с сохранением
+ключей и адреса API:
+
+```bash
+python3 scripts/configure.py --profile extended
+python3 scripts/configure.py --profile extended --apply
+```
+
+Это включает GRAPH_REFINEMENT_ENABLED=1, GRAPH_SEARCH_FRACTION=0.85 и
+GRAPH_PLATEAU_SECONDS=900; extended задаёт 96 API attempts; число обучений не ограничивается.
+Экспортированные env vars сохраняют приоритет. `GRAPH_REFINEMENT_ENABLED=0` отключает переход
+и фазовые резервы; прежний поиск ветвей остаётся доступен.
+
+Проверки и фактические ограничения релиза: `VALIDATION-FINAL-REFINEMENT.md`.

@@ -118,7 +118,11 @@ def train(controller, plans, tickets):
         for job in jobs:
             event = events[job.job_id]
             if event["state"] != "succeeded":
-                controller.degraded = True
+                from agent.orchestrator import budget_trial_timeout
+                if budget_trial_timeout(event, job, controller.store.get(job.experiment_id)['plan']) and controller.store.champion():
+                    controller.log.event('search.budget_trial_timed_out', experiment_id=job.experiment_id, retained_output=True)
+                else:
+                    controller.degraded = True
             else:
                 prediction = next((a for a in event["output_artifact_ids"] if controller.artifacts.meta(a)["kind"] == "validation_predictions"), None)
                 try:
@@ -230,9 +234,14 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
             try:
                 proposal = future.result()
             except Exception as exc:
-                controller.degraded = True
+                phase_budget = isinstance(exc, AgentError) and exc.code == 'SEARCH_PHASE_BUDGET_EXHAUSTED'
+                if not phase_budget:
+                    controller.degraded = True
                 graph.abandon(ticket["work_order"]["work_order_id"], str(exc))
-                controller.log.exception("research.proposal_failed", exc, work_order_id=ticket["work_order"]["work_order_id"])
+                if phase_budget:
+                    controller.log.event('research.phase_budget_reached', work_order_id=ticket['work_order']['work_order_id'])
+                else:
+                    controller.log.exception("research.proposal_failed", exc, work_order_id=ticket["work_order"]["work_order_id"])
                 if not getattr(controller, "local_search", None) or not controller.budget.snapshot()["search_allowed"]:
                     continue
                 work = ticket["work_order"]
@@ -316,10 +325,15 @@ def search(controller):
         assessment = graph.invoke("G07", {"branch_id": branch_id, "expected_branch_revision": branch["branch_revision"]})["assessment"]
         cp = graph.invoke("G01", {"branch_id": branch_id, "expected_branch_revision": branch["branch_revision"], "reason": "manual"})["checkpoint"]
         controller.log.event("search.round_started", round_no=round_no, branch_id=branch_id, attempted_experiments=accepted,
+                             phase='refine' if graph.refinement() else 'search',
                              budget=controller.budget.snapshot(), token_budget=controller.budget.token_snapshot())
         decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": assessment["assessment_id"]})["decision"]
         if decision["action"] == "FINALIZE":
             stop_reason = decision["reason"];break
+        if decision['action'] == 'REFINE_BEST':
+            result = graph.invoke('G15', {'source_experiment_id': decision['parameters']['source_experiment_id'],
+                'expected_graph_revision': graph.revision(), 'reason': decision['reason']}, key='start-final-refinement')
+            branch_id = result['branch']['branch_id'];continue
         if decision["action"] in {"FORK", "BACKTRACK"}:
             branch_id = apply_switch(controller, branch_id, decision);continue
         llm_tickets, trusted_plans, trusted_tickets = [], [], []
@@ -350,6 +364,8 @@ def search(controller):
         if not had_plans:
             controller.no_fit_branches.add(branch_id)
             decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": None})["decision"]
+            if decision['action'] == 'REFINE_BEST':
+                continue
             if decision["action"] == "BACKTRACK":
                 branch_id = apply_switch(controller, branch_id, decision)
                 continue
@@ -364,7 +380,7 @@ def search(controller):
 def finish(controller, stop_reason, accepted):
     graph = controller.graph
     controller.finalize_best()
-    controller.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted, budget=controller.budget.snapshot())
+    controller.log.event("search.finished", stop_reason=stop_reason, phase='refine' if graph.refinement() else 'search', attempted_experiments=accepted, budget=controller.budget.snapshot())
     controller.call("C22", {"action": "stop_search", "reason": stop_reason, "wall_seconds_remaining": int(controller.budget.remaining()), "cancel_job_ids": []}, controller.control)
     controller.cleanup()
     graph.invoke("G11", {"task_spec_id": controller.spec["task_spec_id"], "validation_id": controller.validation["validation_id"], "selection_policy_id": "same-protocol-primary-v1", "scope": "final"}, key="final-export")

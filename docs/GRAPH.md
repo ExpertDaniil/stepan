@@ -1,8 +1,8 @@
-# Research Graph v1 · реализация v0.5.0
+# Research Graph v1 · реализация v0.5.1
 
 Основа: текущая v0.3.1, commit 3b6d7d84879fffbe76d111d05a9d58816b009e77. Фикс завершения worker
 и три его теста сохранены. Интерфейс платформы — прежний solution.py; C00–C24 не меняются.
-G00–G14/I00–I03 — работающие локальные операции, их схемы и request/success/error fixtures находятся в contracts/.
+G00–G15/I00–I03 — работающие локальные операции, их схемы и request/success/error fixtures находятся в contracts/.
 Точная карта модулей и форматов также дана в graph-io.json. Runtime использует stdlib и уже разрешённые зависимости.
 
 Изменения v0.4.2, регрессионные проверки, новые необязательные поля контекста и продолжительный
@@ -32,9 +32,11 @@ G00–G14/I00–I03 — работающие локальные операции
 10. G07 проверяет плато по distinct full solutions и времени с существенного улучшения. G14/G08 возвращают
     поиск к paused альтернативе. Время делится с сохранёнными альтернативами по оценке оставшегося числа испытаний.
     При достижении live-limit законченную линию можно архивировать, сохранив весь её результат.
-    Числового предела обучений нет. Квоты API переключают поиск на локальные серии каталога;
-    ограничения ветвей и собственная база исследователя сохраняются. Подробности: [TIME-SEARCH.md](TIME-SEARCH.md).
-11. После C22/cleanup G11 сравнивает все valid comparable full experiments: предков, старые/закрытые ветви,
+11. По доле времени (85% после вычета резерва Publisher) G14 предлагает REFINE_BEST.
+    После завершения текущих работ G15 восстанавливает origin ветвь измеренного global best, архивирует
+    остальные открытые ветви и явно передаёт best обоим peer. Дальше только exploit; плато не переключает
+    ветку. Подробнее: [FINAL-REFINEMENT.md](FINAL-REFINEMENT.md).
+12. После C22/cleanup G11 сравнивает все valid comparable full experiments: предков, старые/закрытые ветви,
     late results и текущие листья. Лучший evaluated и реально published champion хранятся отдельно.
 
 ## Две структуры и идентичности
@@ -122,6 +124,7 @@ corrupt pin или trained без trusted evaluation блокируют поис
 | G00/G01/G02/G04/G05/G08 | GraphService | Gxx_Request → Gxx_Response |
 | G03 | WorkService + ContextBuilder | G03_Request → G03_Response; вложенный C09_Request |
 | G06/G07/G14 | SearchPolicy | Gxx_Request → Gxx_Response |
+| G15 | RefinementPolicy | G15_Request → G15_Response; GRefinement |
 | G09/G10 | GraphArtifacts | Gxx_Request → Gxx_Response; ArtifactRef |
 | G11/G13 | GraphExport | Gxx_Request → Gxx_Response |
 | G12 | GraphRecovery | G12_Request → G12_Response |
@@ -141,7 +144,8 @@ GEnvironmentManifest дополнен optional owned_runtime_artifact_id/owned_r
 | GRAPH_ENABLED | 1 |
 | GRAPH_PEERS / GRAPH_TRAIN_WORKERS | 2 / 1; каждый ≤ MAX_WORKERS |
 | GRAPH_MAX_LIVE_BRANCHES / GRAPH_MAX_TOTAL_BRANCHES | 3 / 15 |
-| GRAPH_PLATEAU_WINDOW / GRAPH_PLATEAU_SECONDS | 4 / 300 |
+| GRAPH_PLATEAU_WINDOW / GRAPH_PLATEAU_SECONDS | 4 / 900 |
+| GRAPH_REFINEMENT_ENABLED / GRAPH_SEARCH_FRACTION | 1 / 0.85 |
 | GRAPH_MIN_EFFECT | 0.001 |
 | GRAPH_CONTEXT_BYTES | 48000 для полного API request |
 | GRAPH_MAX_ARTIFACT_BYTES / GRAPH_MIN_FREE_DISK_BYTES | 8000000000 / 2000000000 для новых graph blobs |

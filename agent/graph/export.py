@@ -91,6 +91,7 @@ class GraphExport:
         export = {"export_version": "graph-export-1.0", "run_id": self.run_id, "captured_event_seq": cut, "store_revision": selections_revision, "graph_revision": revision,
                   "branches": branches, "heads": heads, "checkpoints": checkpoints, "solutions": solutions, "solution_edges": edges,
                   "branch_seeds": [e["record"] for e in event_records if e["record_schema"] == "GBranchSeed"],
+                  "refinement": self.refinement(),
                   "experiment_links": [{"experiment_id": x["experiment_id"], "solution_id": x["solution_id"]} for x in experiments],
                   "ideas": ideas, "ranking_artifact_id": ranking_art["artifact_id"], "artifact_ids": [a["artifact_id"] for a in artifacts]+[ranking_art["artifact_id"], events_art["artifact_id"]],
                   "artifacts": artifacts+[ranking_art, events_art], "experiments": experiments, "evaluations": evaluations,

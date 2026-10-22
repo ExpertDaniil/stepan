@@ -58,6 +58,8 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                 if meta:
                     setattr(self.constructor, name, {k: meta[k] for k in ("artifact_id", "run_id", "kind", "relative_path", "sha256", "size_bytes", "media_type")})
         self.store.graph = self
+        if row:
+            self.apply_phase_caps()
 
     def default_policy(self):
         p = json.loads((ROOT / "recipes/graph-policy.json").read_text(encoding="utf-8"))
@@ -70,21 +72,27 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                             min_elapsed_seconds=self.config.graph_plateau_seconds, absolute_epsilon=self.config.graph_plateau_absolute_epsilon,
                             relative_epsilon=self.config.graph_plateau_relative_epsilon)
         p["scheduling"]["exploit_steps"] = self.config.graph_exploit_steps
+        p['scheduling'].update(refinement_enabled=self.config.graph_refinement_enabled, search_fraction=self.config.graph_search_fraction)
         p["promotion"]["min_effect"] = self.config.graph_min_effect
         p["retention"].update(max_artifact_bytes=self.config.graph_max_artifact_bytes, min_free_disk_bytes=self.config.graph_min_free_disk_bytes)
         return p
 
     def initialize_defaults(self):
         if self.revision():
-            return self.invoke("G00", {"task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
+            result = self.invoke("G00", {"task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
                 "validation_id": self.validation["validation_id"], "protocol_sha256": self.validation["protocol_sha256"],
                 "environment_lock_artifact_id": self.metadata("environment_artifact_id"), "catalog_manifest_artifact_id": self.metadata("catalog_artifact_id"),
                 "researcher_ids": self.metadata("researcher_ids"), "policy": self.policy}, key="graph-initialize")
+            self.apply_phase_caps()
+            return result
         environment, catalog = self.constructor.prepare()
-        return self.invoke("G00", {"task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
+        result = self.invoke("G00", {"task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
             "validation_id": self.validation["validation_id"], "protocol_sha256": self.validation["protocol_sha256"],
             "environment_lock_artifact_id": environment["artifact_id"], "catalog_manifest_artifact_id": catalog["artifact_id"],
             "researcher_ids": ["researcher-"+str(i+1) for i in range(self.policy["peer_count"])], "policy": self.policy}, key="graph-initialize")
+
+        self.apply_phase_caps()
+        return result
 
     def elapsed(self):
         return max(0, int((time.monotonic()-self.budget.started)*1000))
@@ -155,7 +163,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                        "G04": self.submit_proposal, "G05": self.commit_evaluation, "G06": self.register_idea,
                        "G07": self.assess_plateau, "G08": self.control_branch, "G09": self.files.register_staged,
                        "G10": lambda x, _: {"artifacts": [self.files.resolve(i, x["verify_bytes"]) for i in x["artifact_ids"]]},
-                       "G11": self.export, "G12": self.recover, "G13": self.inspect, "G14": self.decide,
+                       "G11": self.export, "G12": self.recover, "G13": self.inspect, "G14": self.decide, "G15": self.start_refinement,
                        "I00": lambda x, _: self.constructor.verify(x), "I01": lambda x, _: check_constraints(x),
                        "I02": lambda x, _: self.resolve_lineage(x), "I03": lambda x, _: solution(x)}
             return methods[cid](p, key)
@@ -297,6 +305,8 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                     raise AgentError("INVALID_FORK_CHECKPOINT", "Checkpoint heads already contain the new idea")
 
     def fork_decision(self, p, key):
+        if self.refinement():
+            raise AgentError('FINAL_REFINEMENT_ONLY', 'Final refinement does not create decision branches')
         parent = self.branch(p["parent_branch_id"], p["expected_branch_revision"])
         cp = self.checkpoint_record(p["checkpoint_id"])
         row = self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?", (self.run_id, p["idea_id"])).fetchone()
@@ -460,6 +470,12 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if p["manifest"] is None or p["lineage"] is None or proposal["plan"] is None:
             raise AgentError("INVALID_PROPOSAL", "A proposed plan requires a manifest and typed lineage")
         plan = self.catalog.validate_plan(proposal["plan"], self.spec, self.validation["validation_id"], self.artifacts)
+        if self.refinement() and order['base_experiment_id']:
+            base = self.store.get(order['base_experiment_id'])['plan']
+            if base['model']['family'] != 'dummy' and plan['recipe_id'] != base['recipe_id']:
+                raise AgentError('REFINEMENT_FAMILY_CHANGED', 'Final refinement keeps the measured model family')
+            if base['model']['family'] != 'dummy' and any(plan['model']['hyperparameters'].get(feature['parameter']) != base['model']['hyperparameters'].get(feature['parameter']) for feature in self.constructor.registry['features'].values()):
+                raise AgentError('REFINEMENT_COMPONENT_CHANGED', 'Final refinement preserves the measured feature switches')
         if plan["researcher_id"] != order["researcher_id"] or plan["fidelity"] != "full":
             raise AgentError("INVALID_PLAN", "Graph v1 executes full fidelity plans owned by the assigned peer")
         code_pin = self.files.prepare_pin(plan["code_artifact_id"])

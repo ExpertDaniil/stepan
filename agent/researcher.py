@@ -27,7 +27,13 @@ class Researcher:
         proposed = answer["parsed_payload"]
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
-        params = self.catalog.normalize(proposed["recipe_id"], proposed["hyperparameters"])
+        submitted_params = proposed['hyperparameters']
+        if catalog_mode and context['metadata'].get('graph_binding'):
+            branch_user = json.loads(context['messages'][1]['content'])
+            base = branch_user.get('base_result')
+            if branch_user.get('research_phase') == 'refine' and base and base['recipe_id'] == proposed['recipe_id']:
+                submitted_params = {**base['hyperparameters'], **submitted_params}
+        params = self.catalog.normalize(proposed["recipe_id"], submitted_params)
         constraint_changes = {}
         if context["metadata"].get("graph_binding"):
             branch_user = json.loads(context["messages"][1]["content"])

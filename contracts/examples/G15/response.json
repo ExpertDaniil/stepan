@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-g15",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "refinement": {
+      "phase": "refine",
+      "branch_id": "branch-root",
+      "source_experiment_id": "exp-best",
+      "source_solution_id": "sol-best",
+      "prior_heads": [],
+      "seed_heads": [
+        {
+          "researcher_id": "researcher-1",
+          "solution_id": "sol-best",
+          "experiment_id": "exp-best",
+          "head_revision": 3
+        }
+      ],
+      "started_elapsed_ms": 9000000,
+      "started_event_seq": 101,
+      "reason": "search_time_share_reached",
+      "phase_limits": {
+        "search_fraction": 0.85,
+        "call_limit": 27,
+        "output_limit": 222822
+      }
+    },
+    "branch": {
+      "branch_id": "branch-root",
+      "parent_branch_id": null,
+      "fork_checkpoint_id": null,
+      "decision_idea_id": null,
+      "decision": "root",
+      "state": "active",
+      "branch_revision": 2,
+      "constraints": {
+        "required_capability_ids": [],
+        "forbidden_capability_ids": []
+      },
+      "created_event_seq": 1
+    },
+    "graph_revision": 101
+  },
+  "error": null
+}

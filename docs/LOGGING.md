@@ -63,7 +63,7 @@ worker, до C15/C13 release. Она не устанавливает cancelled. 
 
 ## Граф v0.4
 
-G00–G14/I00–I03 проходят ту же трассировку ContractBus. graph.committed содержит operation и
+G00–G15/I00–I03 проходят ту же трассировку ContractBus. graph.committed содержит operation и
 graph_revision. context.built дополнительно связывает work_order_id/branch_id с контекстом peer.
 llm.request_budget_checked проверяет полное отправляемое тело со schema/tools/repair, а не только
 исходные messages. graph.proposal_rejected и graph.component_gate_failed не выдают текст LLM за score.
@@ -81,6 +81,19 @@ context.built показывает assignment, base_experiment_id и сохра�
 Числа плато учитывают только допустимые для ветки references и время после её запуска/возобновления.
 llm_call_limit и llm_output_budget в search.finished — штатные причины остановки, проверенные dispatcher.
 
+
+## Фазы поиска v0.5.1
+
+В v0.5.1 `search.phase_changed` отмечает единственный переход в refine: source_experiment_id,
+branch_id, reason, elapsed_seconds, remaining_seconds, phase_limits. `search.round_started`
+и `search.finished` содержат phase=search/refine. `research.phase_budget_reached` означает
+достижение поискового cap с сохранением резерва доводки. Typed G15/GRefinement в graph-events
+позволяет проверить исходные и новые heads; token_budget показывает фазовые и глобальные остатки.
+
+`search.budget_trial_timed_out` отмечает train-job, у которого lease была сокращена остатком
+общего бюджета. Попытка остаётся timed_out без метрики; сама по себе она не переводит успешный
+запуск с проверенным CSV в degraded. Полный per-job timeout, spawn/validation/API ошибки и
+неуспешный refit по-прежнему считаются ошибками запуска.
 
 ## Размеры и исследования v0.4.3
 

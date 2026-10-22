@@ -5710,6 +5710,14 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 8
+            },
+            "refinement_enabled": {
+              "type": "boolean"
+            },
+            "search_fraction": {
+              "type": "number",
+              "minimum": 0.8,
+              "maximum": 0.9
             }
           },
           "required": [
@@ -6906,7 +6914,8 @@
             "G14",
             "C15",
             "C16",
-            "C22"
+            "C22",
+            "G15"
           ]
         },
         "request_id": {
@@ -7306,6 +7315,16 @@
           "items": {
             "$ref": "#/$defs/GBranchSeed"
           }
+        },
+        "refinement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GRefinement"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -12813,6 +12832,63 @@
             "parameters"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "decision_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "checkpoint_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "action": {
+              "enum": [
+                "REFINE_BEST"
+              ]
+            },
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "source_experiment_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_branch_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "source_experiment_id",
+                "source_branch_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "decision_id",
+            "checkpoint_id",
+            "evidence_ids",
+            "reason",
+            "action",
+            "parameters"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -13313,6 +13389,12 @@
             "exploit_incumbent",
             "explore_alternative"
           ]
+        },
+        "research_phase": {
+          "enum": [
+            "search",
+            "refine"
+          ]
         }
       },
       "required": [
@@ -13455,6 +13537,247 @@
         "selection_reason"
       ],
       "additionalProperties": false
+    },
+    "GRefinement": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "enum": [
+            "refine"
+          ]
+        },
+        "branch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_solution_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_heads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GHead"
+          }
+        },
+        "seed_heads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GHead"
+          }
+        },
+        "started_elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "started_event_seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase_limits": {
+          "type": "object",
+          "properties": {
+            "search_fraction": {
+              "type": "number",
+              "minimum": 0.8,
+              "maximum": 0.9
+            },
+            "call_limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_limit": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "search_fraction",
+            "call_limit",
+            "output_limit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "phase",
+        "branch_id",
+        "source_experiment_id",
+        "source_solution_id",
+        "prior_heads",
+        "seed_heads",
+        "started_elapsed_ms",
+        "started_event_seq",
+        "reason",
+        "phase_limits"
+      ],
+      "additionalProperties": false
+    },
+    "G15_Request": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1.0"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "source_experiment_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_graph_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "source_experiment_id",
+            "expected_graph_revision",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "idempotency_key",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "G15_Response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                true
+              ]
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "refinement": {
+                  "$ref": "#/$defs/GRefinement"
+                },
+                "branch": {
+                  "$ref": "#/$defs/GBranch"
+                },
+                "graph_revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "refinement",
+                "branch",
+                "graph_revision"
+              ],
+              "additionalProperties": false
+            },
+            "error": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "enum": [
+                "1.0"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "enum": [
+                false
+              ]
+            },
+            "data": {
+              "type": "null"
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "run_id",
+            "ok",
+            "data",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   },
   "description": "Use $ref #/$defs/Cxx_Request or #/$defs/Cxx_Response for a specific endpoint. Endpoint routing is external to JSON Schema."

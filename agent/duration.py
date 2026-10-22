@@ -2,7 +2,6 @@
 from collections import defaultdict, deque
 from copy import deepcopy
 import math
-import statistics
 
 
 class DurationModel:
@@ -68,7 +67,8 @@ class DurationModel:
         if complete:
             rates = sorted(sample["fit"] / sample["work"] for sample in complete)
             rate = rates[min(len(rates) - 1, math.ceil(.75 * len(rates)) - 1)]
-            overhead = max(statistics.median(s["overhead"] for s in complete), complete[-1]["overhead"])
+            overheads = sorted(s['overhead'] for s in complete)
+            overhead = max(overheads[math.ceil(.75 * len(overheads))-1], complete[-1]['overhead'])
             seconds = (overhead + work * rate) * 1.35
         else:
             # A bounded initial probe; subsequent estimates use this family's measurements.
@@ -78,7 +78,8 @@ class DurationModel:
             default = deepcopy(plan)
             default["model"]["hyperparameters"] = self.defaults.get(plan["recipe_id"], plan["model"]["hyperparameters"])
             # Imports and process startup remain even for a very small model.
-            seconds = 2 + cold * max(.15, work / self.work(default, "train"))
+            measured_startup = max((s['overhead'] for s in self.samples['dummy'] if not s['censored']), default=0)
+            seconds = max(2, measured_startup*1.35) + cold * max(.15, work / self.work(default, "train"))
         # A timeout is a lower bound on cost, never a fast successful measurement.
         for sample in samples:
             if sample["censored"]:

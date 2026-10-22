@@ -19,7 +19,9 @@ class GraphHarness:
     def __init__(self, kind="regression", **config):
         self.h = Harness(kind)
         h = self.h
-        cfg = replace(h.config, graph_min_free_disk_bytes=0, graph_plateau_seconds=0, **config)
+        defaults = dict(graph_min_free_disk_bytes=0, graph_plateau_seconds=0, graph_refinement_enabled=False)
+        defaults.update(config)
+        cfg = replace(h.config, **defaults)
         budget = Budget(cfg, time.monotonic(), h.log)
         catalog = Catalog(h.spec["task_kind"], cfg)
         evaluator = Evaluator(h.spec, h.artifacts, h.store, h.log)

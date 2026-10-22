@@ -65,12 +65,18 @@ class Config:
     graph_train_workers: int = 1
     graph_max_live_branches: int = 3
     graph_max_total_branches: int = 15
-    graph_plateau_window: int = 3
+    graph_plateau_window: int = 4
     graph_plateau_seconds: int = 300
+    graph_plateau_absolute_epsilon: float = 0.001
+    graph_plateau_relative_epsilon: float = 0.001
+    graph_exploit_steps: int = 3
     graph_min_effect: float = 0.001
     graph_context_bytes: int = 48000
     graph_max_artifact_bytes: int = 8000000000
     graph_min_free_disk_bytes: int = 2000000000
+    model_snapshot_max_bytes: int = 16777216
+    model_snapshot_total_bytes: int = 67108864
+    worker_log_max_bytes: int = 1048576
 
     @classmethod
     def from_env(cls, *, llm_mode=None, work_dir=None):
@@ -106,12 +112,18 @@ class Config:
             graph_train_workers=integer("GRAPH_TRAIN_WORKERS", 1, 1, 2),
             graph_max_live_branches=integer("GRAPH_MAX_LIVE_BRANCHES", 3, 1, 31),
             graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
-            graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 3, 1, 20),
+            graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 4, 1, 20),
             graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 300, 0, 10800),
+            graph_plateau_absolute_epsilon=real("GRAPH_PLATEAU_ABSOLUTE_EPSILON", 0.001, 0, 1000000),
+            graph_plateau_relative_epsilon=real("GRAPH_PLATEAU_RELATIVE_EPSILON", 0.001, 0, 1),
+            graph_exploit_steps=integer("GRAPH_EXPLOIT_STEPS", 3, 1, 8),
             graph_min_effect=real("GRAPH_MIN_EFFECT", 0.001, 0, 1000000),
             graph_context_bytes=integer("GRAPH_CONTEXT_BYTES", 48000, 3000, 2000000),
             graph_max_artifact_bytes=integer("GRAPH_MAX_ARTIFACT_BYTES", 8000000000, 1000000, 100000000000),
             graph_min_free_disk_bytes=integer("GRAPH_MIN_FREE_DISK_BYTES", 2000000000, 0, 100000000000),
+            model_snapshot_max_bytes=integer("MODEL_SNAPSHOT_MAX_BYTES", 16777216, 0, 100000000000),
+            model_snapshot_total_bytes=integer("MODEL_SNAPSHOT_TOTAL_BYTES", 67108864, 0, 100000000000),
+            worker_log_max_bytes=integer("WORKER_LOG_MAX_BYTES", 1048576, 256, 8388608),
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")

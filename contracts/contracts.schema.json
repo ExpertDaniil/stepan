@@ -5705,6 +5705,11 @@
             "minimum_alternative_trials": {
               "type": "integer",
               "minimum": 1
+            },
+            "exploit_steps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
             }
           },
           "required": [
@@ -6821,6 +6826,24 @@
             "minLength": 1
           },
           "minItems": 0
+        },
+        "consecutive_no_gain": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_no_gain": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cumulative_gain_since_reset": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -7277,6 +7300,12 @@
             "minLength": 1
           },
           "minItems": 0
+        },
+        "branch_seeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GBranchSeed"
+          }
         }
       },
       "required": [
@@ -13367,6 +13396,10 @@
               "type": "null"
             }
           ]
+        },
+        "diagnostics": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       "required": [
@@ -13380,6 +13413,46 @@
         "seed",
         "is_incumbent",
         "error"
+      ],
+      "additionalProperties": false
+    },
+    "GBranchSeed": {
+      "type": "object",
+      "properties": {
+        "branch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_branch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fork_checkpoint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection_cut": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "head": {
+          "$ref": "#/$defs/GHead"
+        },
+        "selection_reason": {
+          "enum": [
+            "best_compatible_own_reference",
+            "pre_feature_own_reference",
+            "checkpoint_reference"
+          ]
+        }
+      },
+      "required": [
+        "branch_id",
+        "parent_branch_id",
+        "fork_checkpoint_id",
+        "selection_cut",
+        "head",
+        "selection_reason"
       ],
       "additionalProperties": false
     }

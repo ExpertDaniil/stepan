@@ -17,15 +17,17 @@ def inspect_run(source):
                 raise ValueError("Metadata file too large")
             return path.read_text(encoding="utf-8")
         archive = None
+        sizes = {name: (source/name).stat().st_size for name in names}
     else:
         archive = zipfile.ZipFile(source)
         names = archive.namelist()
+        sizes = {item.filename: item.file_size for item in archive.infolist() if not item.is_dir()}
         def read(name):
             if archive.getinfo(name).file_size > 8*1024*1024:
                 raise ValueError("Metadata file too large")
             return archive.read(name).decode("utf-8")
     try:
-        event_files = sorted(n for n in names if n.endswith("events.jsonl"))
+        event_files = sorted(n for n in names if Path(n).name == "events.jsonl")
         results = []
         for event_file in event_files:
             prefix = event_file[:-len("events.jsonl")]
@@ -64,6 +66,15 @@ def inspect_run(source):
             initial = min(initial,131072)
             valid_outputs = [r["output_tokens"] for r in rows if not r["truncated"] and isinstance(r["output_tokens"],int)]
             state = next((e.get("state") for e in reversed(events) if e.get("event")=="run.finished"),"failed_or_incomplete")
+            categories = {}
+            for name, size in sizes.items():
+                if not name.startswith(prefix):
+                    continue
+                relative = name[len(prefix):]
+                category = "model_snapshots" if relative.endswith(".joblib") else "worker_logs" if relative.endswith(".log") else "predictions_csv" if relative.endswith(".csv") else "other_metadata"
+                categories[category] = categories.get(category, 0)+size
+            storage = {"total_bytes": sum(categories.values()), "by_category": categories,
+                       "largest_files": [{"path": n[len(prefix):], "size_bytes": size} for n, size in sorted(sizes.items(), key=lambda p: p[1], reverse=True) if n.startswith(prefix)][:10]}
             results.append({"run":events[0].get("run_id",prefix.rstrip('/')) if events else prefix,
                             "state":state,"api_attempts":sum(e.get("event")=="llm.call_started" for e in events),
                             "responses":len(rows),"truncated_responses":censored,
@@ -73,7 +84,7 @@ def inspect_run(source):
                             "uncensored_output_median":statistics.median(valid_outputs) if valid_outputs else None,
                             "suggested_initial_output_tokens":initial,"suggested_output_ceiling":min(131072,initial*2),
                             "budget_note":"Client-side starting estimate, not a verified provider maximum or a RUB conversion. Truncated samples are censored; exact token need is unknown.",
-                            "calls":rows})
+                            "storage":storage, "calls":rows})
         return results
     finally:
         if archive is not None:
@@ -92,6 +103,7 @@ def main():
         for report in reports:
             print(f"{report['run']} state={report['state']} attempts={report['api_attempts']} responses={report['responses']}")
             print(f"Output reported={report['reported_output_tokens']}; input={report['reported_input_tokens']}; cached input={report['reported_cached_input_tokens']}; truncated={report['truncated_responses']}")
+            print('Storage: '+json.dumps(report['storage'], ensure_ascii=False))
             for row in report['calls']:
                 print('  '+json.dumps(row,ensure_ascii=False))
             print(f"Suggested initial/ceiling: {report['suggested_initial_output_tokens']}/{report['suggested_output_ceiling']}")

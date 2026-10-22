@@ -12,6 +12,12 @@ is your own incumbent; do not compare every experiment with the dummy baseline.
 Avoid repeating effective configurations already present in facts. Outside graph
 contexts, use recent_experiments. All experiments use the same recorded validation.
 Preserve parameters unrelated to a feature when measuring its individual effect.
+For ordinary tuning start from base_result.hyperparameters and change at most two
+parameters per proposal. If the assigned family differs, use that recipe's defaults
+as the starting point; similarly named parameters across families are not equivalent.
+Read bounded diagnostics to identify which groups or classes need improvement.
+When a trial regresses, return to your measured incumbent before the next adjustment.
+More iterations or a larger model do not by themselves justify an improvement.
 The catalogue's fixed single-value domains are mandatory branch constraints; describe
 the parameters you will actually use, including the required target transform.
 For regression, identity and shifted_log1p are distinct target-transform experiments;

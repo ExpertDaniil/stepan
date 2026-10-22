@@ -7,6 +7,58 @@ from agent.errors import AgentError
 from tools.data import read_table
 
 
+def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction):
+    """Bounded aggregates from the fixed holdout; never expose row-level labels."""
+    import numpy as np
+    import pandas as pd
+    regression = task["task_kind"] == "regression"
+    truth = np.asarray(y, dtype=float if regression else str)
+    predicted = np.asarray(prediction, dtype=float if regression else str)
+    error = np.abs(truth-predicted) if regression else (truth != predicted).astype(float)
+    result = {}
+    if not regression:
+        counts = pd.Series(truth).value_counts()
+        # No N-by-N confusion matrix and no unbounded per-class dump.
+        labels = counts.iloc[:32].index.tolist()
+        classes = []
+        for label in labels:
+            mask = truth == label
+            classes.append({"label": str(label)[:80], "rows": int(mask.sum()), "recall": float(np.mean(predicted[mask] == truth[mask]))})
+        result["class_summary"] = {"class_count": len(counts), "worst_classes": sorted(classes, key=lambda c: (c["recall"], -c["rows"]))[:6],
+                                   "omitted_classes": max(0, len(counts)-len(labels))}
+    groups, used = [], 0
+    excluded = set(task["excluded_features"]) | {task["target_column"]}
+    for column in data:
+        if column in excluded or used >= 4:
+            continue
+        fit, valid = data[column].iloc[fit_indices], data[column].iloc[valid_indices]
+        if pd.api.types.is_numeric_dtype(fit) and not pd.api.types.is_bool_dtype(fit):
+            finite = pd.to_numeric(fit, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            if finite.nunique() < 3:
+                continue
+            cuts = sorted(set(map(float, finite.quantile([1/3, 2/3]).tolist())))
+            bucket = np.searchsorted(cuts, pd.to_numeric(valid, errors="coerce").to_numpy(dtype=float), side="right")
+            masks = [("bin_"+str(i), bucket == i) for i in range(len(cuts)+1)]
+        else:
+            values = fit.fillna("__MISSING__").astype(str)
+            if not 2 <= values.nunique() <= 20:
+                continue
+            labels = values.value_counts().index[:4]
+            actual = valid.fillna("__MISSING__").astype(str).to_numpy()
+            masks = [(str(label)[:80], actual == label) for label in labels]
+        used += 1
+        for label, mask in masks:
+            count = int(mask.sum())
+            if count < max(5, int(len(truth)*.02)):
+                continue
+            record = {"feature": str(column)[:80], "group": label, "rows": count, "mean_error": float(error[mask].mean())}
+            if regression:
+                record.update(rmse=float(np.sqrt(np.mean((truth[mask]-predicted[mask])**2))), bias=float(np.mean(predicted[mask]-truth[mask])))
+            groups.append(record)
+    result["hard_groups"] = sorted(groups, key=lambda g: g["mean_error"], reverse=True)[:4]
+    return result
+
+
 class Evaluator:
     def __init__(self, spec, artifacts, store, log):
         self.spec, self.artifacts, self.store, self.log = spec, artifacts, store, log
@@ -89,7 +141,8 @@ class Evaluator:
         frame = pd.read_csv(path, dtype={"prediction": str} if self.spec["task_kind"] != "regression" else None, keep_default_na=False)
         if list(frame.columns) != ["__row_index", "prediction"] or frame["__row_index"].tolist() != protocol["valid_indices"]:
             raise AgentError("INVALID_PREDICTIONS", "Validation row order or columns do not match")
-        y = read_table(self.artifacts.resolve(self.spec["train_artifact_id"]))[self.spec["target_column"]].iloc[protocol["valid_indices"]]
+        data = read_table(self.artifacts.resolve(self.spec["train_artifact_id"]))
+        y = data[self.spec["target_column"]].iloc[protocol["valid_indices"]]
         prediction = frame["prediction"]
         key = self.spec["metric"]["metric_id"]
         if self.spec["task_kind"] == "regression":
@@ -122,6 +175,7 @@ class Evaluator:
             diagnostics.update(mae=float(mean_absolute_error(y, prediction)), target_mean=float(np.mean(y)),
                                target_std=float(np.std(y)), absolute_error_p50=float(np.quantile(errors, 0.5)),
                                absolute_error_p90=float(np.quantile(errors, 0.9)))
+        diagnostics.update(error_diagnostics(data, self.spec, protocol["train_indices"], protocol["valid_indices"], y, prediction))
         diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json", diagnostics, "diagnostics")
         record = {"evaluation_id": "eval-" + uuid.uuid4().hex[:12], "experiment_id": payload["experiment_id"], "valid": True,
                   "primary_metric": {"metric_id": key, "direction": self.spec["metric"]["direction"], "value": float(value),

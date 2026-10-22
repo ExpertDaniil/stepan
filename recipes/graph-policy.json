@@ -22,15 +22,16 @@
     "min_effect": 0.001
   },
   "plateau": {
-    "window_full_evaluations": 3,
-    "min_distinct_solutions": 3,
+    "window_full_evaluations": 4,
+    "min_distinct_solutions": 4,
     "min_elapsed_seconds": 300,
     "absolute_epsilon": 0.001,
     "relative_epsilon": 0.001
   },
   "scheduling": {
     "preferred_branch_share": 0.7,
-    "minimum_alternative_trials": 1
+    "minimum_alternative_trials": 1,
+    "exploit_steps": 3
   },
   "retention": {
     "max_artifact_bytes": 8000000000,

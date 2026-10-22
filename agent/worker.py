@@ -8,6 +8,44 @@ import sys
 import time
 import traceback
 import threading
+import io
+
+
+class SnapshotLimit(Exception):
+    pass
+
+
+class LimitedSnapshotFile(io.FileIO):
+    def __init__(self, path, maximum):
+        super().__init__(path, "wb")
+        self.maximum = maximum
+
+    def write(self, data):
+        if self.tell()+len(data) > self.maximum:
+            raise SnapshotLimit("Compressed model snapshot exceeds its byte allowance")
+        return super().write(data)
+
+
+def save_snapshot(model, path, maximum):
+    """Optional diagnostics: predictions and reconstruction do not depend on pickle."""
+    import joblib
+    path = Path(path)
+    temporary = path.with_suffix(".joblib.tmp")
+    report = {"status": "disabled", "size_bytes": 0, "limit_bytes": maximum}
+    if maximum <= 0:
+        return report
+    try:
+        with LimitedSnapshotFile(temporary, maximum) as stream:
+            joblib.dump(model, stream, compress=3)
+        os.replace(temporary, path)
+        report.update(status="saved", size_bytes=path.stat().st_size)
+    except SnapshotLimit:
+        report["status"] = "size_limit"
+    except Exception as exc:
+        report.update(status="unavailable", error_type=type(exc).__name__)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return report
 
 
 def self_peak_mb():
@@ -39,7 +77,6 @@ def watch_job(job, done):
 def execute(job):
     import numpy as np
     import pandas as pd
-    import joblib
     from threadpoolctl import threadpool_limits
     from agent.ml import enforce_threads, validate_estimator
     from tools.data import read_table
@@ -85,13 +122,10 @@ def execute(job):
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False, encoding="utf-8")
     model_path = Path(job["model_path"])
-    try:
-        joblib.dump(model, model_path)
-    except Exception as exc:
-        print(f"Model snapshot could not be saved: {exc}", file=sys.stderr, flush=True)
+    snapshot = save_snapshot(model, model_path, job.get("model_snapshot_max_bytes", 16777216))
     return {"success": True, "fit_seconds": fit_seconds, "total_seconds": time.monotonic() - started,
             "rows": len(frame), "prediction_path": str(output),
-            "model_path": str(model_path) if model_path.is_file() else None}
+            "model_path": str(model_path) if model_path.is_file() else None, "model_snapshot": snapshot}
 
 
 def main():

@@ -28,5 +28,10 @@
     "contract_id": "C21",
     "file": "examples/C21/skipped-response.json",
     "schema": "C21_Response"
+  },
+  {
+    "contract_id": "G02",
+    "file": "examples/G02/seed-record.json",
+    "schema": "GBranchSeed"
   }
 ]

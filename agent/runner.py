@@ -113,12 +113,20 @@ class Runner:
     def __init__(self, artifacts, config, budget, log):
         self.artifacts, self.config, self.budget, self.log = artifacts, config, budget, log
         self.jobs = {}
+        self.model_snapshot_reservations = {}
+
+    def snapshot_allowance(self):
+        stored = sum(path.stat().st_size for path in self.artifacts.root.rglob("*.joblib") if path.is_file())
+        reserved = sum(self.model_snapshot_reservations.values())
+        return min(self.config.model_snapshot_max_bytes, max(0, self.config.model_snapshot_total_bytes-stored-reserved))
 
     def _drain(self, stream, path):
         # Redact before bytes reach disk. Retain a bounded log plus marker.
-        maximum = 8 * 1024 * 1024
+        maximum = self.config.worker_log_max_bytes
+        marker = b"\n[OUTPUT LIMIT REACHED; remaining output drained]\n"
         count = 0
-        with path.open("w", encoding="utf-8") as out:
+        truncated = False
+        with path.open("wb") as out:
             while True:
                 chunk = stream.readline(4096)
                 if not chunk:
@@ -131,14 +139,16 @@ class Runner:
                         self.log.event("worker."+stage, job_id=path.parent.name, experiment_id=path.parent.parent.name, **fields)
                     except (ValueError, KeyError, TypeError):
                         pass
-                if count < maximum:
-                    remaining = maximum - count
-                    text = chunk[:remaining]
+                if not truncated:
+                    encoded = chunk.encode("utf-8")
+                    remaining = maximum-len(marker)-count
+                    text = encoded[:remaining].decode("utf-8", errors="ignore").encode("utf-8")
                     out.write(text)
                     out.flush()
                     count += len(text)
-                    if count >= maximum:
-                        out.write("\n[OUTPUT LIMIT REACHED; remaining output drained]\n")
+                    if len(encoded) > len(text):
+                        out.write(marker);out.flush();truncated = True
+                        self.log.event("job.log_truncated", job_id=path.parent.name, stream=path.name, max_bytes=maximum)
             stream.close()
 
     def _start(self, payload, task_spec, experiment, phase):
@@ -159,6 +169,7 @@ class Runner:
                     "seed": experiment["plan"]["seed"], "cpu_threads": lease["cpu_threads"],
                     "memory_limit_mb": lease["memory_limit_mb"], "timeout_seconds": lease["timeout_seconds"],
                     "prediction_path": str(prediction_path), "model_path": str(directory / "pipeline.joblib"),
+                    "model_snapshot_max_bytes": self.snapshot_allowance(),
                     "result_path": str(directory / "result.json")}
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
@@ -180,6 +191,7 @@ class Runner:
                   dict(lease), proc, directory, time.monotonic(), last_heartbeat=time.monotonic())
         job.prediction_path = prediction_path
         self.jobs[ident] = job  # Track before starting drain threads, for cleanup on partial start.
+        self.model_snapshot_reservations[ident] = job_spec["model_snapshot_max_bytes"]
         for name, stream in [("stdout.log", proc.stdout), ("stderr.log", proc.stderr)]:
             thread = threading.Thread(target=self._drain, args=(stream, directory / name), daemon=True)
             thread.start()
@@ -276,6 +288,11 @@ class Runner:
             result = json.loads(result_file.read_text(encoding="utf-8")) if result_file.is_file() else {}
         except (OSError, json.JSONDecodeError):
             result = {}
+        (job.directory / "pipeline.joblib.tmp").unlink(missing_ok=True)
+        self.model_snapshot_reservations.pop(job.job_id, None)
+        if "model_snapshot" in result:
+            self.log.event("job.model_snapshot", job_id=job.job_id, experiment_id=job.experiment_id,
+                           phase=job.phase, **result["model_snapshot"])
         success = job.process.returncode == 0 and result.get("success") is True
         state = job.forced_state or ("succeeded" if success else "timed_out" if result.get("error_type") == "JOB_TIMEOUT" else "failed")
         job.peak_memory_mb = max(job.peak_memory_mb, float(result.get("peak_memory_mb", 0)))

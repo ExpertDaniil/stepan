@@ -231,5 +231,32 @@
     "facts": "Own branch and checkpoint-bounded ancestor observations plus explicit donors; rejection facts have no score",
     "producer": "agent/graph/context.py -> agent/context.py",
     "consumer": "agent/researcher.py -> C10; immutable capsule references persisted by G03"
+  },
+  "additions_v043": {
+    "GBranchSeed": {
+      "producer": "G02 / GraphService.fork_decision",
+      "consumers": [
+        "WorkService.visible_history",
+        "G07 / SearchPolicy.assess_plateau",
+        "G11 / GraphExport.export"
+      ],
+      "required_fields": [
+        "branch_id",
+        "parent_branch_id",
+        "fork_checkpoint_id",
+        "selection_cut",
+        "head",
+        "selection_reason"
+      ],
+      "authority": "typed G02 event in state.sqlite; GGraphExport.branch_seeds optional projection"
+    },
+    "GPlateau": [
+      "optional consecutive_no_gain",
+      "optional required_no_gain",
+      "optional cumulative_gain_since_reset"
+    ],
+    "GExperimentMemory.diagnostics": "optional bounded evaluator aggregates; emitted by memory_record and consumed in C10 context",
+    "GPolicy.scheduling.exploit_steps": "optional integer 1..8, default3; equal per-peer completed-work schedule",
+    "compatibility": "All 100 non-G schema definitions and C00-C24 envelopes unchanged"
   }
 }

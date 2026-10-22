@@ -129,7 +129,12 @@ class Catalog:
             for transform in variants:
                 params = {"target_transform": transform} if "target_transform" in self.recipes[key]["parameters"] else {}
                 choices.append((key, self.normalize(key, params)))
-        return choices
+        # Both peers first measure a feature-free family. A feature discovered in
+        # the next pass then has useful pre-idea bases, rather than two Dummies.
+        primary = list(dict.fromkeys(recipe for recipe, _ in choices))[:2]
+        return ([(r, p) for r in primary for key, p in choices if key == r and p.get("target_transform", "identity") == "identity"]
+                + [(r, p) for r in primary for key, p in choices if key == r and p.get("target_transform", "identity") != "identity"]
+                + [(r, p) for r, p in choices if r not in primary])
 
 
 def factory_source(recipe_id):

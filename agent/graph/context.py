@@ -25,9 +25,12 @@ class WorkService:
         """Only observations made on this line before each ancestor's fork cut."""
         history = []
         for branch_id, cut in self.lineage_cuts(branch_id):
-            for row in self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND event_seq<=? AND json_extract(record_json,'$.record_schema') IN ('GHeadResult','Error') ORDER BY event_seq DESC", (self.run_id, cut)):
+            for row in self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND event_seq<=? AND json_extract(record_json,'$.record_schema') IN ('GHeadResult','GBranchSeed','Error') ORDER BY event_seq DESC", (self.run_id, cut)):
                 event = json.loads(row["record_json"]);record = event["record"]
-                if event["record_schema"] == "GHeadResult":
+                if event["record_schema"] == "GBranchSeed":
+                    if record["branch_id"] == branch_id and (not researcher_id or record["head"]["researcher_id"] == researcher_id) and record["head"]["experiment_id"]:
+                        history.append((row["event_seq"], record["head"]["experiment_id"]))
+                elif event["record_schema"] == "GHeadResult":
                     if record["branch_id"] != branch_id or (researcher_id and record["researcher_id"] != researcher_id):
                         continue
                     history.append((row["event_seq"], record["experiment_id"]))
@@ -52,11 +55,26 @@ class WorkService:
         ev = self.store.experiment_evaluation(experiment_id)
         trusted = ev and exp["state"] == "evaluated" and ev["valid"] and not ev["violations"]
         error = self.log.redactor.clean(str(exp["error"])) if exp["error"] else None
+        diagnostics = {}
+        if trusted:
+            raw = self.artifacts.read_json(ev["diagnostics_artifact_id"])
+            diagnostics = {k: raw[k] for k in ("mae", "absolute_error_p50", "absolute_error_p90", "class_summary", "hard_groups") if k in raw}
         return {"experiment_id": experiment_id, "state": exp["state"], "recipe_id": plan["recipe_id"],
                 "hypothesis": plan["hypothesis"][:600], "metric": ev["primary_metric"] if trusted else None,
                 "hyperparameters": plan["model"]["hyperparameters"], "feature_steps": plan["feature_steps"],
                 "seed": plan["seed"], "is_incumbent": bool(head and experiment_id == head["experiment_id"]),
-                "error": error[:self.policy["context"]["max_error_excerpt_bytes"]//4] if error else None}
+                "error": error[:self.policy["context"]["max_error_excerpt_bytes"]//4] if error else None,
+                "diagnostics": diagnostics}
+
+    def research_assignment(self, branch_id, researcher_id):
+        # Count this peer's completed proposals, not loop iterations spent forking
+        # or backtracking. Both equal peers get the same exploit/explore ratio.
+        trials = 0
+        for line_id, cut in self.lineage_cuts(branch_id):
+            trials += self.db.execute("SELECT count(*) FROM g_work_orders w WHERE w.run_id=? AND w.branch_id=? AND w.researcher_id=? AND w.state='completed' AND json_extract(w.order_json,'$.action') IN ('improve','counterfactual') AND EXISTS(SELECT 1 FROM g_proposals p WHERE p.run_id=w.run_id AND p.work_order_id=w.work_order_id AND p.proposal_id NOT LIKE 'trusted-%') AND EXISTS(SELECT 1 FROM g_events e WHERE e.run_id=w.run_id AND e.event_seq<=? AND json_extract(e.record_json,'$.operation')='G04' AND json_extract(e.record_json,'$.entity_id')=w.work_order_id)", (self.run_id, line_id, researcher_id, cut)).fetchone()[0]
+        exploit = self.policy["scheduling"].get("exploit_steps", 3)
+        phase = (trials + self.metadata("researcher_ids").index(researcher_id)*2) % (exploit+1)
+        return "explore_alternative" if phase == exploit else "exploit_incumbent"
 
     def recent_for_context(self, branch_id, head, donors):
         history = self.visible_history(branch_id, head["researcher_id"])
@@ -118,7 +136,7 @@ class WorkService:
             protected_ids = {head["experiment_id"], *binding["allowed_donor_experiment_ids"]}
             facts = ([f for f in facts if f["source_id"] in protected_ids] + rejected + [f for f in facts if f["source_id"] not in protected_ids])[:max(1, self.policy["context"]["max_related_records"])]
             total_recent += len(rejected)
-            assignment = "exploit_incumbent" if (self.context.round_no + self.metadata("researcher_ids").index(p["researcher_id"])) % 2 == 0 else "explore_alternative"
+            assignment = self.research_assignment(branch["branch_id"], p["researcher_id"])
             if p["action"] == "transfer":
                 assignment = "exploit_incumbent"
             observed_recipes = [self.store.get(eid)["plan"]["recipe_id"] for eid in self.visible_history(branch["branch_id"])]

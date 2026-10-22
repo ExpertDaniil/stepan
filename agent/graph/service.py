@@ -15,7 +15,7 @@ from agent.graph.export import GraphExport
 from agent.graph.identity import dependency_closure, digest, solution
 from agent.graph.recovery import GraphRecovery
 from agent.observability.logging import CURRENT_CALL
-from agent.search_policy import SearchPolicy
+from agent.search_policy import SearchPolicy, utility
 from agent.store import comparable, is_better
 
 
@@ -67,7 +67,9 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         p["context"].update(max_input_tokens=min(self.config.max_context_tokens, 12000), max_output_tokens=self.config.llm_max_output_tokens,
                             max_api_request_bytes=self.config.graph_context_bytes)
         p["plateau"].update(window_full_evaluations=self.config.graph_plateau_window, min_distinct_solutions=self.config.graph_plateau_window,
-                            min_elapsed_seconds=self.config.graph_plateau_seconds)
+                            min_elapsed_seconds=self.config.graph_plateau_seconds, absolute_epsilon=self.config.graph_plateau_absolute_epsilon,
+                            relative_epsilon=self.config.graph_plateau_relative_epsilon)
+        p["scheduling"]["exploit_steps"] = self.config.graph_exploit_steps
         p["promotion"]["min_effect"] = self.config.graph_min_effect
         p["retention"].update(max_artifact_bytes=self.config.graph_max_artifact_bytes, min_free_disk_bytes=self.config.graph_min_free_disk_bytes)
         return p
@@ -179,7 +181,10 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
     def head_satisfies(self, head, constraints):
         if not head["solution_id"]:
             return False
-        caps, _ = dependency_closure(self.manifest(head["solution_id"])["core"]["components"])
+        manifest = self.manifest(head["solution_id"])
+        if (constraints["required_capability_ids"] or constraints["forbidden_capability_ids"]) and manifest["verification_level"] != "catalog_verified":
+            return False
+        caps, _ = dependency_closure(manifest["core"]["components"])
         return set(constraints["required_capability_ids"]) <= set(caps) and not set(constraints["forbidden_capability_ids"]) & set(caps)
 
     def manifest(self, solution_id):
@@ -306,6 +311,35 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if set(idea["capability_ids"]) & (required | forbidden):
             raise AgentError("CONSTRAINT_CONFLICT", "Fork must introduce a new unconstrained capability")
         children = {kind: ident("branch-"+kind) for kind in ("accept", "reject")}
+        # The causal checkpoint remains immutable. Explicit seeds carry this peer's
+        # later measured knowledge into a child, rather than throwing warmups away.
+        selection_cut = self.cut()
+        seeds = {}
+        for kind in children:
+            constraints = {"required_capability_ids": sorted(required | (set(idea["capability_ids"]) if kind == "accept" else set())),
+                           "forbidden_capability_ids": sorted(forbidden | (set(idea["capability_ids"]) if kind == "reject" else set()))}
+            seeds[kind] = []
+            for head in cp["heads"]:
+                ids = list(dict.fromkeys(([head["experiment_id"]] if head["experiment_id"] else []) + self.visible_history(parent["branch_id"], head["researcher_id"])))
+                choices = []
+                expected = {"dataset_id": self.spec["dataset_id"], "validation_id": self.validation["validation_id"],
+                            "metric_id": self.spec["metric"]["metric_id"], "direction": self.spec["metric"]["direction"], "fidelity": "full"}
+                for eid in ids:
+                    evaluation = self.store.experiment_evaluation(eid)
+                    if (self.store.get(eid)["state"] == "evaluated" and evaluation and evaluation["valid"]
+                            and not evaluation["violations"] and comparable(evaluation["primary_metric"], expected)):
+                        choices.append({**head, "experiment_id": eid, "solution_id": self.experiment_solution(eid)})
+                eligible = [h for h in choices if self.head_satisfies(h, constraints)]
+                reason = "best_compatible_own_reference"
+                if not eligible and kind == "accept":
+                    # A new feature may not have been tested on this peer yet.
+                    eligible = [h for h in choices if self.head_satisfies(h, parent["constraints"])
+                                and not set(dependency_closure(self.manifest(h["solution_id"])["core"]["components"])[0]) & set(idea["capability_ids"])]
+                    reason = "pre_feature_own_reference"
+                chosen = max(eligible, key=lambda h: utility(self.store.experiment_evaluation(h["experiment_id"]))) if eligible else head
+                chosen = {**chosen, "head_revision": head["head_revision"] + int(chosen["experiment_id"] != head["experiment_id"])}
+                seeds[kind].append({"branch_id": children[kind], "parent_branch_id": parent["branch_id"], "fork_checkpoint_id": cp["checkpoint_id"],
+                                    "selection_cut": selection_cut, "head": chosen, "selection_reason": reason if eligible else "checkpoint_reference"})
         def mutate():
             current = self.branch(parent["branch_id"], parent["branch_revision"])
             if current["state"] != "active":
@@ -321,9 +355,12 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                 self.db.execute("INSERT INTO g_constraints SELECT run_id,?,capability_id,mode,origin_branch_id FROM g_constraints WHERE run_id=? AND branch_id=?", (child, self.run_id, parent["branch_id"]))
                 for cap in idea["capability_ids"]:
                     self.db.execute("INSERT INTO g_constraints VALUES(?,?,?,?,?)", (self.run_id, child, cap, "required" if kind == "accept" else "forbidden", child))
-                for h in cp["heads"]:
+                for seed in seeds[kind]:
+                    h = seed["head"]
                     self.db.execute("INSERT INTO g_heads VALUES(?,?,?,?,?,?)", (self.run_id, child, h["researcher_id"], h["solution_id"], h["experiment_id"], h["head_revision"]))
                 self.event("G02", "branch", child, "GBranch", self.branch(child))
+                for seed in seeds[kind]:
+                    self.event("G02", "branch", child, "GBranchSeed", seed)
             self.event("G02", "branch", parent["branch_id"], "GBranch", self.branch(parent["branch_id"]))
             return {"parent_branch": self.branch(parent["branch_id"]), "accept_branch": self.branch(children["accept"]), "reject_branch": self.branch(children["reject"]),
                     "revoked_work_order_ids": revoked, "origin_running_job_ids": jobs, "graph_revision": 0}
@@ -331,6 +368,9 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         self.log.event("graph.branch_forked", parent_branch_id=parent["branch_id"], idea_id=idea["idea_id"],
                        checkpoint_id=cp["checkpoint_id"], accept_branch_id=result["accept_branch"]["branch_id"],
                        reject_branch_id=result["reject_branch"]["branch_id"], capability_ids=idea["capability_ids"])
+        for kind, branch_key in (("accept", "accept_branch"), ("reject", "reject_branch")):
+            self.log.event("graph.branch_seeded", branch_id=result[branch_key]["branch_id"],
+                           heads=self.heads(result[branch_key]["branch_id"]), selection_cut=selection_cut)
         return result
 
     def control_branch(self, p, key):

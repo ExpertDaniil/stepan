@@ -159,33 +159,44 @@ class SearchPolicy:
         records = []
         for row in self.db.execute("SELECT * FROM g_branch_evaluations WHERE run_id=? AND branch_id=? ORDER BY event_seq", (self.run_id, branch["branch_id"])):
             ev = self.store.evaluation(row["evaluation_id"])
-            if ev["valid"] and not ev["violations"] and ev["primary_metric"]["fidelity"] == "full":
+            event = self.db.execute("SELECT record_json FROM g_events WHERE run_id=? AND event_seq=?", (self.run_id, row["event_seq"])).fetchone()
+            archived = event and json.loads(event[0])["record"].get("disposition", "").startswith("archived")
+            if not archived and ev["valid"] and not ev["violations"] and ev["primary_metric"]["fidelity"] == "full":
                 records.append((dict(row), ev))
         params = self.policy["plateau"]
-        seen, window = set(), []
-        for row, ev in reversed(records):
-            if row["solution_id"] not in seen:
-                seen.add(row["solution_id"]);window.append((row, ev))
-                if len(window) >= params["window_full_evaluations"]:
-                    break
-        window.reverse()
-        seed = []
-        if branch["fork_checkpoint_id"]:
-            seed = [self.store.experiment_evaluation(h["experiment_id"]) for h in self.checkpoint_record(branch["fork_checkpoint_id"])["heads"] if self.head_satisfies(h, branch["constraints"])]
-        first_seq = window[0][0]["event_seq"] if window else 0
-        before = seed + [ev for row, ev in records if row["event_seq"] < first_seq]
-        before = [e for e in before if e and e["valid"] and e["primary_metric"]["fidelity"] == "full"]
-        before_best = max(before, key=utility) if before else None
-        all_evals = before+[ev for _, ev in window]
-        after_best = max(all_evals, key=utility) if all_evals else None
-        epsilon = max(params["absolute_epsilon"], params["relative_epsilon"]*max(abs(utility(before_best)) if before_best else 0, 1e-12))
-        last_gain = 0
-        best = max((utility(e) for e in seed if e), default=None)
+        seed_heads = [json.loads(r[0])["record"]["head"] for r in self.db.execute(
+            "SELECT record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.record_schema')='GBranchSeed' AND json_extract(record_json,'$.record.branch_id')=? ORDER BY event_seq",
+            (self.run_id, branch["branch_id"]))]
+        if not seed_heads and branch["fork_checkpoint_id"]:
+            seed_heads = self.checkpoint_record(branch["fork_checkpoint_id"])["heads"]
+        seed = [self.store.experiment_evaluation(h["experiment_id"]) for h in seed_heads if self.head_satisfies(h, branch["constraints"])]
+        seen = {h["solution_id"] for h in seed_heads if self.head_satisfies(h, branch["constraints"])}
+        distinct = []
         for row, ev in records:
-            if best is None or utility(ev) > best+max(params["absolute_epsilon"], params["relative_epsilon"]*max(abs(best), 1e-12)):
-                last_gain = row["elapsed_ms"];best = utility(ev)
+            if row["solution_id"] not in seen:
+                seen.add(row["solution_id"]);distinct.append((row, ev))
+        window = distinct[-params["window_full_evaluations"]:]
+        before = seed + [ev for _, ev in distinct[:-len(window)]] if window else seed
+        before_best = max(before, key=utility) if before else None
+        all_evals = seed+[ev for _, ev in distinct]
+        after_best = max(all_evals, key=utility) if all_evals else None
+        def tolerance(value):
+            return max(params["absolute_epsilon"], params["relative_epsilon"]*max(abs(value), 1e-12))
+        anchor = max((utility(e) for e in seed), default=None)
+        best, last_gain, streak = anchor, 0, 0
+        for row, ev in distinct:
+            value = utility(ev)
+            if best is None:
+                best = anchor = value;last_gain = row["elapsed_ms"]
+                continue
+            best = max(best, value)
+            # Accumulate small improvements against a fixed anchor. Updating the
+            # anchor after every tiny gain would hide meaningful gradual progress.
+            if best-anchor > tolerance(anchor):
+                anchor = best;last_gain = row["elapsed_ms"];streak = 0
             else:
-                best = max(best, utility(ev))
+                streak += 1
+        epsilon = tolerance(utility(before_best) if before_best else anchor if anchor is not None else 0)
         active = self.db.execute("SELECT record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.entity_id')=? AND json_extract(record_json,'$.record_schema')='GBranch' AND json_extract(record_json,'$.record.state')='active' ORDER BY event_seq DESC LIMIT 1", (self.run_id, branch["branch_id"])).fetchone()
         activated_ms = json.loads(active[0])["elapsed_ms"] if active else 0
         elapsed = max(0, (self.elapsed()-max(last_gain, activated_ms))//1000)
@@ -193,14 +204,16 @@ class SearchPolicy:
         reasons = []
         if not self.budget.snapshot()["search_allowed"]:
             status, action = "budget_stop", "stop_search"
-        elif len(window) < params["window_full_evaluations"] or len(seen) < params["min_distinct_solutions"] or before_best is None:
+        elif len(window) < params["window_full_evaluations"] or len(distinct) < params["min_distinct_solutions"] or before_best is None:
             status, action = "insufficient_evidence", "continue";reasons.append("need_distinct_full_solutions_and_a_before_reference")
-        elif elapsed >= params["min_elapsed_seconds"] and gain <= epsilon:
+        elif streak >= params["window_full_evaluations"] and elapsed >= params["min_elapsed_seconds"] and gain <= epsilon:
             status, action = "plateau", "pause_and_resume_sibling"
         else:
             status, action = "searching", "continue"
         result = {"assessment_id": "plateau-"+uuid.uuid4().hex[:16], "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
-                  "status": status, "evaluation_ids": [e["evaluation_id"] for _, e in window], "distinct_solution_count": len(seen), "elapsed_seconds": elapsed,
+                  "status": status, "evaluation_ids": [e["evaluation_id"] for _, e in window], "distinct_solution_count": len(window), "elapsed_seconds": elapsed,
+                  "consecutive_no_gain": streak, "required_no_gain": params["window_full_evaluations"],
+                  "cumulative_gain_since_reset": best-anchor if best is not None else None,
                   "best_before_evaluation_id": before_best["evaluation_id"] if before_best else None, "best_after_evaluation_id": after_best["evaluation_id"] if after_best else None,
                   "utility_gain": gain, "epsilon": epsilon, "recommended_action": action, "reasons": reasons}
         artifact = self.files.put_json(result, "plateau_report")
@@ -212,7 +225,8 @@ class SearchPolicy:
         result = self.commit("G07", p, key, mutate)
         self.log.event("graph.plateau_assessed", branch_id=branch["branch_id"], status=result["assessment"]["status"],
                        distinct_solution_count=result["assessment"]["distinct_solution_count"],
-                       elapsed_seconds=result["assessment"]["elapsed_seconds"], utility_gain=result["assessment"]["utility_gain"], epsilon=epsilon)
+                       elapsed_seconds=result["assessment"]["elapsed_seconds"], utility_gain=result["assessment"]["utility_gain"], epsilon=epsilon,
+                       consecutive_no_gain=streak, required_no_gain=params["window_full_evaluations"])
         return result
 
     def _compatible_pilot(self, offer):
@@ -292,7 +306,7 @@ class SearchPolicy:
                 current_trials = self.branch_trial_count(branch["branch_id"])
                 alternatives = self.pending_alternatives(branch)
                 reserve = sum(deficit for _, deficit in alternatives)
-                if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold) or remaining <= reserve):
+                if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold and current_trials >= self.policy["plateau"]["window_full_evaluations"]) or remaining <= reserve):
                     alt = alternatives[0][0]
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve a counterfactual trial before the experiment cap")
             if decision["action"] == "CONTINUE":

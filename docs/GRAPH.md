@@ -1,4 +1,4 @@
-# Research Graph v1 · реализация v0.4.2
+# Research Graph v1 · реализация v0.4.3
 
 Основа: текущая v0.3.1, commit 3b6d7d84879fffbe76d111d05a9d58816b009e77. Фикс завершения worker
 и три его теста сохранены. Интерфейс платформы — прежний solution.py; C00–C24 не меняются.
@@ -15,7 +15,7 @@ G00–G14/I00–I03 — работающие локальные операции
 2. Ранний Dummy выдаётся одному peer как доверенный baseline work order. Он проходит C11–C21 и публикует CSV.
    Остальные peers получают тот же результат через свои duplicate bindings без повторного fit.
 3. Каталожные warmups и последующие исследования привязаны к собственным heads. Роли exploit/explore
-   чередуются, постоянного лидера-инженера нет. Dispatcher связывает каждый Future с ticket задания.
+   выдаются каждому peer в отношении 3:1, постоянного лидера-инженера нет. Dispatcher связывает каждый Future с ticket задания.
 4. G03 собирает свежий контекст: задача/метрика/output, work order, собственный code/config, ограничения,
    до восьми относящихся к линии фактов и явно назначенные donors. Другие ветви не подмешиваются как global recent.
 5. C09/C10 по умолчанию возвращают ResearchChoice-v1. C11 создаёт точный owned factory. I00–I03 проверяют
@@ -26,8 +26,9 @@ G00–G14/I00–I03 — работающие локальные операции
    изменён только заявленный feature. G06 сохраняет фактический delta и provisional идею.
 8. G14 назначает один pilot другому peer от его собственной базы. После положительного source и recipient
    эффектов идея становится confirmed новой неизменяемой записью. min_paired_seeds=1 — инженерный gate, не доказательство значимости.
-9. G02 берёт checkpoint до идеи, запечатывает родителя и атомарно создаёт accept/reject. Каждому peer
-   восстанавливается именно его прежняя голова. Accept требует feature в новых планах; reject наследует запрет.
+9. G02 сохраняет checkpoint до идеи, запечатывает родителя и атомарно создаёт accept/reject.
+   GBranchSeed явно задаёт каждому peer собственную измеренную базу, совместимую с новой линией.
+   Accept требует feature в новых планах; reject наследует запрет.
 10. G07 проверяет плато по distinct full solutions и времени с существенного улучшения. G14/G08 возвращают
     поиск к paused альтернативе. Также резервируется хотя бы одна проверка альтернативы перед исчерпанием trial cap.
     При достижении live-limit законченную линию можно архивировать, сохранив весь её результат.
@@ -138,7 +139,7 @@ GEnvironmentManifest дополнен optional owned_runtime_artifact_id/owned_r
 | GRAPH_ENABLED | 1 |
 | GRAPH_PEERS / GRAPH_TRAIN_WORKERS | 2 / 1; каждый ≤ MAX_WORKERS |
 | GRAPH_MAX_LIVE_BRANCHES / GRAPH_MAX_TOTAL_BRANCHES | 3 / 15 |
-| GRAPH_PLATEAU_WINDOW / GRAPH_PLATEAU_SECONDS | 3 / 300 |
+| GRAPH_PLATEAU_WINDOW / GRAPH_PLATEAU_SECONDS | 4 / 300 |
 | GRAPH_MIN_EFFECT | 0.001 |
 | GRAPH_CONTEXT_BYTES | 48000 для полного API request |
 | GRAPH_MAX_ARTIFACT_BYTES / GRAPH_MIN_FREE_DISK_BYTES | 8000000000 / 2000000000 для новых graph blobs |
@@ -172,3 +173,27 @@ intent recovery, SQL integrity, все ветви финального ranking �
 State-machine тесты явно инъецируют синтетические scores для проверки переходов. Сквозные тесты обучают модели
 и вычисляют настоящие метрики на синтетических CSV, имитируя только LLM-ответы. Внешний live API, CatBoost
 и официальный контейнер проверяются отдельно. Результат общего прогона и точные версии — VALIDATION-GRAPH.md.
+
+
+## Старт ветвей и плато v0.4.3
+
+Причинный fork_checkpoint_id остаётся неизменным. При G02 создаются GBranchSeed для каждого peer
+и ребёнка: branch_id, parent_branch_id, fork_checkpoint_id, selection_cut, head и selection_reason.
+Из собственных валидных full результатов родительской линии выбирается лучший, совместимый
+с constraints ребёнка. Если для accept такого ещё нет, берётся собственная база без новой фичи
+и используется прежний механизм controlled transfer. Чужой глобальный лидер не становится базой.
+G03/visible_history включают эти явные ссылки; обычный ancestor cut остаётся прежним. G11 добавляет
+optional branch_seeds, а typed events полностью описывают происхождение каждого старта.
+
+Плато: четыре новые distinct solution подряд, суммарный gain относительно фиксированного anchor
+не превышает epsilon, и прошло GRAPH_PLATEAU_SECONDS после существенного gain/активации.
+Сумма маленьких улучшений выше epsilon сбрасывает счётчик. Seed, exact cache и другой seed
+той же solution не считаются новыми шагами. Ошибка обучения расходует бюджет, но не является оценкой плато.
+Новые optional GPlateau поля: consecutive_no_gain, required_no_gain, cumulative_gain_since_reset.
+Epsilon задают GRAPH_PLATEAU_ABSOLUTE_EPSILON / GRAPH_PLATEAU_RELATIVE_EPSILON; он не запрещает
+обновление head/итогового CSV при меньшем улучшении. Бюджетный переход остаётся отдельной причиной;
+обычное переключение по доле бюджета ждёт четыре испытания текущей линии, аварийный резерв
+альтернативы действует перед жёстким лимитом.
+
+GRAPH_EXPLOIT_STEPS=3 задаёт три own-base доработки на одну exploration на каждого peer;
+счётчик зависит от его завершённых поручений, а не количества проходов цикла.

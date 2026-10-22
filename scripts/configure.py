@@ -18,7 +18,9 @@ def recommended_settings(profile="standard"):
     config = Config()
     keys = ("research_mode", "catalog_warmup_experiments", "max_research_experiments", "llm_max_calls",
             "llm_timeout_seconds", "llm_operation_timeout_seconds", "llm_bootstrap_output_tokens",
-            "llm_max_output_tokens", "llm_max_output_tokens_limit", "llm_max_total_output_tokens", "llm_progress_seconds")
+            "llm_max_output_tokens", "llm_max_output_tokens_limit", "llm_max_total_output_tokens", "llm_progress_seconds",
+            "graph_plateau_window", "graph_plateau_seconds", "graph_plateau_absolute_epsilon", "graph_plateau_relative_epsilon", "graph_exploit_steps",
+            "model_snapshot_max_bytes", "model_snapshot_total_bytes", "worker_log_max_bytes")
     settings = {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":"human", "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
     if profile == "extended":
         settings.update(MAX_RESEARCH_EXPERIMENTS="100", LLM_MAX_CALLS="96")

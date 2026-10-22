@@ -1,0 +1,59 @@
+{
+  "version": "0.4.3",
+  "base_commit": "ccde4624f9e16a29b1a0cb567618b3b8ebc6f21e",
+  "date": "2026-10-22",
+  "command": "python3 scripts/check.py",
+  "exit_code": 0,
+  "tests": 155,
+  "unittest_seconds": 358.601,
+  "elapsed_seconds": 360.587,
+  "new_tests": 17,
+  "focused_graph_tests": 70,
+  "focused_graph_seconds": 48.515,
+  "environment": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scipy": "1.17.0",
+    "sklearn": "1.8.0",
+    "joblib": "1.5.3",
+    "catboost_available": false,
+    "openai_available": false
+  },
+  "platform_package": {
+    "files": 41,
+    "size_bytes": 167814,
+    "sha256": "7c3068e7919d425286aeb723a3e340bf2abdcd137d2e113688a9e48a26cb8890"
+  },
+  "unchanged_non_g_schema_definitions": 100,
+  "runtime_file_count": 51,
+  "reviewed_run": {
+    "run_id": "run-20261022T091615Z-3c154043",
+    "runtime_files_matching_base": 51,
+    "experiments": 13,
+    "research_attempts": 12,
+    "api_attempts": 11,
+    "stop_reason": "experiment_limit",
+    "plateau_events": 0,
+    "best_rmse": 44.922615037678995,
+    "total_bytes": 30551344,
+    "model_bytes": 16705685,
+    "worker_log_bytes": 4648
+  },
+  "limits": [
+    "No original user train/test in attached archive; no new task RMSE measured",
+    "No classification archive of 3GB supplied; exact category not verified",
+    "LLM mocked in synthetic tests",
+    "CatBoost and OpenAI SDK unavailable locally",
+    "Official organizer image and continuous 3-hour run not verified"
+  ],
+  "weightless_reconstruction": {
+    "command": "MODEL_SNAPSHOT_MAX_BYTES=0 python3 -m unittest tests.test_graph_end_to_end.GraphEndToEndTests.test_real_training_confirms_transfer_forks_and_backtracks -v",
+    "tests": 1,
+    "unittest_seconds": 95.844,
+    "exit_code": 0,
+    "prediction_rtol": 1e-09,
+    "prediction_atol": 1e-09
+  }
+}

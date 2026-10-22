@@ -1,0 +1,13 @@
+{
+  "branch_id": "branch-accept-example",
+  "parent_branch_id": "branch-root-example",
+  "fork_checkpoint_id": "checkpoint-example",
+  "selection_cut": 40,
+  "head": {
+    "researcher_id": "researcher-1",
+    "solution_id": "sol-example",
+    "experiment_id": "exp-example",
+    "head_revision": 2
+  },
+  "selection_reason": "best_compatible_own_reference"
+}

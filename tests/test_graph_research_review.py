@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 from agent.errors import AgentError
 from agent.graph.controller import research_batch, transfer_ticket, lineage_for
@@ -48,6 +49,9 @@ class GraphResearchReviewTests(unittest.TestCase):
         try:
             h.result('researcher-1', {'alpha': 1}, 10)
             h.result('researcher-2', {'alpha': 2}, 12)
+            h.result('researcher-1', {'alpha': 3}, 11)
+            h.result('researcher-1', {'alpha': 4}, 12)
+            h.result('researcher-2', {'alpha': 5}, 13)
             h.controller.context.round_no = 1
             ticket = h.issue('researcher-1')
             user = self.context_user(h, ticket)
@@ -216,7 +220,11 @@ class GraphResearchReviewTests(unittest.TestCase):
     def test_acceptance_applies_confirmed_feature_without_llm_or_retraining_cached_results(self):
         h = GraphHarness()
         try:
-            fork, _, _ = h.make_fork();out = h.g.invoke('G02', fork);accept = out['accept_branch']['branch_id']
+            fork, _, _ = h.make_fork()
+            # Exercise compatibility with an unseeded historical checkpoint.
+            with patch.object(h.g, 'visible_history', return_value=[]):
+                out = h.g.invoke('G02', fork)
+            accept = out['accept_branch']['branch_id']
             h.controller.graph = h.g
             h.controller.call = lambda cid, payload, fn: h.g.bus.call(cid, payload, fn)['data']
             before = h.g.db.execute('SELECT count(*) FROM experiments').fetchone()[0]
@@ -241,17 +249,20 @@ class GraphResearchReviewTests(unittest.TestCase):
     def test_preidea_reference_does_not_block_valid_branch_head_or_hide_its_progress(self):
         h = GraphHarness()
         try:
-            fork, _, _ = h.make_fork();out = h.g.invoke('G02', fork);accept = out['accept_branch']['branch_id']
+            fork, _, _ = h.make_fork()
+            with patch.object(h.g, 'visible_history', return_value=[]):
+                out = h.g.invoke('G02', fork)
+            accept = out['accept_branch']['branch_id']
             global_best = h.g.store.best()
             latest = None
-            for alpha, score in [(4, 20), (5, 19), (6, 18), (7, 17)]:
+            for alpha, score in [(4, 20), (5, 19), (6, 18), (7, 17), (8, 16)]:
                 _, latest, _, result = h.result('researcher-1', {'alpha': alpha, 'target_transform': 'shifted_log1p'}, score, branch=accept)
                 self.assertEqual(result['head_results'][0]['disposition'], 'advanced')
             self.assertEqual(h.g.heads(accept)[0]['experiment_id'], latest['lead_submission']['experiment_id'])
             self.assertEqual(h.g.store.best(), global_best)
             assessment = h.g.invoke('G07', {'branch_id': accept, 'expected_branch_revision': 0})['assessment']
             self.assertEqual(assessment['status'], 'searching')
-            self.assertEqual(assessment['utility_gain'], 3)
+            self.assertEqual(assessment['utility_gain'], 4)
         finally:
             h.close()
 

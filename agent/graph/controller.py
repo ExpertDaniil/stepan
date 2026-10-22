@@ -165,6 +165,26 @@ def apply_switch(controller, branch_id, decision):
     return target["branch_id"]
 
 
+def warmup_ticket(controller, branch_id, peer, recipe, params):
+    graph = controller.graph
+    # An already planned warmup can also be the independent recipient pilot.
+    # Preserve the peer's own base and exact configuration; no extra fit or API.
+    for row in graph.db.execute("SELECT record_json FROM g_idea_candidates WHERE run_id=? ORDER BY rowid", (graph.run_id,)):
+        offer = json.loads(row[0])
+        if offer["state"] != "pending" or offer["branch_id"] != branch_id:
+            continue
+        head = graph._compatible_pilot(offer)
+        if not head or head["researcher_id"] != peer:
+            continue
+        base = controller.store.get(head["experiment_id"])["plan"]
+        patch = controller.artifacts.read_json(offer["patch_artifact_id"])
+        if base["recipe_id"] == recipe and graph.constructor.patch_params(recipe, base["model"]["hyperparameters"], patch) == params:
+            return transfer_ticket(controller, {"parameters": {"branch_id": branch_id, "researcher_id": peer,
+                                   "source_experiment_id": offer["source_experiment_id"]}})
+    ticket = issue(controller, branch_id, peer, "improve")
+    return bind_trusted(controller.warmup_plan(recipe, params), ticket), ticket
+
+
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     """Keep all SQL on the dispatcher while overlapping serial training with other peers' API work."""
     graph = controller.graph
@@ -213,14 +233,18 @@ def run(controller):
     controller.store.set_run_state("searching")
     accepted, branch_id = 0, root
     warmups = controller.catalog.warmup_choices()[:min(controller.config.catalog_warmup_experiments, controller.config.max_research_experiments)]
-    for offset in range(0, len(warmups), len(peers)):
+    owners = {}
+    feature_parameters = {feature["parameter"] for feature in graph.constructor.registry["features"].values()}
+    for warmup_index, (recipe, params) in enumerate(warmups):
         if not controller.budget.snapshot()["search_allowed"]:
             break
-        choices = warmups[offset:offset+len(peers)]
-        controller.log.event("search.catalog_warmup", configurations=[{"recipe_id": r, "hyperparameters": p} for r, p in choices])
-        tickets = [issue(controller, root, peers[i], "improve") for i in range(len(choices))]
-        plans = [bind_trusted(controller.warmup_plan(recipe, params), ticket) for (recipe, params), ticket in zip(choices, tickets)]
-        accepted += controller.run_training(plans, tickets);controller.finalize_best()
+        owner_key = canonical([recipe, {name: value for name, value in params.items() if name not in feature_parameters}])
+        owner = owners.setdefault(owner_key, peers[len(owners) % len(peers)])
+        controller.log.event("search.catalog_warmup", configurations=[{"recipe_id": recipe, "hyperparameters": params}], researcher_id=owner)
+        plan, ticket = warmup_ticket(controller, root, owner, recipe, params)
+        accepted += controller.run_training([plan], [ticket])
+        if (warmup_index+1) % len(peers) == 0 or warmup_index+1 == len(warmups):
+            controller.finalize_best()
     stop_reason = "round_limit"
     for round_no in range(controller.config.max_research_experiments*2+4):
         if accepted >= controller.config.max_research_experiments or not controller.budget.snapshot()["search_allowed"]:

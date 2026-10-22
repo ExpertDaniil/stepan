@@ -76,8 +76,10 @@ class GraphTests(unittest.TestCase):
         fork,_,idea=self.h.make_fork();self.assertEqual(idea['status'],'confirmed')
         old_best=self.g.store.best();cp=self.g.checkpoint_record(fork['checkpoint_id'])
         out=self.g.invoke('G02',fork,key='fork')
-        for child in ['accept_branch','reject_branch']:
-            self.assertEqual(self.g.heads(out[child]['branch_id']),cp['heads'])
+        self.assertEqual(self.g.heads(out['reject_branch']['branch_id']),cp['heads'])
+        for head in self.g.heads(out['accept_branch']['branch_id']):
+            self.assertTrue(self.g.head_satisfies(head,out['accept_branch']['constraints']))
+        self.assertEqual(self.g.checkpoint_record(fork['checkpoint_id']),cp)
         self.assertNotEqual(cp['heads'][0]['solution_id'],cp['heads'][1]['solution_id'])
         self.assertEqual(self.g.store.best(),old_best)
         self.assertEqual(out['parent_branch']['state'],'sealed')
@@ -220,10 +222,10 @@ class GraphTests(unittest.TestCase):
 
     def test_plateau_uses_distinct_solutions_and_old_best(self):
         self.h.result('researcher-1',{'alpha':1},10)
-        for a in [2,3,4]:self.h.result('researcher-1',{'alpha':a},11+a)
+        for a in [2,3,4,5]:self.h.result('researcher-1',{'alpha':a},11+a)
         out=self.g.invoke('G07',{'branch_id':self.h.root,'expected_branch_revision':0})['assessment']
         self.assertEqual(out['status'],'plateau');self.assertEqual(out['utility_gain'],0)
-        self.assertEqual(out['distinct_solution_count'],3)
+        self.assertEqual(out['distinct_solution_count'],4)
 
     def test_final_ranking_keeps_ancestors_and_paused_branches(self):
         fork,_,_=self.h.make_fork();best=self.g.store.best();self.g.invoke('G02',fork)

@@ -19,11 +19,45 @@ from scripts.reconstruct_solution import reconstruct
 
 
 class GraphEndToEndTests(unittest.TestCase):
+    def test_warmup_transfer_forks_from_measured_bases_without_a_research_api_call(self):
+        import numpy as np
+        import pandas as pd
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);task=make_demo(root/'task','regression',rows=120,test_rows=20)
+            for name in ['train.csv','test.csv']:
+                frame=pd.read_csv(task.parent/name,dtype={'id':str},keep_default_na=False)
+                x=np.linspace(0,3,len(frame));frame['x_numeric']=x;frame['z_numeric']=0.;frame['category']='same'
+                if name=='train.csv':frame['label']=np.exp(2*x)
+                frame.to_csv(task.parent/name,index=False)
+            def warmups(catalog):
+                return [('linear-regressor-v1', catalog.normalize('linear-regressor-v1', {'alpha': a, 'target_transform': t}))
+                        for t in ['identity','shifted_log1p'] for a in [1.,3.]]
+            settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'120','MAX_RESEARCH_EXPERIMENTS':'6',
+                'CATALOG_WARMUP_EXPERIMENTS':'4','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog',
+                'GRAPH_MIN_FREE_DISK_BYTES':'0','MODEL_SNAPSHOT_MAX_BYTES':'0'}
+            with patch.dict(os.environ,settings),patch.object(Catalog,'warmup_choices',warmups),redirect_stderr(io.StringIO()) as stderr:
+                code=main([str(task),'--llm-mode','mock','--work-dir',str(root/'runs')])
+            self.assertEqual(code,0,stderr.getvalue()[-4000:])
+            run=next((root/'runs').glob('run-*'))
+            graph=json.loads(next(run.glob('exports/final-*/graph.json')).read_text())
+            self.assertEqual(len(graph['branches']),3)
+            self.assertEqual(len(graph['branch_seeds']),4)
+            plans={e['experiment_id']:e['plan'] for e in graph['experiments']}
+            self.assertTrue(all(plans[s['head']['experiment_id']]['model']['family']=='linear' for s in graph['branch_seeds']))
+            accept=next(b['branch_id'] for b in graph['branches'] if b['decision']=='accept')
+            self.assertTrue(all(plans[s['head']['experiment_id']]['model']['hyperparameters']['target_transform']=='shifted_log1p'
+                                for s in graph['branch_seeds'] if s['branch_id']==accept))
+            events=[json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
+            self.assertEqual(sum(e['event']=='llm.call_started' for e in events),2)
+            self.assertTrue(any(e['event']=='research.component_transfer_prepared' and e['purpose']=='pilot' for e in events))
+            self.assertTrue((task.parent/'submission.csv').is_file())
+
     def test_no_research_api_quota_finishes_cleanly_with_the_verified_baseline(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);task=make_demo(root/'task')
             settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'90','MAX_RESEARCH_EXPERIMENTS':'3',
-                'CATALOG_WARMUP_EXPERIMENTS':'0','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog','GRAPH_MIN_FREE_DISK_BYTES':'0'}
+                'CATALOG_WARMUP_EXPERIMENTS':'0','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog','GRAPH_MIN_FREE_DISK_BYTES':'0',
+                'MODEL_SNAPSHOT_MAX_BYTES':'0'}
             with patch.dict(os.environ,settings),redirect_stderr(io.StringIO()) as stderr:
                 code=main([str(task),'--llm-mode','mock','--work-dir',str(root/'runs')])
             self.assertEqual(code,0,stderr.getvalue()[-4000:]);self.assertTrue((task.parent/'submission.csv').is_file())
@@ -33,6 +67,8 @@ class GraphEndToEndTests(unittest.TestCase):
             finish=next(e for e in events if e['event']=='search.finished')
             self.assertEqual(finish['stop_reason'],'llm_call_limit')
             self.assertFalse(any(e['event']=='research.proposal_failed' for e in events))
+            self.assertFalse(list(run.rglob('*.joblib')))
+            self.assertTrue(any(e['event']=='job.model_snapshot' and e['status']=='disabled' for e in events))
 
     def test_spawn_failure_after_baseline_closes_assignments_and_retains_csv(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -13874,6 +13874,14 @@
             "minLength": 1
           },
           "maxItems": 12
+        },
+        "knowledge_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 12
         }
       },
       "required": [
@@ -13944,6 +13952,48 @@
         "columns",
         "group_by",
         "include_target"
+      ],
+      "additionalProperties": false
+    },
+    "KnowledgeQuery": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Concrete data/method question, in English when possible; empty when reading IDs."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "maxItems": 8
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 3,
+          "description": "Known method-/kg- IDs to read instead of searching."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "description": "Character offset for reading long source write-ups by ID."
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        }
+      },
+      "required": [
+        "query"
       ],
       "additionalProperties": false
     }

@@ -1,0 +1,442 @@
+[
+  {
+    "id": "method-constant-features",
+    "kind": "method",
+    "title": "Remove features constant on fit rows",
+    "tags": [
+      "constant_features"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Many constant or all-missing features; no target values are required.",
+    "mechanism": "Fit the retained column set on fit rows, then use exactly that set for validation/test.",
+    "cautions": "Do not decide which columns to retain using held-out labels or test variation. This is a complexity reduction, not a promised score gain.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": {
+      "origin": "project_authored",
+      "verification": "not_executed",
+      "source": "from sklearn.base import BaseEstimator, TransformerMixin\nfrom sklearn.pipeline import Pipeline\nfrom agent.ml import build_pipeline\n\nclass DropConstants(BaseEstimator, TransformerMixin):\n    def fit(self, X, y=None):\n        self.columns_ = [c for c in X.columns if X[c].nunique(dropna=False) > 1]\n        if not self.columns_:\n            raise ValueError(\"Every feature is constant on fit rows\")\n        return self\n\n    def transform(self, X):\n        return X.loc[:, self.columns_].copy()\n\ndef make_pipeline(task_spec, params):\n    options = dict(params)\n    default = \"hist-gradient-regressor-v1\" if task_spec[\"task_kind\"] == \"regression\" else \"hist-gradient-classifier-v1\"\n    base = options.pop(\"base_recipe_id\", default)\n    return Pipeline([(\"drop_constants\", DropConstants()),\n                     (\"model\", build_pipeline(base, task_spec, options))])\n"
+    },
+    "inspected_code_reference": {
+      "source_record": 348,
+      "solution_title": "11th place",
+      "url": "https://github.com/Danila89/kaggle_mercedes/blob/30d9a6e95977b68d23971aba2919fc2a82259161/solution_11_place.ipynb",
+      "git_blob_sha1": "32c50e6f517842165c8057d4d6923007b43d9a19",
+      "code_cells": 7,
+      "status": "inspected_legacy_notebook; project_example_is_an_independent_adaptation",
+      "adaptation_notes": "The notebook removes constant features, but also contains target-dependent grouping, train/test distribution filtering, local helper imports, file IO, Python-2 syntax and 100 repeated model fits. Those parts are not copied into the runtime example. Supervised grouping would need fit-only/OOF handling. Original notebook is linked, not bundled or advertised as runnable Python 3.12."
+    },
+    "related_source_ids": [
+      "kg-808539c1ed0097a44c95374a",
+      "kg-7c9b010f4b7560694fc94eaf",
+      "kg-750ab55afba8ec471ddd7d63",
+      "kg-265e1ba8d8c8d1b94456d317"
+    ]
+  },
+  {
+    "id": "method-missing-flags",
+    "kind": "method",
+    "title": "Preserve missingness before imputation",
+    "tags": [
+      "missing"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Missing features and an owned median-imputation base without indicators.",
+    "mechanism": "Add row-wise missing flags before the fitted imputer. Select columns using fit rows only.",
+    "cautions": "Native-NaN CatBoost already preserves numeric missingness; median-imputation is not its limitation. Missingness can shift between train and test.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": {
+      "origin": "project_authored",
+      "verification": "not_executed",
+      "source": "from sklearn.base import BaseEstimator, TransformerMixin\nfrom sklearn.pipeline import Pipeline\nfrom agent.ml import build_pipeline\n\nclass MissingFlags(BaseEstimator, TransformerMixin):\n    def fit(self, X, y=None):\n        self.columns_ = [c for c in X.columns if X[c].isna().any()]\n        self.prefix_ = \"missing_flag_\"\n        while any(str(c).startswith(self.prefix_) for c in X.columns):\n            self.prefix_ = \"_\" + self.prefix_\n        return self\n\n    def transform(self, X):\n        out = X.copy()\n        for i, column in enumerate(self.columns_):\n            out[self.prefix_ + str(i)] = X[column].isna().astype(float)\n        return out\n\ndef make_pipeline(task_spec, params):\n    options = dict(params)\n    default = \"hist-gradient-regressor-v1\" if task_spec[\"task_kind\"] == \"regression\" else \"hist-gradient-classifier-v1\"\n    base = options.pop(\"base_recipe_id\", default)\n    return Pipeline([(\"missing_flags\", MissingFlags()),\n                     (\"model\", build_pipeline(base, task_spec, options))])\n"
+    },
+    "related_source_ids": [
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-c6dc84836fa33eda10405b14",
+      "kg-265e1ba8d8c8d1b94456d317",
+      "kg-0c0a12bc6cc146c661b28c12"
+    ]
+  },
+  {
+    "id": "method-frequency-features",
+    "kind": "method",
+    "title": "Fit-only frequency features for categories",
+    "tags": [
+      "frequency_encoding",
+      "categorical",
+      "rare_categories"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Repeated categorical levels where prevalence may convey information.",
+    "mechanism": "Fit relative-frequency maps on fit rows, add frequencies, map unknown levels to zero, retain original features.",
+    "cautions": "No target values are used. Frequency can reflect sampling drift; do not learn maps from validation or test.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": {
+      "origin": "project_authored",
+      "verification": "not_executed",
+      "source": "from sklearn.base import BaseEstimator, TransformerMixin\nfrom sklearn.pipeline import Pipeline\nfrom agent.ml import build_pipeline\n\nclass FrequencyFeatures(BaseEstimator, TransformerMixin):\n    def fit(self, X, y=None):\n        self.maps_ = {}\n        for column in X.select_dtypes(exclude=\"number\").columns:\n            self.maps_[column] = X[column].astype(str).value_counts(normalize=True).to_dict()\n        self.prefix_ = \"frequency_\"\n        while any(str(c).startswith(self.prefix_) for c in X.columns):\n            self.prefix_ = \"_\" + self.prefix_\n        return self\n\n    def transform(self, X):\n        out = X.copy()\n        for i, column in enumerate(self.maps_):\n            out[self.prefix_ + str(i)] = X[column].astype(str).map(self.maps_[column]).fillna(0.0)\n        return out\n\ndef make_pipeline(task_spec, params):\n    options = dict(params)\n    default = \"hist-gradient-regressor-v1\" if task_spec[\"task_kind\"] == \"regression\" else \"hist-gradient-classifier-v1\"\n    base = options.pop(\"base_recipe_id\", default)\n    return Pipeline([(\"frequency\", FrequencyFeatures()),\n                     (\"model\", build_pipeline(base, task_spec, options))])\n"
+    },
+    "related_source_ids": [
+      "kg-d70a5e5eccceb00509a36048",
+      "kg-b4fa3f31e7896597ffbc5a3d",
+      "kg-702fab25bf8f961e9b3c87b5",
+      "kg-18f8292ad6a2d176b246f524"
+    ]
+  },
+  {
+    "id": "method-log-numeric-features",
+    "kind": "method",
+    "title": "Logarithms for selected nonnegative features",
+    "tags": [
+      "log_features",
+      "linear"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Nonnegative counts or skewed magnitudes; inspect distributions before selecting columns.",
+    "mechanism": "Apply log1p to explicitly selected columns, then fit preprocessing and a suitable linear model.",
+    "cautions": "This transforms features, not the target. Do not transform arbitrary signed measurements or assume an isolated gain from a blended Kaggle solution.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": {
+      "origin": "project_authored",
+      "verification": "not_executed",
+      "source": "import numpy as np\nfrom sklearn.base import BaseEstimator, TransformerMixin\nfrom sklearn.pipeline import Pipeline\nfrom agent.ml import build_pipeline\n\nclass LogColumns(BaseEstimator, TransformerMixin):\n    def __init__(self, columns=()):\n        self.columns = columns\n\n    def fit(self, X, y=None):\n        self.columns_ = list(self.columns)\n        for column in self.columns_:\n            if (X[column].dropna() < 0).any():\n                raise ValueError(\"log1p example requires nonnegative selected features\")\n        return self\n\n    def transform(self, X):\n        out = X.copy()\n        for column in self.columns_:\n            if (X[column].dropna() < 0).any():\n                raise ValueError(\"Negative unseen values violate the selected log1p precondition\")\n            out[column] = np.log1p(X[column])\n        return out\n\ndef make_pipeline(task_spec, params):\n    options = dict(params)\n    columns = options.pop(\"log_columns\", [])\n    default = \"linear-regressor-v1\" if task_spec[\"task_kind\"] == \"regression\" else \"linear-classifier-v1\"\n    base = options.pop(\"base_recipe_id\", default)\n    return Pipeline([(\"log_features\", LogColumns(columns)),\n                     (\"model\", build_pipeline(base, task_spec, options))])\n"
+    },
+    "related_source_ids": [
+      "kg-0607f79e301142cde8a88fd7",
+      "kg-31fda754b9ce9b8dcde53b5d",
+      "kg-0f3a543b57cd1611ec27603c",
+      "kg-4e86845c1c33cf0e1c193a1c"
+    ]
+  },
+  {
+    "id": "method-native-categories",
+    "kind": "method",
+    "title": "Native categories versus ordinal prefixes",
+    "tags": [
+      "categorical",
+      "boosting"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Categories with no meaningful order; compare native category models or fitted one-hot representations.",
+    "mechanism": "Owned CatBoost uses string categories and numeric NaN directly. HGB/tree recipes ordinal-encode categories; linear recipes one-hot encode.",
+    "cautions": "Never describe all catalogue recipes as median/ordinal. One-hot may be expensive at high cardinality.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-3921657920941f573ec80d23",
+      "kg-7d483f5a9b172ba4a79de807",
+      "kg-b4fa3f31e7896597ffbc5a3d"
+    ]
+  },
+  {
+    "id": "method-rare-levels",
+    "kind": "method",
+    "title": "Rare and unseen category handling",
+    "tags": [
+      "rare_categories",
+      "categorical"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Many low-count levels or unseen levels in test features.",
+    "mechanism": "Fit category vocabularies and optional rare-level grouping on fit rows, preserve an explicit unknown path.",
+    "cautions": "Do not build a train+validation vocabulary. Do not import the source competition's thresholds unchanged.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-d70a5e5eccceb00509a36048",
+      "kg-b4fa3f31e7896597ffbc5a3d",
+      "kg-702fab25bf8f961e9b3c87b5",
+      "kg-18f8292ad6a2d176b246f524"
+    ]
+  },
+  {
+    "id": "method-target-transform",
+    "kind": "method",
+    "title": "Choose target transformations under the actual metric",
+    "tags": [
+      "target_transform"
+    ],
+    "task_kinds": [
+      "regression"
+    ],
+    "when": "Regression with skewed targets or scale-dependent errors.",
+    "mechanism": "Fit the target transformation on fit labels only and invert predictions before authoritative evaluation.",
+    "cautions": "RMSE, RMSLE and MAE optimize different errors. Log-target training can bias original-scale predictions. Use current measured comparisons.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-808539c1ed0097a44c95374a",
+      "kg-0607f79e301142cde8a88fd7",
+      "kg-950280b8a21f94f7b4a4ce00",
+      "kg-07e3b4a18b7b111f9094a029"
+    ]
+  },
+  {
+    "id": "method-interactions",
+    "kind": "method",
+    "title": "Candidate interactions from data structure",
+    "tags": [
+      "interactions"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "A plausible relationship among features, even if marginal correlations look weak.",
+    "mechanism": "Propose bounded products, ratios with safe denominators, or domain-motivated combinations jointly with an appropriate model.",
+    "cautions": "Low pairwise association does not establish independence or absence of useful interactions. Prevent feature explosion and nonfinite values.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-808539c1ed0097a44c95374a",
+      "kg-ae2d5fe512ad7d65968eba56",
+      "kg-e3b1d425059abd9d7b44e0e5",
+      "kg-75e43b766de321bbe5c2133e"
+    ]
+  },
+  {
+    "id": "method-group-aggregates",
+    "kind": "method",
+    "title": "Learned aggregates respecting split boundaries",
+    "tags": [
+      "aggregates"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Repeated entities, groups or sessions with usable group identifiers.",
+    "mechanism": "Fit feature-only group statistics on fit rows and define an unknown-group fallback.",
+    "cautions": "Target aggregates require out-of-fold construction inside fit. Entity leakage can make a random holdout misleading.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-7e8f81af873f445aec53b932",
+      "kg-7d483f5a9b172ba4a79de807",
+      "kg-5565d4b4ad1172c1b7434912",
+      "kg-b55f30ae3955e354bb6a8be9"
+    ]
+  },
+  {
+    "id": "method-temporal-features",
+    "kind": "method",
+    "title": "Temporal features with an inference-time boundary",
+    "tags": [
+      "temporal",
+      "validation"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Timestamps or repeated measurements with a real temporal prediction setting.",
+    "mechanism": "Use calendar features and only lags/rolling statistics available at prediction time.",
+    "cautions": "The mere presence of a year column does not prove a forecasting task. Future observations and labels cannot enter features.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-71f6962487e94c9394cf411f",
+      "kg-2db07749cbd85bfe823ebe81",
+      "kg-9f1432e2249575dafbf5d15e",
+      "kg-03106a20c71acbc05f8e0d74"
+    ]
+  },
+  {
+    "id": "method-split-structure",
+    "kind": "method",
+    "title": "Match validation to repeated entities and time",
+    "tags": [
+      "validation",
+      "leakage"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Entity reuse, duplicates or chronological drift.",
+    "mechanism": "Inspect whether the frozen validation reflects deployment. Explain a mismatch explicitly before proposing actions.",
+    "cautions": "Researchers cannot mutate the frozen protocol. A Kaggle random-fold recipe is not authority for the current split.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-ca4aba2c16c8610ebff00a61",
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-9461c5276dae941bfb6efde1",
+      "kg-db02ee3b5923b93e324e6808"
+    ]
+  },
+  {
+    "id": "method-class-imbalance",
+    "kind": "method",
+    "title": "Multiclass imbalance and decision rules",
+    "tags": [
+      "imbalance"
+    ],
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "when": "Multiclass labels with unequal representation or poor minority-class recall.",
+    "mechanism": "Inspect class support and confusion patterns; consider regularization, class weights or training-only sampling under the requested metric.",
+    "cautions": "Accuracy, macro-F1 and log-loss can disagree. Class weighting changes probability calibration; binary thresholds do not transfer directly.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-d70a5e5eccceb00509a36048",
+      "kg-b4fa3f31e7896597ffbc5a3d",
+      "kg-0b321ab5c5233e2d62f28af0"
+    ]
+  },
+  {
+    "id": "method-error-slices",
+    "kind": "method",
+    "title": "Use error slices to select a next experiment",
+    "tags": [
+      "error_analysis"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "A measured model with errors concentrated in interpretable groups.",
+    "mechanism": "Connect an error pattern to a feature/model hypothesis and measure the complete proposed solution.",
+    "cautions": "Group bias alone does not prove underfitting. Repeated use of validation diagnostics can overfit the holdout.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-71f6962487e94c9394cf411f",
+      "kg-7c9b010f4b7560694fc94eaf",
+      "kg-e36d731c7b6709243f0e9cbf",
+      "kg-750ab55afba8ec471ddd7d63"
+    ]
+  },
+  {
+    "id": "method-linear-baseline",
+    "kind": "method",
+    "title": "Encoded and regularized linear alternatives",
+    "tags": [
+      "linear",
+      "categorical"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Sparse categories, additive structure or a cheap complementary model.",
+    "mechanism": "Fit one-hot categories, scale numeric columns inside fit and tune regularization on the frozen protocol.",
+    "cautions": "Binary AUC scores from category-encoding competitions are not multiclass performance evidence.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-0f3a543b57cd1611ec27603c",
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-7d483f5a9b172ba4a79de807",
+      "kg-b4fa3f31e7896597ffbc5a3d"
+    ]
+  },
+  {
+    "id": "method-boosting-budget",
+    "kind": "method",
+    "title": "Budget-aware boosting capacity search",
+    "tags": [
+      "boosting"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "A measured boosting base whose capacity or regularization remains uncertain.",
+    "mechanism": "Coordinate learning rate, iterations, leaf capacity and regularization using measured durations and scores.",
+    "cautions": "Iteration counts are not comparable across CatBoost and HGB. A tuning series is optional; preserve time for refit.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-3921657920941f573ec80d23",
+      "kg-10a789d4950f14bc14c9221c",
+      "kg-b4fa3f31e7896597ffbc5a3d"
+    ]
+  },
+  {
+    "id": "method-complementary-ensemble",
+    "kind": "method",
+    "title": "Blend genuinely complementary predictions",
+    "tags": [
+      "ensemble",
+      "validation"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Several measured, compatible models with complementary errors and remaining compute.",
+    "mechanism": "Use predictions aligned to the same protocol; train stacking layers only on out-of-fold base predictions.",
+    "cautions": "A 33-model, multi-layer winning ensemble is not a three-hour recipe. In-sample stacking leaks labels. No gain is assumed.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-ca4aba2c16c8610ebff00a61",
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-9b9ec04f6dd3a0417644d72b",
+      "kg-176458fcff459be9af875ad6"
+    ]
+  },
+  {
+    "id": "method-leakage-check",
+    "kind": "method",
+    "title": "Keep supervised feature learning inside fit",
+    "tags": [
+      "leakage",
+      "validation"
+    ],
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "when": "Target encoding, feature selection, target transforms or supervised preprocessing.",
+    "mechanism": "Fit every learned operation within the returned pipeline. Build training encodings out of fold when they use targets.",
+    "cautions": "Never use held-out labels or source-competition leaks. A reported leaderboard improvement does not certify honest validation.",
+    "origin": "project_authored_guidance",
+    "status": "hypothesis_not_current_task_evidence",
+    "code_example": null,
+    "related_source_ids": [
+      "kg-ca4aba2c16c8610ebff00a61",
+      "kg-4e86845c1c33cf0e1c193a1c",
+      "kg-9461c5276dae941bfb6efde1",
+      "kg-db02ee3b5923b93e324e6808"
+    ]
+  }
+]

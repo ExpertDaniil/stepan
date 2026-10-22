@@ -29,6 +29,12 @@ RESOURCE_FILES = (
     "prompts/researcher-catalog.md",
     "prompts/researcher-adaptive.md",
     "prompts/TOOLS.md",
+    "recipes/knowledge/manifest.json",
+    "recipes/knowledge/cards.json",
+    "recipes/knowledge/competitions.json",
+    "recipes/knowledge/sources.jsonl",
+    "recipes/knowledge/selection.json",
+    "recipes/knowledge/UPSTREAM_LICENSE.txt",
 )
 
 

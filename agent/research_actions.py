@@ -18,7 +18,8 @@ ACTION_SCHEMA = {
         'feature_steps': {'type': 'array', 'items': {'type': 'object'}},
         'code': {'anyOf': [{'type': 'string', 'minLength': 1}, {'type': 'null'}]},
         'tuning': {'anyOf': [TUNING_SCHEMA, {'type': 'null'}]},
-        'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12}},
+        'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
+        'knowledge_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12}},
     'required': ['action', 'recipe_id', 'hyperparameters', 'hypothesis', 'expected_effect',
                  'feature_steps', 'code', 'tuning', 'evidence_ids'], 'additionalProperties': False}
 

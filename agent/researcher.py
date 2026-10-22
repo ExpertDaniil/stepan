@@ -24,7 +24,7 @@ class Researcher:
         context = self.artifacts.read_json(payload["context_id"])
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
-                                        "tool_schema_ids": ['analyze_data'] if adaptive else [] if catalog_mode else ["write_code"],
+                                        "tool_schema_ids": (['analyze_data'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 8 if adaptive else 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
@@ -40,9 +40,15 @@ class Researcher:
             evidence.update(r['artifact_id'] for r in user.get('analysis_history', []))
             evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
             evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
-            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id'))
+            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id') and call.get('name') != 'search_knowledge')
             if not set(proposed['evidence_ids']) <= evidence:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
+            knowledge = user.get('profile_summary', user).get('knowledge', {})
+            visible_knowledge = {r['id'] for r in knowledge.get('results', [])}
+            visible_knowledge.update(ident for call in answer['tool_calls'] for ident in call.get('knowledge_ids', []))
+            if not set(proposed.get('knowledge_ids', [])) <= visible_knowledge:
+                raise AgentError('INVALID_RESEARCH_ACTION', 'Unseen knowledge_ids: '+', '.join(sorted(set(proposed.get('knowledge_ids', []))-visible_knowledge))+
+                                 '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
             if proposed['action'] == 'stop':
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
@@ -92,10 +98,14 @@ class Researcher:
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)
         if adaptive:
             self.artifacts.write_json('research/intent-'+plan['plan_id']+'.json',
-                {k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
+                {**{k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
+                 'knowledge_ids': proposed.get('knowledge_ids', []),
+                 'knowledge_retrieval_artifact_ids': ([knowledge['artifact_id']] if knowledge.get('artifact_id') else [])+
+                    [call['artifact_id'] for call in answer['tool_calls'] if call.get('name') == 'search_knowledge' and call.get('artifact_id')]},
                 'research_intent', ident='intent-'+plan['plan_id'])
             self.log.event('research.action_proposed', plan_id=plan['plan_id'], researcher_id=payload['researcher_id'],
-                           action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'])
+                           action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'],
+                           knowledge_ids=proposed.get('knowledge_ids', []))
         self.log.event("research.hypothesis_proposed", researcher_id=payload["researcher_id"],
                        context_id=payload["context_id"], model_output_artifact_id=answer["output_artifact_id"],
                        hypothesis=plan["hypothesis"], expected_effect=plan["expected_effect"], recipe_id=plan["recipe_id"],

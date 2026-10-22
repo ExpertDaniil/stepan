@@ -107,6 +107,7 @@ class Gateway:
         self.daily_budget_exhausted = threading.Event()
         self.provider_credits_exhausted = threading.Event()
         self.analysis = None
+        self.knowledge = None
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
@@ -257,6 +258,13 @@ class Gateway:
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
                 'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. columns contains input features only, never the target: use include_target=true for target summaries. For group, group_by must be one of columns. At most 12 columns; [] selects defaults.',
                 'parameters': ANALYSIS_SCHEMA}})
+        if 'search_knowledge' in payload['tool_schema_ids']:
+            from tools.knowledge import KNOWLEDGE_SCHEMA
+            if self.knowledge is None:
+                raise AgentError('KNOWLEDGE_UNAVAILABLE', 'No offline knowledge library is configured')
+            tools.append({'type': 'function', 'function': {'name': 'search_knowledge',
+                'description': 'Search offline Kaggle experience and complete project-authored pipeline examples. Returns content, source IDs and current-pipeline cautions, not just links. Use ids to read a known item. External experience is not current-task evidence; cite its IDs only in knowledge_ids. No network.',
+                'parameters': KNOWLEDGE_SCHEMA}})
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
@@ -273,9 +281,15 @@ class Gateway:
                 request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
                 terminal = bool(tools and attempt == payload['attempt_limit'])
                 if terminal:
-                    request['messages'].append({'role': 'user', 'content':
-                        'The analysis/tool phase is complete. Return one final JSON object matching the output schema '
-                        'using the evidence already available. No tools are available on this final turn.'})
+                    instruction = ('The analysis/tool phase is complete. Return one final JSON object matching the output schema '
+                        'using the evidence already available. No tools are available on this final turn.')
+                    if context['metadata']['schema_id'] == 'ResearchAction-v1':
+                        current_user = json.loads(context['messages'][1]['content'])
+                        facts = current_user.get('profile_summary', current_user).get('current_pipeline_facts')
+                        if facts:
+                            compact_facts = {k: v for k, v in facts.items() if k != 'effective_parameters'}
+                            instruction += '\nAuthoritative current-base facts (external experience cannot override them): '+json.dumps(compact_facts, ensure_ascii=False)
+                    request['messages'].append({'role': 'user', 'content': instruction})
                     self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'])
                 elif tools:
                     request.update(tools=tools, parallel_tool_calls=False)
@@ -311,10 +325,11 @@ class Gateway:
                     prepared = []
                     for call in message["tool_calls"]:
                         name = call['function']['name']
-                        if name not in payload['tool_schema_ids'] or name not in {'write_code', 'analyze_data'}:
+                        if name not in payload['tool_schema_ids'] or name not in {'write_code', 'analyze_data', 'search_knowledge'}:
                             raise ValueError("Unexpected model tool call")
                         args = parse_json(call["function"]["arguments"])
-                        schema = (self.bus.schemas.schema['$defs']['C11_Request']['properties']['payload'] if name == 'write_code' else ANALYSIS_SCHEMA)
+                        schema = (self.bus.schemas.schema['$defs']['C11_Request']['properties']['payload'] if name == 'write_code'
+                                  else KNOWLEDGE_SCHEMA if name == 'search_knowledge' else ANALYSIS_SCHEMA)
                         self.bus.schemas._check(args, schema, "$.tool")
                         if name == 'write_code' and args.get("researcher_id") != context["metadata"].get("researcher_id"):
                             raise ValueError("Tool call uses another researcher's namespace")
@@ -328,12 +343,21 @@ class Gateway:
                         if name == 'write_code':
                             result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
                             calls.append({"call_id": call["id"], "name": name, "request_id": result["request_id"]})
-                        else:
+                        elif name == 'analyze_data':
                             try:
                                 result = self.analysis.analyze(args)
                             except AgentError as error:
                                 result = {'error': error.as_dict()}
                             calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')})
+                        else:
+                            try:
+                                user = json.loads(context['messages'][1]['content'])
+                                facts = user.get('profile_summary', user).get('current_pipeline_facts')
+                                result = self.knowledge.search(args, facts)
+                            except AgentError as error:
+                                result = {'error': error.as_dict()}
+                            calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
+                                          'knowledge_ids': [r['id'] for r in result.get('results', [])]})
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
                     last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue

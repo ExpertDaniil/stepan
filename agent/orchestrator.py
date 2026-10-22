@@ -28,6 +28,14 @@ class Orchestrator:
             analysis = AnalysisService(spec, validation, artifacts, budget, log)
             self.context.analysis = analysis
             self.researcher.gateway.analysis = analysis
+            from tools.knowledge import KnowledgeService
+            try:
+                knowledge = KnowledgeService(spec, profile, catalog, artifacts, log)
+            except AgentError as error:
+                log.exception('knowledge.unavailable', error)
+            else:
+                self.context.knowledge = knowledge
+                self.researcher.gateway.knowledge = knowledge
         self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes)
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)

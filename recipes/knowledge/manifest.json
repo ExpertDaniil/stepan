@@ -1,0 +1,32 @@
+{
+  "version": "knowledge-v1",
+  "upstream": {
+    "repository": "https://github.com/zjunlp/AutoMind",
+    "commit": "1a1ba234ee2bd1e831c6757cd2ec01c2e4ccf52e",
+    "source_path": "automind/utils/tagged_competition_solutions.jsonl",
+    "source_url": "https://raw.githubusercontent.com/zjunlp/AutoMind/1a1ba234ee2bd1e831c6757cd2ec01c2e4ccf52e/automind/utils/tagged_competition_solutions.jsonl",
+    "source_bytes": 14646193,
+    "source_sha256": "cf4e5182d6db75c6940d40a4936fbf2b7d93647f79d7b4bba8ff924dbef56512",
+    "source_git_blob_sha1": "3d50e955bd512b411f15ba8bb66787cfd16c0f80",
+    "competitions": 450,
+    "source_solution_entries": 3308,
+    "normalized_text_entries": 3307,
+    "excluded_non_text_entries": 1,
+    "quality_note": "Limited structural validation only. The collection includes solution write-ups, announcements, and other scraped text; substantive correctness and coverage have not been checked."
+  },
+  "selection_policy": "Explicit reviewed task/modality scope; original tags are not authoritative. Not every post has been fact-checked.",
+  "counts": {
+    "competitions": 43,
+    "posts": 154,
+    "methods": 17
+  },
+  "files": {
+    "competitions.json": "7b57028d76622e096782d2cc30520c4314dd75022063846c7fa08280e481f48f",
+    "selection.json": "98189c1193d7734580650d2326130dabdbb2af5f52e8e7e66330dfe625d09e2a",
+    "sources.jsonl": "1212b051b35058aa7f18c93dc552db253d612f13d1b8296c53ab348ad83d8d56",
+    "cards.json": "1eadd0eb7805e6b7fc631f27e0b657808655b75a5ffe12ca0e6514af2610f428",
+    "UPSTREAM_LICENSE.txt": "00b0265f59640819e0aa1764117142b1f0aaeaf4e79575d1a75ab6ce5fa72f63"
+  },
+  "rights_note": "Upstream repository MIT notice retained. It does not establish separate rights to third-party write-ups. Implementation examples are project-authored, not recovered Kaggle notebooks.",
+  "verification": "No local execution of the example pipelines was performed."
+}

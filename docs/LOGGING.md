@@ -1,5 +1,11 @@
 # Наблюдаемость
 
+`knowledge.loaded` фиксирует версию/объём локальной библиотеки и доступность пакетов.
+`knowledge.seeded` и `knowledge.retrieved` связывают запрос с выданными knowledge IDs и
+артефактом `knowledge/query-*.json`. Одинаковые обращения могут переиспользовать артефакт.
+`knowledge.unavailable` явно сообщает об отключении библиотеки. В `research.action_proposed`
+и `research/intent-plan-*.json` сохранены knowledge_ids; это внешние гипотезы, не измерения.
+
 В adaptive `llm.request_budget_checked` содержит `limit_bytes=null` и
 `input_limit_owner=provider`: локальная отсечка входного контекста отключена.
 `llm.final_decision_requested` отмечает последний ход диалога без инструментов.

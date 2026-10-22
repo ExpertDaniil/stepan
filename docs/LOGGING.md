@@ -65,3 +65,11 @@ Root events.jsonl остаётся telemetry. Authoritative graph events нах�
 их export — exports/<scope>-<cut>/graph-events.jsonl. Каждый event содержит typed record_schema,
 проверенный record, run_id, request_id и event_seq. Graph export фиксирует read-cut до создания
 самих экспортных артефактов; последующие G09/G11 поэтому не включаются в этот же срез.
+
+v0.4.2 добавляет search.decision, graph.idea_registered, graph.branch_forked,
+graph.branch_state_changed, graph.plateau_assessed и research.component_transfer_prepared.
+В терминале видны причина перехода, обе дочерние ветки, source/base/pilot и статус плато.
+research.constraints_applied раскрывает отличие предложенных и эффективных параметров;
+context.built показывает assignment, base_experiment_id и сохранённую/пропущенную историю.
+Числа плато учитывают только допустимые для ветки references и время после её запуска/возобновления.
+llm_call_limit и llm_output_budget в search.finished — штатные причины остановки, проверенные dispatcher.

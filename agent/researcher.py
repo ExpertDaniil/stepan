@@ -28,9 +28,15 @@ class Researcher:
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
         params = self.catalog.normalize(proposed["recipe_id"], proposed["hyperparameters"])
+        constraint_changes = {}
         if context["metadata"].get("graph_binding"):
             branch_user = json.loads(context["messages"][1]["content"])
-            params = self.catalog.constrain_params(proposed["recipe_id"], params, branch_user["restrictions"])
+            effective = self.catalog.constrain_params(proposed["recipe_id"], params, branch_user["restrictions"])
+            constraint_changes = {name: {"proposed": value, "effective": effective[name]} for name, value in params.items() if value != effective[name]}
+            if constraint_changes:
+                self.log.event("research.constraints_applied", researcher_id=payload["researcher_id"], context_id=payload["context_id"],
+                               branch_id=branch_user["branch_id"], work_order_id=branch_user["work_order_id"], changes=constraint_changes)
+            params = effective
         source = factory_source(proposed["recipe_id"]) if catalog_mode else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
         code = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
@@ -44,6 +50,10 @@ class Researcher:
                 "feature_steps": self.catalog.feature_steps(params) if catalog_mode else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
                 "resources": {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                               "timeout_seconds": self.config.experiment_timeout_seconds}}
+        if constraint_changes:
+            note = " Effective branch constraints override the proposal: " + canonical(constraint_changes)
+            plan["hypothesis"] += note
+            plan["expected_effect"] += note
         if context["metadata"].get("graph_binding") and branch_user["restrictions"]["required_capability_ids"]:
             plan["parent_ids"] = list(dict.fromkeys(plan["parent_ids"]+branch_user["allowed_donor_experiment_ids"]))
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)

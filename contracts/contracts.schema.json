@@ -13268,6 +13268,22 @@
         "assignment": {
           "type": "string",
           "minLength": 1
+        },
+        "base_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GExperimentMemory"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "research_strategy": {
+          "enum": [
+            "exploit_incumbent",
+            "explore_alternative"
+          ]
         }
       },
       "required": [
@@ -13285,6 +13301,85 @@
         "allowed_donor_experiment_ids",
         "budget",
         "assignment"
+      ],
+      "additionalProperties": false
+    },
+    "GExperimentMemory": {
+      "type": "object",
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "trained",
+            "evaluated",
+            "failed",
+            "invalid",
+            "timed_out",
+            "cancelled"
+          ]
+        },
+        "recipe_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypothesis": {
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hyperparameters": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "feature_steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "is_incumbent": {
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "experiment_id",
+        "state",
+        "recipe_id",
+        "hypothesis",
+        "metric",
+        "hyperparameters",
+        "feature_steps",
+        "seed",
+        "is_incumbent",
+        "error"
       ],
       "additionalProperties": false
     }

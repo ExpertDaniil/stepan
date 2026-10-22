@@ -122,21 +122,33 @@ def train(controller, plans, tickets):
 
 def transfer_ticket(controller, decision):
     graph = controller.graph;p = decision["parameters"]
+    branch = graph.branch(p["branch_id"])
+    acceptance = None
+    if branch["decision"] == "accept" and branch["decision_idea_id"]:
+        idea_row = graph.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?", (graph.run_id, branch["decision_idea_id"])).fetchone()
+        idea = json.loads(idea_row[0]) if idea_row else None
+        if idea and idea["source_experiment_id"] == p["source_experiment_id"]:
+            acceptance = idea
     offer_row = graph.db.execute("SELECT record_json FROM g_idea_candidates WHERE run_id=? AND source_experiment_id=?", (graph.run_id, p["source_experiment_id"])).fetchone()
-    if not offer_row:
+    if not offer_row and not acceptance:
         raise AgentError("ENTITY_NOT_FOUND", "Transfer candidate")
-    offer = json.loads(offer_row[0]);ticket = issue(controller, p["branch_id"], p["researcher_id"], "transfer", [p["source_experiment_id"]])
+    offer = acceptance or json.loads(offer_row[0])
+    ticket = issue(controller, p["branch_id"], p["researcher_id"], "transfer", [p["source_experiment_id"]])
     work = ticket["work_order"];base = deepcopy(controller.store.get(work["base_experiment_id"])["plan"])
-    patch = controller.artifacts.read_json(offer["patch_artifact_id"])
+    patch = controller.artifacts.read_json(offer["transfer_patch_artifact_id"] if acceptance else offer["patch_artifact_id"])
     params = graph.constructor.patch_params(base["recipe_id"], base["model"]["hyperparameters"], patch)
     code = controller.call("C11", {"researcher_id": work["researcher_id"], "filename": "transfer.py", "content": factory_source(base["recipe_id"]), "declared_entrypoint": "make_pipeline"}, lambda args: write_code(args, controller.artifacts))["artifact"]
     base.update(plan_id="pilot-"+uuid.uuid4().hex[:16], hypothesis="Controlled recipient transfer: "+",".join(offer["capability_ids"]),
                 expected_effect="Measure the component against this peer's own unchanged base.", model={"family": base["model"]["family"], "hyperparameters": params},
                 feature_steps=controller.catalog.feature_steps(params), code_artifact_id=code["artifact_id"])
     base = bind_trusted(base, ticket)
-    offer.update(state="pilot_running", pilot_work_order_id=work["work_order_id"])
-    with controller.store.transaction():
-        graph.db.execute("UPDATE g_idea_candidates SET record_json=? WHERE run_id=? AND source_experiment_id=?", (canonical(offer), graph.run_id, p["source_experiment_id"]))
+    if not acceptance:
+        offer.update(state="pilot_running", pilot_work_order_id=work["work_order_id"])
+        with controller.store.transaction():
+            graph.db.execute("UPDATE g_idea_candidates SET record_json=? WHERE run_id=? AND source_experiment_id=?", (canonical(offer), graph.run_id, p["source_experiment_id"]))
+    controller.log.event("research.component_transfer_prepared", branch_id=branch["branch_id"], researcher_id=work["researcher_id"],
+                         purpose="acceptance" if acceptance else "pilot", base_experiment_id=work["base_experiment_id"],
+                         source_experiment_id=p["source_experiment_id"], work_order_id=work["work_order_id"])
     return base, ticket
 
 
@@ -151,6 +163,41 @@ def apply_switch(controller, branch_id, decision):
     graph.invoke("G08", {"branch_id": branch_id, "expected_branch_revision": current["branch_revision"], "action": "archive" if live >= graph.policy["max_live_branches"] else "pause", "reason": decision["reason"]}, key="backtrack-from/"+decision["decision_id"])
     graph.invoke("G08", {"branch_id": target["branch_id"], "expected_branch_revision": target["branch_revision"], "action": "resume", "reason": decision["reason"]}, key="backtrack-to/"+decision["decision_id"])
     return target["branch_id"]
+
+
+def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
+    """Keep all SQL on the dispatcher while overlapping serial training with other peers' API work."""
+    graph = controller.graph
+    plans, tickets = list(trusted_plans), list(trusted_tickets)
+    accepted = 0
+    streaming = graph.policy["max_train_workers"] == 1
+    peers = graph.metadata("researcher_ids")
+    with ThreadPoolExecutor(max_workers=len(peers), thread_name_prefix="researcher") as pool:
+        futures = {pool.submit(controller.call, "C09", ticket["researcher_request"]["payload"], controller.researcher.propose): ticket for ticket in llm_tickets}
+        if streaming and plans:
+            accepted += controller.run_training(plans, tickets)
+            plans, tickets = [], []
+        for future in as_completed(futures):
+            ticket = futures[future]
+            try:
+                proposal = future.result()
+                if proposal["decision"] == "stop":
+                    graph.invoke("G04", {"work_order_id": ticket["work_order"]["work_order_id"], "proposal": proposal, "manifest": None, "lineage": None}, key="stop/"+ticket["work_order"]["work_order_id"])
+                else:
+                    ticket["_proposal"] = proposal
+            except Exception as exc:
+                controller.degraded = True
+                graph.abandon(ticket["work_order"]["work_order_id"], str(exc))
+                controller.log.exception("research.proposal_failed", exc, work_order_id=ticket["work_order"]["work_order_id"])
+                continue
+            if proposal["decision"] != "stop":
+                if streaming:
+                    accepted += controller.run_training([proposal["plan"]], [ticket])
+                else:
+                    plans.append(proposal["plan"]);tickets.append(ticket)
+    if plans:
+        accepted += controller.run_training(plans, tickets)
+    return accepted, bool(plans or trusted_plans or any("_proposal" in ticket for ticket in llm_tickets))
 
 
 def run(controller):
@@ -190,7 +237,7 @@ def run(controller):
         if decision["action"] in {"FORK", "BACKTRACK"}:
             branch_id = apply_switch(controller, branch_id, decision);continue
         llm_tickets, trusted_plans, trusted_tickets = [], [], []
-        slots = min(len(peers), controller.config.max_research_experiments-accepted)
+        slots = graph.research_slots(branch, controller.config.max_research_experiments-accepted)
         for slot in range(slots):
             if slot:
                 decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": None})["decision"]
@@ -205,24 +252,10 @@ def run(controller):
                 llm_tickets.append(issue(controller, branch_id, peer, decision["parameters"]["action"], donors))
             else:
                 break
-        plans, tickets = list(trusted_plans), list(trusted_tickets)
-        with ThreadPoolExecutor(max_workers=len(peers), thread_name_prefix="researcher") as pool:
-            futures = {pool.submit(controller.call, "C09", ticket["researcher_request"]["payload"], controller.researcher.propose): ticket for ticket in llm_tickets}
-            for future in as_completed(futures):
-                ticket = futures[future]
-                try:
-                    proposal = future.result()
-                    if proposal["decision"] == "stop":
-                        graph.invoke("G04", {"work_order_id": ticket["work_order"]["work_order_id"], "proposal": proposal, "manifest": None, "lineage": None}, key="stop/"+ticket["work_order"]["work_order_id"])
-                    else:
-                        ticket["_proposal"] = proposal;plans.append(proposal["plan"]);tickets.append(ticket)
-                except Exception as exc:
-                    controller.degraded = True
-                    graph.abandon(ticket["work_order"]["work_order_id"], str(exc))
-                    controller.log.exception("research.proposal_failed", exc, work_order_id=ticket["work_order"]["work_order_id"])
-        if not plans:
+        attempted, had_plans = research_batch(controller, trusted_plans, trusted_tickets, llm_tickets)
+        if not had_plans:
             stop_reason = "no_valid_proposals";break
-        accepted += controller.run_training(plans, tickets)
+        accepted += attempted
         controller.finalize_best()
     controller.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted, experiment_limit=controller.config.max_research_experiments, budget=controller.budget.snapshot())
     controller.call("C22", {"action": "stop_search", "reason": stop_reason, "wall_seconds_remaining": int(controller.budget.remaining()), "cancel_job_ids": []}, controller.control)

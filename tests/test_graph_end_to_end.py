@@ -19,6 +19,21 @@ from scripts.reconstruct_solution import reconstruct
 
 
 class GraphEndToEndTests(unittest.TestCase):
+    def test_no_research_api_quota_finishes_cleanly_with_the_verified_baseline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);task=make_demo(root/'task')
+            settings={'LLM_MODE':'mock','GRAPH_ENABLED':'1','TIME_BUDGET_SECONDS':'90','MAX_RESEARCH_EXPERIMENTS':'3',
+                'CATALOG_WARMUP_EXPERIMENTS':'0','LLM_MAX_CALLS':'2','LOG_LEVEL':'ERROR','RESEARCH_MODE':'catalog','GRAPH_MIN_FREE_DISK_BYTES':'0'}
+            with patch.dict(os.environ,settings),redirect_stderr(io.StringIO()) as stderr:
+                code=main([str(task),'--llm-mode','mock','--work-dir',str(root/'runs')])
+            self.assertEqual(code,0,stderr.getvalue()[-4000:]);self.assertTrue((task.parent/'submission.csv').is_file())
+            run=next((root/'runs').glob('run-*'))
+            self.assertIn('State: completed',(run/'summary.md').read_text())
+            events=[json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
+            finish=next(e for e in events if e['event']=='search.finished')
+            self.assertEqual(finish['stop_reason'],'llm_call_limit')
+            self.assertFalse(any(e['event']=='research.proposal_failed' for e in events))
+
     def test_spawn_failure_after_baseline_closes_assignments_and_retains_csv(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);task=make_demo(root/'task')

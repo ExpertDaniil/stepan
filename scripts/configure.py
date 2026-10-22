@@ -12,21 +12,29 @@ if str(ROOT) not in sys.path:
 from agent.config import Config
 
 
-def recommended_settings():
+def recommended_settings(profile="standard"):
+    if profile not in {"standard", "extended"}:
+        raise ValueError("Unknown research profile")
     config = Config()
     keys = ("research_mode", "catalog_warmup_experiments", "max_research_experiments", "llm_max_calls",
             "llm_timeout_seconds", "llm_operation_timeout_seconds", "llm_bootstrap_output_tokens",
             "llm_max_output_tokens", "llm_max_output_tokens_limit", "llm_max_total_output_tokens", "llm_progress_seconds")
-    return {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":"human", "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
+    settings = {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":"human", "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
+    if profile == "extended":
+        settings.update(MAX_RESEARCH_EXPERIMENTS="100", LLM_MAX_CALLS="96")
+    return settings
 
 
-def configure(path, apply=False):
+def configure(path, apply=False, profile="standard"):
     path = Path(path)
     if not path.is_file() or path.is_symlink():
         raise ValueError("Choose an existing regular .env file; create it from .env.example if needed")
-    settings = recommended_settings()
+    settings = recommended_settings(profile)
+    original = path.read_text(encoding='utf-8')
+    if profile == 'extended' and re.search(r'^\s*(?:export\s+)?LLM_MAX_TOTAL_OUTPUT_TOKENS\s*=', original, re.MULTILINE):
+        settings.pop('LLM_MAX_TOTAL_OUTPUT_TOKENS')
     lines, seen = [], set()
-    for line in path.read_text(encoding='utf-8').splitlines(keepends=True):
+    for line in original.splitlines(keepends=True):
         match = re.match(r'^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=',line)
         key = match[1] if match else None
         if key in settings:
@@ -57,9 +65,10 @@ def configure(path, apply=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--env-file',type=Path,default=Path('.env'))
+    parser.add_argument('--profile', choices=['standard','extended'], default='standard', help='Extended raises the trial/call ceilings while preserving the total output-token cap and configured time budget')
     parser.add_argument('--apply',action='store_true',help='Write settings atomically; otherwise show only proposed non-secret values')
     args = parser.parse_args()
-    settings = configure(args.env_file,args.apply)
+    settings = configure(args.env_file,args.apply,args.profile)
     print(('Applied' if args.apply else 'Proposed')+' non-secret settings:')
     for key,value in settings.items():
         print(key+'='+value)

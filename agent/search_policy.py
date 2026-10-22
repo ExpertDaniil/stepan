@@ -14,6 +14,25 @@ def utility(evaluation):
 
 
 class SearchPolicy:
+    def attempted_research_count(self):
+        return self.db.execute("SELECT count(*) FROM experiments WHERE run_id=? AND attempt_no>0 AND json_extract(plan,'$.model.family')<>'dummy'", (self.run_id,)).fetchone()[0]
+
+    def branch_trial_count(self, branch_id):
+        return self.db.execute("SELECT count(DISTINCT b.experiment_id) FROM g_bindings b JOIN g_work_orders w USING(run_id,work_order_id) JOIN experiments e USING(run_id,experiment_id) WHERE b.run_id=? AND w.branch_id=? AND (e.attempt_no>0 OR EXISTS(SELECT 1 FROM g_branch_evaluations v WHERE v.run_id=b.run_id AND v.branch_id=w.branch_id AND v.experiment_id=b.experiment_id))", (self.run_id, branch_id)).fetchone()[0]
+
+    def pending_alternatives(self, branch):
+        candidates = []
+        for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' AND decision='reject' ORDER BY rowid DESC", (self.run_id,)):
+            alternative = self.branch(row[0])
+            deficit = self.policy["scheduling"]["minimum_alternative_trials"] - self.branch_trial_count(alternative["branch_id"])
+            if deficit > 0:
+                candidates.append((alternative, deficit))
+        return sorted(candidates, key=lambda pair: pair[0]["parent_branch_id"] != branch["parent_branch_id"])
+
+    def research_slots(self, branch, remaining):
+        reserve = sum(deficit for _, deficit in self.pending_alternatives(branch))
+        return min(self.policy["peer_count"], max(0, remaining), max(1, remaining-reserve))
+
     def _paired_effect(self, before_id, after_id, patch):
         before, after = self.store.get(before_id), self.store.get(after_id)
         a, b = self.store.experiment_evaluation(before_id), self.store.experiment_evaluation(after_id)
@@ -119,6 +138,10 @@ class SearchPolicy:
             return {"idea": idea, "graph_revision": 0}
         result = self.commit("G06", p, key, mutate)
         self.files.put_json(result["idea"], "component_idea")
+        self.log.event("graph.idea_registered", idea_id=result["idea"]["idea_id"], branch_id=cp["branch_id"],
+                       status=result["idea"]["status"], capability_ids=result["idea"]["capability_ids"],
+                       source_experiment_id=p["source_experiment_id"], transfer_pilot_experiment_ids=p["transfer_pilot_experiment_ids"],
+                       gate_reasons=result["idea"]["gate_reasons"])
         return result
 
     def _trial(self, component_id, peer_id, effect, before, after, source_trial):
@@ -148,7 +171,7 @@ class SearchPolicy:
         window.reverse()
         seed = []
         if branch["fork_checkpoint_id"]:
-            seed = [self.store.experiment_evaluation(h["experiment_id"]) for h in self.checkpoint_record(branch["fork_checkpoint_id"])["heads"] if h["experiment_id"]]
+            seed = [self.store.experiment_evaluation(h["experiment_id"]) for h in self.checkpoint_record(branch["fork_checkpoint_id"])["heads"] if self.head_satisfies(h, branch["constraints"])]
         first_seq = window[0][0]["event_seq"] if window else 0
         before = seed + [ev for row, ev in records if row["event_seq"] < first_seq]
         before = [e for e in before if e and e["valid"] and e["primary_metric"]["fidelity"] == "full"]
@@ -163,7 +186,9 @@ class SearchPolicy:
                 last_gain = row["elapsed_ms"];best = utility(ev)
             else:
                 best = max(best, utility(ev))
-        elapsed = max(0, (self.elapsed()-last_gain)//1000)
+        active = self.db.execute("SELECT record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.entity_id')=? AND json_extract(record_json,'$.record_schema')='GBranch' AND json_extract(record_json,'$.record.state')='active' ORDER BY event_seq DESC LIMIT 1", (self.run_id, branch["branch_id"])).fetchone()
+        activated_ms = json.loads(active[0])["elapsed_ms"] if active else 0
+        elapsed = max(0, (self.elapsed()-max(last_gain, activated_ms))//1000)
         gain = utility(after_best)-utility(before_best) if before_best and after_best else None
         reasons = []
         if not self.budget.snapshot()["search_allowed"]:
@@ -184,7 +209,11 @@ class SearchPolicy:
             self.db.execute("INSERT INTO g_assessments VALUES(?,?,?,?,?)", (self.run_id, result["assessment_id"], branch["branch_id"], artifact["artifact_id"], canonical(result)))
             self.event("G07", "branch", branch["branch_id"], "GPlateau", result)
             return {"assessment": result, "artifact": artifact}
-        return self.commit("G07", p, key, mutate)
+        result = self.commit("G07", p, key, mutate)
+        self.log.event("graph.plateau_assessed", branch_id=branch["branch_id"], status=result["assessment"]["status"],
+                       distinct_solution_count=result["assessment"]["distinct_solution_count"],
+                       elapsed_seconds=result["assessment"]["elapsed_seconds"], utility_gain=result["assessment"]["utility_gain"], epsilon=epsilon)
+        return result
 
     def _compatible_pilot(self, offer):
         branch = self.branch(offer["branch_id"])
@@ -206,7 +235,30 @@ class SearchPolicy:
                 pass
         return None
 
+    def _acceptance_transfer(self, branch, free):
+        if branch["decision"] != "accept" or not branch["decision_idea_id"]:
+            return None
+        idea = json.loads(self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?", (self.run_id, branch["decision_idea_id"])).fetchone()[0])
+        patch = self.artifacts.read_json(idea["transfer_patch_artifact_id"])
+        for head in self.heads(branch["branch_id"]):
+            if head["researcher_id"] not in free or not head["experiment_id"] or self.head_satisfies(head, branch["constraints"]):
+                continue
+            attempted = self.db.execute("SELECT 1 FROM g_bindings b JOIN g_work_orders w USING(run_id,work_order_id) WHERE b.run_id=? AND w.branch_id=? AND w.researcher_id=? AND w.state='completed' AND json_extract(w.order_json,'$.action')='transfer' AND EXISTS(SELECT 1 FROM json_each(w.order_json,'$.allowed_donor_experiment_ids') WHERE value=?)", (self.run_id, branch["branch_id"], head["researcher_id"], idea["source_experiment_id"])).fetchone()
+            if attempted:
+                continue
+            base = self.store.get(head["experiment_id"])["plan"]
+            try:
+                self.constructor.patch_params(base["recipe_id"], base["model"]["hyperparameters"], patch)
+            except AgentError:
+                continue
+            source = self.manifest(self.experiment_solution(idea["source_experiment_id"]))
+            components = [c["component_id"] for c in source["core"]["components"] if c["capability_id"] in idea["capability_ids"]]
+            return {"branch_id": branch["branch_id"], "expected_branch_revision": branch["branch_revision"],
+                    "researcher_id": head["researcher_id"], "source_experiment_id": idea["source_experiment_id"], "component_ids": components}
+        return None
+
     def decide(self, p, key):
+        self.expire_work()
         cp = self.checkpoint_record(p["checkpoint_id"])
         branch = self.branch(cp["branch_id"], cp["branch_revision"])
         if branch["state"] != "active":
@@ -232,25 +284,30 @@ class SearchPolicy:
                 if assessment["status"] == "plateau" and alternatives:
                     alt = next((x for x in alternatives if x["parent_branch_id"] == branch["parent_branch_id"]), alternatives[0])
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Measured plateau; resume a saved alternative", evidence_ids=[assessment["assessment_id"]])
-            if decision["action"] == "CONTINUE" and branch["decision"] == "accept":
+            attempted = self.attempted_research_count()
+            remaining = max(0, self.config.max_research_experiments-attempted)
+            if decision["action"] == "CONTINUE":
                 # A small run must not spend its entire trial cap before examining its saved alternative.
-                attempted = self.db.execute("SELECT count(*) FROM experiments WHERE run_id=? AND attempt_no>0 AND json_extract(plan,'$.model.family')<>'dummy'", (self.run_id,)).fetchone()[0]
                 threshold = max(1, int(self.config.max_research_experiments*self.policy["scheduling"]["preferred_branch_share"]))
-                if attempted >= threshold:
-                    for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' AND decision='reject' ORDER BY rowid DESC", (self.run_id,)):
-                        alt = self.branch(row[0])
-                        trials = self.db.execute("SELECT count(*) FROM g_branch_evaluations WHERE run_id=? AND branch_id=?", (self.run_id, alt["branch_id"])).fetchone()[0]
-                        if trials < self.policy["scheduling"]["minimum_alternative_trials"]:
-                            decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve a counterfactual trial before the experiment cap")
-                            break
+                current_trials = self.branch_trial_count(branch["branch_id"])
+                alternatives = self.pending_alternatives(branch)
+                reserve = sum(deficit for _, deficit in alternatives)
+                if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold) or remaining <= reserve):
+                    alt = alternatives[0][0]
+                    decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve a counterfactual trial before the experiment cap")
             if decision["action"] == "CONTINUE":
                 for row in self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? ORDER BY rowid DESC", (self.run_id,)):
                     idea = json.loads(row[0]);origin = self.checkpoint_record(idea["fork_checkpoint_id"])
                     already = self.db.execute("SELECT 1 FROM g_branches WHERE run_id=? AND decision_idea_id=?", (self.run_id, idea["idea_id"])).fetchone()
                     live = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (self.run_id,)).fetchone()[0]
                     total = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=?", (self.run_id,)).fetchone()[0]
-                    if idea["status"] == "confirmed" and origin["branch_id"] == branch["branch_id"] and origin["branch_revision"] == branch["branch_revision"] and not already and live+1 <= self.policy["max_live_branches"] and total+2 <= self.policy["max_total_branches"]:
+                    if idea["status"] == "confirmed" and origin["branch_id"] == branch["branch_id"] and origin["branch_revision"] == branch["branch_revision"] and not already and live+1 <= self.policy["max_live_branches"] and total+2 <= self.policy["max_total_branches"] and remaining >= 2*self.policy["scheduling"]["minimum_alternative_trials"]:
                         decision.update(action="FORK", parameters={"parent_branch_id": branch["branch_id"], "expected_branch_revision": branch["branch_revision"], "checkpoint_id": idea["fork_checkpoint_id"], "idea_id": idea["idea_id"]}, reason="A controlled component and recipient pilot passed the transfer gate", evidence_ids=[idea["idea_id"]]);break
+            if decision["action"] == "CONTINUE":
+                acceptance = self._acceptance_transfer(branch, free)
+                if acceptance:
+                    decision.update(action="TRANSFER_COMPONENT", parameters=acceptance,
+                                    reason="Apply the confirmed component to this peer's restored base before tuning", evidence_ids=[branch["decision_idea_id"]])
             if decision["action"] == "CONTINUE":
                 for row in self.db.execute("SELECT record_json FROM g_idea_candidates WHERE run_id=? ORDER BY rowid", (self.run_id,)):
                     offer = json.loads(row[0])
@@ -260,6 +317,24 @@ class SearchPolicy:
                             source = self.manifest(self.experiment_solution(offer["source_experiment_id"]))
                             cids = [c["component_id"] for c in source["core"]["components"] if c["capability_id"] in offer["capability_ids"]]
                             decision.update(action="TRANSFER_COMPONENT", parameters={"branch_id": branch["branch_id"], "expected_branch_revision": branch["branch_revision"], "researcher_id": pilot["researcher_id"], "source_experiment_id": offer["source_experiment_id"], "component_ids": cids}, reason="Run one controlled recipient pilot before collective adoption", evidence_ids=[offer["source_experiment_id"]]);break
+            if decision["action"] == "CONTINUE":
+                # Assignments are issued before the parallel API calls start. Account for them now.
+                pending = self.db.execute("SELECT count(*) FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND (order_json IS NULL OR json_extract(order_json,'$.action') NOT IN ('baseline','transfer'))", (self.run_id,)).fetchone()[0]
+                stop_reason = None
+                if remaining <= 0:
+                    stop_reason = "experiment_limit"
+                elif self.budget.snapshot()["llm_calls_remaining"] <= pending:
+                    stop_reason = "llm_call_limit"
+                elif self.budget.token_snapshot()["output_available"] < (pending+1)*self.config.llm_max_output_tokens:
+                    stop_reason = "llm_output_budget"
+                gateway = getattr(self.controller, "gateway", None)
+                if gateway is not None:
+                    try:
+                        gateway.check_availability()
+                    except AgentError as exc:
+                        stop_reason = exc.code.lower()
+                if stop_reason:
+                    decision.update(action="FINALIZE", parameters={"reason": stop_reason}, reason=stop_reason)
         artifact = self.files.put_json(decision, "search_decision")
         def mutate():
             self.branch(branch["branch_id"], branch["branch_revision"])
@@ -268,7 +343,10 @@ class SearchPolicy:
             self.db.execute("INSERT INTO g_decisions VALUES(?,?,?,?,?)", (self.run_id, decision["decision_id"], cp["checkpoint_id"], artifact["artifact_id"], canonical(decision)))
             self.event("G14", "branch", branch["branch_id"], "GSearchDecision", decision)
             return {"decision": decision, "decision_artifact_id": artifact["artifact_id"], "graph_revision": 0}
-        return self.commit("G14", p, key, mutate)
+        result = self.commit("G14", p, key, mutate)
+        self.log.event("search.decision", decision_id=decision["decision_id"], branch_id=branch["branch_id"],
+                       action=decision["action"], reason=decision["reason"], parameters=decision["parameters"], evidence_ids=decision["evidence_ids"])
+        return result
 
     def offer_component(self, experiment_id):
         """Discover only a controlled portable feature change, never infer causality from a mixed improvement."""

@@ -71,6 +71,22 @@ class Catalog:
         except AgentError:
             return False
 
+    def branch_recipes(self, recipe_ids, constraints):
+        from copy import deepcopy
+        features = json.loads((ROOT / "recipes/components.json").read_text(encoding="utf-8"))["features"]
+        recipes = []
+        for recipe_id in recipe_ids:
+            recipe = deepcopy(self.recipes[recipe_id])
+            for capability, feature in features.items():
+                domain = recipe["parameters"].get(feature["parameter"])
+                required = capability in constraints["required_capability_ids"]
+                forbidden = capability in constraints["forbidden_capability_ids"]
+                if domain is not None and (required or forbidden):
+                    value = feature["enabled_value"] if required else feature["disabled_value"]
+                    domain.update(default=value, enum=[value])
+            recipes.append(recipe)
+        return recipes
+
     def validate_plan(self, plan, spec, validation_id, artifacts):
         if plan["task_spec_id"] != spec["task_spec_id"] or plan["dataset_id"] != spec["dataset_id"] or plan["validation_id"] != validation_id:
             raise AgentError("STALE_VALIDATION", "Plan references a different task or validation")

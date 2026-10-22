@@ -176,6 +176,12 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         return [{"researcher_id": r["researcher_id"], "solution_id": r["solution_id"], "experiment_id": r["experiment_id"], "head_revision": r["revision"]}
                 for r in self.db.execute("SELECT * FROM g_heads WHERE run_id=? AND branch_id=? ORDER BY researcher_id", (self.run_id, branch_id))]
 
+    def head_satisfies(self, head, constraints):
+        if not head["solution_id"]:
+            return False
+        caps, _ = dependency_closure(self.manifest(head["solution_id"])["core"]["components"])
+        return set(constraints["required_capability_ids"]) <= set(caps) and not set(constraints["forbidden_capability_ids"]) & set(caps)
+
     def manifest(self, solution_id):
         row = self.db.execute("SELECT manifest_artifact_id FROM g_solutions WHERE run_id=? AND solution_id=?", (self.run_id, solution_id)).fetchone()
         if not row:
@@ -321,7 +327,11 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             self.event("G02", "branch", parent["branch_id"], "GBranch", self.branch(parent["branch_id"]))
             return {"parent_branch": self.branch(parent["branch_id"]), "accept_branch": self.branch(children["accept"]), "reject_branch": self.branch(children["reject"]),
                     "revoked_work_order_ids": revoked, "origin_running_job_ids": jobs, "graph_revision": 0}
-        return self.commit("G02", p, key, mutate)
+        result = self.commit("G02", p, key, mutate)
+        self.log.event("graph.branch_forked", parent_branch_id=parent["branch_id"], idea_id=idea["idea_id"],
+                       checkpoint_id=cp["checkpoint_id"], accept_branch_id=result["accept_branch"]["branch_id"],
+                       reject_branch_id=result["reject_branch"]["branch_id"], capability_ids=idea["capability_ids"])
+        return result
 
     def control_branch(self, p, key):
         def mutate():
@@ -335,7 +345,10 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             updated = self.branch(branch["branch_id"])
             self.event("G08", "branch", branch["branch_id"], "GBranch", updated)
             return {"branch": updated, "revoked_work_order_ids": revoked, "origin_running_job_ids": jobs, "graph_revision": 0}
-        return self.commit("G08", p, key, mutate)
+        result = self.commit("G08", p, key, mutate)
+        self.log.event("graph.branch_state_changed", branch_id=p["branch_id"], action=p["action"], reason=p["reason"],
+                       state=result["branch"]["state"], branch_revision=result["branch"]["branch_revision"])
+        return result
 
     def check_order(self, order_id):
         order = self.order(order_id)
@@ -482,7 +495,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                     disposition = "archived_stale"
                 elif metric["fidelity"] != "full":
                     disposition = "kept_screening"
-                elif head["experiment_id"] is None or is_better(metric, self.store.experiment_evaluation(head["experiment_id"])["primary_metric"]):
+                elif not self.head_satisfies(head, branch["constraints"]) or is_better(metric, self.store.experiment_evaluation(head["experiment_id"])["primary_metric"]):
                     changed = self.db.execute("UPDATE g_heads SET solution_id=?,experiment_id=?,revision=revision+1 WHERE run_id=? AND branch_id=? AND researcher_id=? AND revision=?",
                         (solution_id, exp["experiment_id"], self.run_id, order["branch_id"], order["researcher_id"], order["base_head_revision"])).rowcount
                     if changed != 1:

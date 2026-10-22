@@ -1,0 +1,58 @@
+{
+  "version": "0.4.2",
+  "date": "2026-10-22",
+  "review_base_commit": "c7fb573568a87bc6be5757121b3f8a5d7aa3a394",
+  "tests": {
+    "command": "python3 scripts/check.py",
+    "passed": 138,
+    "duration_seconds": 193.034,
+    "exit_code": 0,
+    "upstream_tests": 120,
+    "new_tests": 18,
+    "log": "validation-research-unittest.log"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "packages": {
+      "numpy": "2.3.5",
+      "pandas": "2.2.3",
+      "scipy": "1.17.0",
+      "scikit-learn": "1.8.0",
+      "joblib": "1.5.3",
+      "catboost": null,
+      "openai": null
+    }
+  },
+  "context_retention_ab": {
+    "baseline": {
+      "retained_facts": 0,
+      "has_measured_base": false,
+      "message_bytes": 5762
+    },
+    "fixed": {
+      "retained_facts": 2,
+      "has_measured_base": true,
+      "message_bytes": 9003
+    },
+    "scenario": "Synthetic large redundant profile; injected unit scores, not a model-quality benchmark"
+  },
+  "original_non_G_schema_definitions_unchanged": 100,
+  "package": {
+    "path_hint": "dist/solution.zip",
+    "files": 41,
+    "runtime_files": 51,
+    "bytes": 163345,
+    "sha256": "c98f3e99bd2904b9bcf1b0e565bd13d94750313ecd8cf1204d756325707c281d",
+    "flat_and_readable": true,
+    "official_requirements_byte_identical": true
+  },
+  "source_freeze": "Runtime sources were unchanged during the successful full test run; only documentation and manifest were finalized afterwards.",
+  "limits": [
+    "LLM/API mocked in tests",
+    "ML data synthetic; state-machine scores explicitly injected",
+    "User regression dataset and saved run workspace unavailable",
+    "CatBoost and OpenAI SDK not installed in this test environment",
+    "Official organizer container, live API and uninterrupted three-hour run not executed"
+  ]
+}

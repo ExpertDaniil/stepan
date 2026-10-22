@@ -1,9 +1,12 @@
-# Research Graph v1 · реализация v0.4.0
+# Research Graph v1 · реализация v0.4.2
 
 Основа: текущая v0.3.1, commit 3b6d7d84879fffbe76d111d05a9d58816b009e77. Фикс завершения worker
 и три его теста сохранены. Интерфейс платформы — прежний solution.py; C00–C24 не меняются.
 G00–G14/I00–I03 — работающие локальные операции, их схемы и request/success/error fixtures находятся в contracts/.
 Точная карта модулей и форматов также дана в graph-io.json. Runtime использует stdlib и уже разрешённые зависимости.
+
+Изменения v0.4.2, регрессионные проверки, новые необязательные поля контекста и продолжительный
+профиль поиска описаны в [RESEARCH-REVIEW.md](RESEARCH-REVIEW.md). Читаемая плоская поставка v0.4.1 сохранена.
 
 ## Как идёт работа
 
@@ -53,7 +56,10 @@ branch_revision меняется при pause/resume/seal/archive; head_revision
 messages/metadata с graph_binding; user.content проверяется как GContextUser. В profile_summary находятся data,
 доступные recipes, task_text и context_budget. Schema ResearchChoice-v1 добавлена к старому ResearchProposal-v1.
 
-Необязательные facts/profile сокращаются до запроса. Условия, constraints и base code не обрезаются.
+Сначала сокращается избыточный профиль. Измеренная база (`base_result`), явные donors и ближайшие
+факты защищены; затем сокращается оставшаяся история. Собственные наблюдения предков ограничены
+captured_event_seq соответствующего fork checkpoint. Чужая линия не становится global recent.
+Условия, constraints и base code не обрезаются. research_strategy явно передаёт exploit/explore.
 Gateway перед каждым реальным API-вызовом проверяет полный сериализованный request: schemas, tools и repair rounds
 также занимают бюджет. Без tokenizer byte-based estimate не выдаётся за точное число токенов или известное окно провайдера.
 При превышении mandatory части возвращается явная ошибка; ранее опубликованный CSV остаётся.

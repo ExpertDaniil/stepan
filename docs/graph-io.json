@@ -223,5 +223,13 @@
     "submission": "CSV according to TaskSpec.output",
     "state.sqlite": "native schema + agent/graph/schema.sql",
     "llm_context": "messages + metadata; GResearchContext in graph mode"
+  },
+  "review_base_commit": "c7fb573568a87bc6be5757121b3f8a5d7aa3a394",
+  "context_additions_v042": {
+    "GContextUser.base_result": "Optional GExperimentMemory or null; measured own reference protected during trimming",
+    "GContextUser.research_strategy": "Optional exploit_incumbent or explore_alternative; produced on every new graph context",
+    "facts": "Own branch and checkpoint-bounded ancestor observations plus explicit donors; rejection facts have no score",
+    "producer": "agent/graph/context.py -> agent/context.py",
+    "consumer": "agent/researcher.py -> C10; immutable capsule references persisted by G03"
   }
 }

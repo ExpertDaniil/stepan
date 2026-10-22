@@ -8,16 +8,71 @@ from agent.graph.identity import dependency_closure
 
 
 class WorkService:
+    def lineage_cuts(self, branch_id):
+        seen = set()
+        cut = self.cut()
+        while branch_id:
+            if branch_id in seen:
+                raise AgentError("INVALID_BRANCH_GRAPH", "Branch ancestry contains a cycle")
+            seen.add(branch_id)
+            yield branch_id, cut
+            branch = self.branch(branch_id)
+            if branch["fork_checkpoint_id"]:
+                cut = min(cut, self.checkpoint_record(branch["fork_checkpoint_id"])["captured_event_seq"])
+            branch_id = branch["parent_branch_id"]
+
+    def visible_history(self, branch_id, researcher_id=None):
+        """Only observations made on this line before each ancestor's fork cut."""
+        history = []
+        for branch_id, cut in self.lineage_cuts(branch_id):
+            for row in self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND event_seq<=? AND json_extract(record_json,'$.record_schema') IN ('GHeadResult','Error') ORDER BY event_seq DESC", (self.run_id, cut)):
+                event = json.loads(row["record_json"]);record = event["record"]
+                if event["record_schema"] == "GHeadResult":
+                    if record["branch_id"] != branch_id or (researcher_id and record["researcher_id"] != researcher_id):
+                        continue
+                    history.append((row["event_seq"], record["experiment_id"]))
+                elif event["entity_type"] == "work_order":
+                    binding = self.db.execute("SELECT b.experiment_id,w.branch_id,w.researcher_id FROM g_bindings b JOIN g_work_orders w USING(run_id,work_order_id) WHERE b.run_id=? AND b.work_order_id=?", (self.run_id, event["entity_id"])).fetchone()
+                    if binding and binding["branch_id"] == branch_id and (not researcher_id or binding["researcher_id"] == researcher_id):
+                        history.append((row["event_seq"], binding["experiment_id"]))
+        return list(dict.fromkeys(eid for _, eid in sorted(history, reverse=True)))
+
+    def rejection_facts(self, branch_id, researcher_id):
+        errors = []
+        for branch_id, cut in self.lineage_cuts(branch_id):
+            rows = self.db.execute("SELECT e.event_seq,e.record_json FROM g_events e JOIN g_work_orders w ON w.run_id=e.run_id AND w.work_order_id=json_extract(e.record_json,'$.entity_id') WHERE e.run_id=? AND e.event_seq<=? AND w.branch_id=? AND w.researcher_id=? AND json_extract(e.record_json,'$.record_schema')='Error' AND NOT EXISTS(SELECT 1 FROM g_bindings b WHERE b.run_id=w.run_id AND b.work_order_id=w.work_order_id) ORDER BY e.event_seq DESC", (self.run_id, cut, branch_id, researcher_id))
+            for row in rows:
+                event = json.loads(row["record_json"]);error = event["record"]
+                summary = canonical({"code": error["code"], "message": error["message"][:self.policy["context"]["max_error_excerpt_bytes"]//4], "stage": "proposal_rejected"})
+                errors.append((row["event_seq"], {"kind": "failure", "source_id": event["entity_id"], "summary": summary, "artifact_ids": []}))
+        return [fact for _, fact in sorted(errors, key=lambda pair: pair[0], reverse=True)]
+
+    def memory_record(self, experiment_id, head=None):
+        exp = self.store.get(experiment_id);plan = exp["plan"]
+        ev = self.store.experiment_evaluation(experiment_id)
+        trusted = ev and exp["state"] == "evaluated" and ev["valid"] and not ev["violations"]
+        error = self.log.redactor.clean(str(exp["error"])) if exp["error"] else None
+        return {"experiment_id": experiment_id, "state": exp["state"], "recipe_id": plan["recipe_id"],
+                "hypothesis": plan["hypothesis"][:600], "metric": ev["primary_metric"] if trusted else None,
+                "hyperparameters": plan["model"]["hyperparameters"], "feature_steps": plan["feature_steps"],
+                "seed": plan["seed"], "is_incumbent": bool(head and experiment_id == head["experiment_id"]),
+                "error": error[:self.policy["context"]["max_error_excerpt_bytes"]//4] if error else None}
+
     def recent_for_context(self, branch_id, head, donors):
-        rows = self.db.execute("SELECT b.experiment_id FROM g_bindings b JOIN g_work_orders w USING(run_id,work_order_id) WHERE w.run_id=? AND w.branch_id=? ORDER BY b.rowid DESC", (self.run_id, branch_id)).fetchall()
-        ids = list(dict.fromkeys(([head["experiment_id"]] if head["experiment_id"] else []) + list(donors) + [r[0] for r in rows]))
-        recent = []
-        for eid in ids[:self.policy["context"]["max_related_records"]]:
-            exp = self.store.get(eid);plan = exp["plan"];ev = self.store.experiment_evaluation(eid)
-            recent.append({"experiment_id": eid, "state": exp["state"], "recipe_id": plan["recipe_id"], "hypothesis": plan["hypothesis"],
-                           "metric": ev["primary_metric"] if ev else None, "hyperparameters": plan["model"]["hyperparameters"],
-                           "feature_steps": plan["feature_steps"], "seed": plan["seed"], "is_incumbent": eid == head["experiment_id"]})
-        return recent, len(ids)
+        history = self.visible_history(branch_id, head["researcher_id"])
+        ids = list(dict.fromkeys(([head["experiment_id"]] if head["experiment_id"] else []) + list(donors) + history))
+        return [self.memory_record(eid, head) for eid in ids[:max(1, self.policy["context"]["max_related_records"])]], len(ids)
+
+    def expire_work(self):
+        expired = self.db.execute("SELECT work_order_id,order_json FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, self.elapsed())).fetchall()
+        if not expired:
+            return
+        with self.store.transaction():
+            for row in expired:
+                self.db.execute("UPDATE g_work_orders SET state='expired' WHERE run_id=? AND work_order_id=?", (self.run_id, row["work_order_id"]))
+                if row["order_json"]:
+                    self.event("G03", "work_order", row["work_order_id"], "GWorkOrder", self.order(row["work_order_id"]))
+            self.db.execute("UPDATE g_runs SET graph_revision=graph_revision+1 WHERE run_id=?", (self.run_id,))
 
     def issue_work(self, p, key):
         branch = self.branch(p["branch_id"], p["expected_branch_revision"])
@@ -36,8 +91,8 @@ class WorkService:
             if set(caps) & set(branch["constraints"]["forbidden_capability_ids"]):
                 raise AgentError("CAPABILITY_FORBIDDEN", "Donor contains a capability forbidden in this line")
         now = self.elapsed()
+        self.expire_work()
         with self.store.transaction():
-            self.db.execute("UPDATE g_work_orders SET state='expired' WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, now))
             if self.db.execute("SELECT 1 FROM g_work_orders WHERE run_id=? AND researcher_id=? AND state IN ('preparing','issued','submitted')", (self.run_id, p["researcher_id"])).fetchone():
                 raise AgentError("PEER_BUSY", "This equal peer already has an unfinished work order")
             order_id = "work-"+uuid.uuid4().hex[:16]
@@ -59,11 +114,19 @@ class WorkService:
             task_contract = self.artifacts.read_json(self.metadata("task_contract_artifact_id"))
             facts = [{"kind": "result" if r["metric"] else "failure", "source_id": r["experiment_id"], "summary": canonical(r),
                       "artifact_ids": [self.store.get(r["experiment_id"])["plan"]["code_artifact_id"]]} for r in recent]
+            rejected = self.rejection_facts(branch["branch_id"], p["researcher_id"])
+            protected_ids = {head["experiment_id"], *binding["allowed_donor_experiment_ids"]}
+            facts = ([f for f in facts if f["source_id"] in protected_ids] + rejected + [f for f in facts if f["source_id"] not in protected_ids])[:max(1, self.policy["context"]["max_related_records"])]
+            total_recent += len(rejected)
             assignment = "exploit_incumbent" if (self.context.round_no + self.metadata("researcher_ids").index(p["researcher_id"])) % 2 == 0 else "explore_alternative"
+            if p["action"] == "transfer":
+                assignment = "exploit_incumbent"
+            observed_recipes = [self.store.get(eid)["plan"]["recipe_id"] for eid in self.visible_history(branch["branch_id"])]
             graph_input = {"binding": {"work_order_id": order_id, "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
                                         "head_revision": head["head_revision"], "capsule_artifact_id": capsule_id},
                            "task_contract": task_contract, "head": head, "base_code": base_code, "constraints": branch["constraints"],
                            "facts": facts, "recent": recent, "total_recent": total_recent, "donors": binding["allowed_donor_experiment_ids"],
+                           "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None, "observed_recipes": observed_recipes,
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
             args = {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"], "tools_catalog_version": p["tools_catalog_version"],
                     "researcher_id": p["researcher_id"], "assignment": assignment, "max_input_tokens": self.policy["context"]["max_input_tokens"]}

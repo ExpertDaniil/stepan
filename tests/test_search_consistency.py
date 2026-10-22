@@ -95,7 +95,7 @@ class SearchConsistencyTests(unittest.TestCase):
         out = self.g.invoke('G02', fork)
         self.g.policy['max_live_branches'] = 2
         accept, reject = out['accept_branch']['branch_id'], out['reject_branch']['branch_id']
-        decision = {'decision_id': 'fixture-switch', 'reason': 'fixture', 'parameters': {'target_branch_id': reject}}
+        decision = {'decision_id': 'fixture-switch', 'action': 'BACKTRACK', 'reason': 'fixture', 'parameters': {'target_branch_id': reject}}
         apply_switch(self.c, accept, decision)
         self.assertEqual(self.g.branch(accept)['state'], 'paused')
         self.assertEqual(self.g.branch(reject)['state'], 'active')

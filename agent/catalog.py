@@ -12,6 +12,10 @@ class Catalog:
         all_recipes = json.loads((ROOT / "recipes" / "catalog.json").read_text(encoding="utf-8"))
         self.recipes = {r["id"]: r for r in all_recipes if (kind == "regression") == (r["task_kind"] == "regression")
                         and (r.get("requires") is None or importlib.util.find_spec(r["requires"]))}
+        if config.research_mode == 'adaptive':
+            from agent.research_actions import CUSTOM_RECIPE
+            self.recipes[CUSTOM_RECIPE] = {'id': CUSTOM_RECIPE, 'task_kind': kind, 'family': 'custom',
+                'parameters': {}, 'requires': None, 'description': 'Explicit generated make_pipeline; arbitrary finite JSON parameters, no private _parameters.'}
 
     def select(self, payload, artifacts, schemas):
         tools = []
@@ -22,6 +26,10 @@ class Catalog:
         ]:
             tools.append({"name": name, "description": desc, "input_schema": schemas.schema["$defs"][cid + "_Request"]["properties"]["payload"],
                           "timeout_seconds": timeout, "side_effect": side_effect})
+        if self.config.research_mode == 'adaptive':
+            from tools.analysis import ANALYSIS_SCHEMA
+            tools.append({'name': 'analyze_data', 'description': 'Bounded fit-only statistics, feature comparisons and metadata.',
+                          'input_schema': ANALYSIS_SCHEMA, 'timeout_seconds': 120, 'side_effect': 'artifact_write'})
         markdown = "# Tool catalogue v1\n\nEach call has a fresh process only when executed by Runner. Files persist; Python variables do not.\n\n"
         for tool in tools:
             markdown += "## " + tool["name"] + "\n\n" + tool["description"] + "\n\n```json\n" + json.dumps(tool["input_schema"], indent=2) + "\n```\n\n"
@@ -33,6 +41,15 @@ class Catalog:
         if recipe_id not in self.recipes:
             raise AgentError("INVALID_PLAN", f"Unavailable recipe: {recipe_id}")
         recipe = self.recipes[recipe_id]
+        if recipe['family'] == 'custom':
+            from agent.contracts import canonical
+            try:
+                size = len(canonical(params).encode())
+            except (TypeError, ValueError) as error:
+                raise AgentError('INVALID_PLAN', 'Custom parameters must be finite JSON') from error
+            if any(not isinstance(k, str) or k.startswith('_') for k in params) or size > 16000:
+                raise AgentError('INVALID_PLAN', 'Custom parameters must be finite JSON with no reserved names, at most 16 KiB')
+            return deepcopy(params)
         if set(params) - set(recipe["parameters"]):
             raise AgentError("INVALID_PLAN", "Unknown hyperparameter", details={"unknown": sorted(set(params) - set(recipe["parameters"]))})
         result = {}
@@ -109,6 +126,8 @@ class Catalog:
 
     def assignment_recipes(self, assignment, recent):
         usable = [key for key, value in self.recipes.items() if value["family"] != "dummy"]
+        if self.config.research_mode == 'adaptive':
+            return usable
         # Snapshot order is recent-first; the dispatcher supplies the incumbent
         # separately in the assignment context when available.
         focus = next((row.get("recipe_id") for row in recent if row.get("is_incumbent") and row.get("recipe_id") in usable), None)

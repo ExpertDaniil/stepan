@@ -27,6 +27,7 @@ RESOURCE_FILES = (
     "prompts/validation.md",
     "prompts/researcher.md",
     "prompts/researcher-catalog.md",
+    "prompts/researcher-adaptive.md",
     "prompts/TOOLS.md",
 )
 

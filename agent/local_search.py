@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import random
+import time
 
 from agent.catalog import factory_source
 from agent.contracts import canonical
@@ -20,6 +21,7 @@ class LocalSearch:
         self.coverage = Counter()
         self.parameter_turn = Counter()
         self.rowid = 0
+        self.authorizations = {}
 
     @staticmethod
     def key(recipe, params):
@@ -46,10 +48,17 @@ class LocalSearch:
         return self.key(plan["recipe_id"], plan["model"]["hyperparameters"]) in self.seen
 
     def has_series(self, peer, branch):
+        if self.c.config.research_mode == 'adaptive':
+            auth = self.authorizations.get((branch, peer))
+            if not auth or time.monotonic() >= auth['deadline']:
+                self.series.pop((branch, peer), None)
+                return False
         item = self.series.get((branch, peer))
         return bool(item and item[0] > 0 and item[1])
 
     def refining(self, branch, base):
+        if self.c.config.research_mode == 'adaptive':
+            return False  # Empirical feature choices remain revisable in the final phase.
         graph = getattr(self.c, 'graph', None)
         phase = graph.refinement() if graph else None
         return bool(phase and phase['branch_id'] == branch and base and base['model']['family'] != 'dummy')
@@ -60,12 +69,14 @@ class LocalSearch:
             return {feature['parameter'] for feature in graph.constructor.registry['features'].values()}
         return {'target_transform', 'numeric_interactions', 'class_weight'}
 
-    def variants(self, recipe, params, *, numeric_only=False, offset=0, fine=False):
+    def variants(self, recipe, params, *, numeric_only=False, offset=0, fine=False, parameter_names=None):
         """Interleave axes; do not spend an entire series on the first parameter."""
         axes = []
         locked = self.feature_parameters() if numeric_only else set()
         domains = list(self.c.catalog.recipes[recipe]['parameters'].items())
         domains = [(name, domain) for name, domain in domains if name not in locked]
+        if parameter_names is not None:
+            domains = [(name, domain) for name, domain in domains if name in parameter_names]
         if domains:
             offset %= len(domains)
             domains = domains[offset:] + domains[:offset]
@@ -98,10 +109,19 @@ class LocalSearch:
                 if index < len(axis):
                     yield axis[index]
 
-    def start_series(self, peer, branch, plan):
+    def start_series(self, peer, branch, plan, *, request=None):
+        adaptive = self.c.config.research_mode == 'adaptive'
+        if adaptive and request is None:
+            return
+        if adaptive:
+            if request['budget_seconds'] <= 0:
+                return
+            self.authorizations[(branch, peer)] = {'deadline': time.monotonic()+request['budget_seconds'],
+                                                  'parameters': request['parameters']}
         recipe, params = plan["recipe_id"], plan["model"]["hyperparameters"]
-        values = deque((recipe, p) for p in self.variants(recipe, params, numeric_only=self.refining(branch, plan)))
-        self.series[(branch, peer)] = [self.c.config.research_series_size - 1, values, recipe, params]
+        values = deque((recipe, p) for p in self.variants(recipe, params, numeric_only=self.refining(branch, plan),
+                       parameter_names=request['parameters'] if adaptive else None))
+        self.series[(branch, peer)] = [(request['max_trials'] if adaptive else self.c.config.research_series_size) - 1, values, recipe, params]
 
     def measured_base(self, peer, branch, recipe, fallback):
         graph = getattr(self.c, 'graph', None)
@@ -137,11 +157,14 @@ class LocalSearch:
         constraints = constraints or {"required_capability_ids": [], "forbidden_capability_ids": []}
         tried = set()
         final = self.refining(branch, base)
+        adaptive = self.c.config.research_mode == 'adaptive'
+        authorized = self.has_series(peer, branch) if adaptive else False
         feature_parameters = self.feature_parameters() if final else set()
 
         def variants(recipe, params):
             return self.variants(recipe, params, numeric_only=final,
-                                 offset=self.parameter_turn[(branch, peer, recipe)], fine=final)
+                                 offset=self.parameter_turn[(branch, peer, recipe)], fine=final,
+                                 parameter_names=self.authorizations[(branch, peer)]['parameters'] if authorized else None)
 
         def allowed(recipe, params):
             if final and params == base['model']['hyperparameters']:
@@ -176,8 +199,10 @@ class LocalSearch:
                     item[0] -= 1
                     return choice
         self.series.pop((branch, peer), None)
+        if adaptive and self.c.llm_available():
+            return None  # Let the planner choose another action; no implicit follow-up.
         recipes = [r for r, value in self.c.catalog.recipes.items()
-                   if value["family"] != "dummy" and (not final or r == base['recipe_id']) and self.c.catalog.allows_constraints(r, constraints)]
+                   if value["family"] not in {'dummy', 'custom'} and (not final or r == base['recipe_id']) and self.c.catalog.allows_constraints(r, constraints)]
         recipes.sort(key=lambda r: self.coverage[r])
         turn = self.sequence[(branch, peer)]
         self.sequence[(branch, peer)] += 1

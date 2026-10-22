@@ -23,6 +23,11 @@ class Orchestrator:
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
         self.researcher.validation_id = validation["validation_id"]
+        if config.research_mode == 'adaptive':
+            from tools.analysis import AnalysisService
+            analysis = AnalysisService(spec, validation, artifacts, budget, log)
+            self.context.analysis = analysis
+            self.researcher.gateway.analysis = analysis
         self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes)
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
@@ -80,12 +85,36 @@ class Orchestrator:
         if choice is None:
             return None
         plan = self.warmup_plan(*choice)
+        if self.config.research_mode == 'adaptive':
+            authorization = self.local_search.authorizations.get((branch, peer))
+            if authorization:
+                left = int(authorization['deadline']-time.monotonic())
+                if left < 1:
+                    return None
+                plan['resources']['timeout_seconds'] = min(plan['resources']['timeout_seconds'], left)
         plan.update(researcher_id=peer, parent_ids=[self.store.best()] if self.store.best() else [],
                     hypothesis="Related local catalogue trial: vary checked parameters on the fixed validation.",
                     expected_effect="Measure against the recorded base; improvement is not assumed.")
         self.log.event("search.local_trial", researcher_id=peer, branch_id=branch, recipe_id=plan["recipe_id"],
                        hyperparameters=plan["model"]["hyperparameters"])
         return plan
+
+    def authorize_research(self, plan, branch='legacy'):
+        """Dispatcher admits an explicit research action; implicit catalogue series stay legacy-only."""
+        if self.config.research_mode != 'adaptive':
+            self.local_search.start_series(plan['researcher_id'], branch, plan)
+            return
+        intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        request = None
+        if intent['action'] == 'tune':
+            request = dict(intent['tuning'])
+            request['budget_seconds'] = min(request['budget_seconds'], max(0, int(min(
+                self.budget.phase_remaining(), self.budget.remaining()-self.budget.reserve_seconds()))))
+            self.local_search.start_series(plan['researcher_id'], branch, plan, request=request)
+        else:
+            self.local_search.series.pop((branch, plan['researcher_id']), None)
+        self.log.event('research.action_admitted', plan_id=plan['plan_id'], action=intent['action'],
+                       branch_id=branch, tuning=intent['tuning'], effective_tuning=request, evidence_ids=intent['evidence_ids'])
 
     def update_final_reserve(self):
         best = self.store.best()
@@ -385,7 +414,7 @@ class Orchestrator:
                 for future in as_completed(futures):
                     try:
                         reply = future.result()
-                        if reply["decision"] == "stop":
+                        if reply["decision"] == "stop" and self.config.research_mode != 'adaptive':
                             best = self.store.best()
                             plan = self.local_plan(reply["researcher_id"], base=self.store.get(best)["plan"] if best else None)
                             if plan:
@@ -395,7 +424,7 @@ class Orchestrator:
                             if self.local_search.repeated(plan) or not self.budget.can_train(plan)["allowed"]:
                                 plan = self.local_plan(reply["researcher_id"], base=plan)
                             else:
-                                self.local_search.start_series(plan["researcher_id"], "legacy", plan)
+                                self.authorize_research(plan)
                             if plan:
                                 plans.append(plan)
                     except AgentError as exc:

@@ -11839,7 +11839,8 @@
             "schema_id": {
               "enum": [
                 "ResearchChoice-v1",
-                "ResearchProposal-v1"
+                "ResearchProposal-v1",
+                "ResearchAction-v1"
               ]
             },
             "researcher_id": {
@@ -13785,6 +13786,163 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ResearchAction": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "catalog",
+            "pipeline",
+            "tune",
+            "stop"
+          ]
+        },
+        "recipe_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hyperparameters": {
+          "type": "object"
+        },
+        "hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feature_steps": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tuning": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "maxItems": 12
+                },
+                "max_trials": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 16
+                },
+                "budget_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3600
+                }
+              },
+              "required": [
+                "parameters",
+                "max_trials",
+                "budget_seconds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 12
+        }
+      },
+      "required": [
+        "action",
+        "recipe_id",
+        "hyperparameters",
+        "hypothesis",
+        "expected_effect",
+        "feature_steps",
+        "code",
+        "tuning",
+        "evidence_ids"
+      ],
+      "additionalProperties": false
+    },
+    "AnalysisQuery": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "summary",
+            "association",
+            "group",
+            "compare",
+            "dictionary",
+            "report"
+          ]
+        },
+        "report_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 12
+        },
+        "group_by": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "include_target": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "columns",
+        "group_by",
+        "include_target"
+      ],
+      "additionalProperties": false
     }
   },
   "description": "Use $ref #/$defs/Cxx_Request or #/$defs/Cxx_Response for a specific endpoint. Endpoint routing is external to JSON Schema."

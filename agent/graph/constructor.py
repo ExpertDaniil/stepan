@@ -84,6 +84,8 @@ class Constructor:
                            "implementation_sha256": self.implementation_hash, "parameters": {"recipe_id": recipe_id, **model_params},
                            "dependency_component_ids": [], "origin": "builtin", "provenance_sha256": self.provenance["sha256"]})
         result = [model]
+        if self.catalog.recipes[recipe_id]['family'] == 'custom':
+            return result  # Never certify generated feature semantics from declared parameter names.
         for capability, feature in sorted(features.items()):
             if params.get(feature["parameter"]) == feature["enabled_value"]:
                 result.append(component({"capability_id": capability, "version": "1.0", "implementation_sha256": self.implementation_hash,

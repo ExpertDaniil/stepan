@@ -5,6 +5,11 @@ import math
 
 
 class DurationModel:
+    @staticmethod
+    def sample_key(plan):
+        family = plan['model']['family']
+        return family+':'+plan['code_artifact_id'] if family == 'custom' else family
+
     def __init__(self, config):
         self.config = config
         self.rows = {"train": 1, "refit": 1}
@@ -54,7 +59,7 @@ class DurationModel:
         if state != "succeeded" and not censored:
             return
         fit = seconds if fit_seconds is None else min(seconds, max(0, fit_seconds))
-        self.samples[plan["model"]["family"]].append({
+        self.samples[self.sample_key(plan)].append({
             "work": self.work(plan, phase), "fit": fit, "overhead": max(0, seconds - fit),
             "censored": censored, "phase": phase,
         })
@@ -62,7 +67,7 @@ class DurationModel:
     def estimate(self, plan, phase="train"):
         family = plan["model"]["family"]
         work = self.work(plan, phase)
-        samples = list(self.samples[family])
+        samples = list(self.samples[self.sample_key(plan)])
         complete = [sample for sample in samples if not sample["censored"]]
         if complete:
             rates = sorted(sample["fit"] / sample["work"] for sample in complete)

@@ -267,6 +267,7 @@ class ContinuedSearchTests(unittest.TestCase):
             # Stop after fourteen measured fits above; this ceiling must leave
             # enough room for process startup on slower CI machines.
             settings = {"LLM_MODE": "mock", "GRAPH_ENABLED": str(int(graph)), "TIME_BUDGET_SECONDS": "600",
+                        "RESEARCH_MODE": "catalog",
                         "LLM_MAX_CALLS": str(calls), "CATALOG_WARMUP_EXPERIMENTS": "0", "MAX_RESEARCH_EXPERIMENTS": "1",
                         "RESEARCH_SERIES_SIZE": "1" if duplicate else "4", "MAX_WORKERS": "1", "GRAPH_PEERS": "1",
                         "GRAPH_MIN_FREE_DISK_BYTES": "0", "LOG_LEVEL": "ERROR"}

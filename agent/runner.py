@@ -162,6 +162,7 @@ class Runner:
         prediction_path = directory / "validation.csv" if phase == "train" else self.artifacts.safe_path(payload["output_relative_path"])
         prediction_path.parent.mkdir(parents=True, exist_ok=True)
         job_spec = {"job_id": ident, "phase": phase, "task_spec": task_spec,
+                    "guard_generated": self.config.research_mode == 'adaptive' and experiment['plan']['model']['family'] == 'custom',
                     "train_path": str(self.artifacts.resolve(task_spec["train_artifact_id"])),
                     "test_path": str(self.artifacts.resolve(task_spec["test_artifact_id"])),
                     "code_path": str(self.artifacts.resolve(experiment["plan"]["code_artifact_id"])),

@@ -255,6 +255,9 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                 proposal = {"decision": "stop", "plan": None}
             if getattr(controller, "local_search", None):
                 plan = proposal.get("plan")
+                if proposal['decision'] == 'stop' and controller.config.research_mode == 'adaptive':
+                    stop_ticket(controller, ticket, proposal.get('stop_reason') or 'No useful affordable research action')
+                    continue
                 reason = ("stopped_proposal" if proposal["decision"] == "stop" else
                           "duplicate" if controller.local_search.repeated(plan) else
                           "predicted_duration" if not controller.budget.can_train(plan)["allowed"] else None)
@@ -267,7 +270,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     proposal = {"decision": "propose", "plan": plan}
                 else:
                     work = ticket["work_order"]
-                    controller.local_search.start_series(work["researcher_id"], work["branch_id"], plan)
+                    controller.authorize_research(plan, work['branch_id'])
                     ticket["_proposal"] = proposal
             elif proposal["decision"] != "stop":
                 ticket["_proposal"] = proposal

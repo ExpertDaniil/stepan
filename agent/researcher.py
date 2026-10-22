@@ -6,6 +6,8 @@ from agent.contracts import canonical
 from agent.catalog import factory_source
 from agent.errors import AgentError
 from tools.code import write_code
+from agent.context import research_schema
+from agent.research_actions import validate_action
 
 
 class Researcher:
@@ -17,14 +19,32 @@ class Researcher:
         if not payload["budget"]["search_allowed"]:
             return {"proposal_id": "proposal-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                     "plan": None, "decision": "stop", "stop_reason": "No search time remains"}
+        adaptive = self.config.research_mode == 'adaptive'
         catalog_mode = self.config.research_mode == "catalog"
         context = self.artifacts.read_json(payload["context_id"])
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
-                                        "response_schema_id": "ResearchChoice-v1" if catalog_mode else "ResearchProposal-v1",
-                                        "tool_schema_ids": [] if catalog_mode else ["write_code"],
+                                        "response_schema_id": research_schema(self.config.research_mode),
+                                        "tool_schema_ids": ['analyze_data'] if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
-                                        "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 4}, self.gateway.complete)["data"]
+                                        "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 8 if adaptive else 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
+        if adaptive:
+            validate_action(proposed, self.catalog)
+            user = json.loads(context['messages'][1]['content'])
+            evidence = {f['source_id'] for f in user.get('facts', [])}
+            for fact in user.get('facts', []):
+                evidence.update(fact.get('artifact_ids', []))
+            evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
+            evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
+            evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
+            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id'))
+            if not set(proposed['evidence_ids']) <= evidence:
+                raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
+            if proposed['action'] == 'stop':
+                self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
+                return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
+                        'plan': None, 'decision': 'stop', 'stop_reason': proposed['hypothesis']}
+            catalog_mode = proposed['action'] != 'pipeline'
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
         submitted_params = proposed['hyperparameters']
@@ -62,9 +82,17 @@ class Researcher:
             note = " Effective branch constraints override the proposal: " + canonical(constraint_changes)
             plan["hypothesis"] += note
             plan["expected_effect"] += note
+        if adaptive and proposed['action'] == 'tune':
+            plan['resources']['timeout_seconds'] = min(plan['resources']['timeout_seconds'], proposed['tuning']['budget_seconds'])
         if context["metadata"].get("graph_binding") and branch_user["restrictions"]["required_capability_ids"]:
             plan["parent_ids"] = list(dict.fromkeys(plan["parent_ids"]+branch_user["allowed_donor_experiment_ids"]))
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)
+        if adaptive:
+            self.artifacts.write_json('research/intent-'+plan['plan_id']+'.json',
+                {k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
+                'research_intent', ident='intent-'+plan['plan_id'])
+            self.log.event('research.action_proposed', plan_id=plan['plan_id'], researcher_id=payload['researcher_id'],
+                           action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'])
         self.log.event("research.hypothesis_proposed", researcher_id=payload["researcher_id"],
                        context_id=payload["context_id"], model_output_artifact_id=answer["output_artifact_id"],
                        hypothesis=plan["hypothesis"], expected_effect=plan["expected_effect"], recipe_id=plan["recipe_id"],

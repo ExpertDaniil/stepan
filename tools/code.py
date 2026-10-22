@@ -5,8 +5,10 @@ import re
 
 from agent.errors import AgentError
 
-ALLOWED_IMPORTS = {"agent.ml", "numpy", "pandas", "sklearn", "catboost", "math"}
+ALLOWED_IMPORTS = {"agent.ml", "numpy", "pandas", "scipy", "sklearn", "catboost", "lightgbm", "xgboost", "math"}
 BLOCKED_CALLS = {"exec", "eval", "open", "compile", "__import__", "input", "globals", "locals", "getattr", "setattr", "delattr", "vars", "breakpoint"}
+BLOCKED_ATTRIBUTES = {'os', 'sys', 'environ', 'load', 'save', 'loadtxt', 'savetxt', 'genfromtxt', 'memmap',
+                      'fromfile', 'tofile', 'ctypes', 'f2py', 'system', 'popen', 'read_pickle', 'to_pickle', 'eval', 'query'}
 
 
 def validate_code(content):
@@ -46,6 +48,9 @@ def validate_code(content):
             raise AgentError("INVALID_CODE", f"Call not allowed: {node.func.id}")
         if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
             raise AgentError("INVALID_CODE", "Dunder attribute access is not allowed")
+        if isinstance(node, ast.Attribute) and (node.attr in BLOCKED_ATTRIBUTES or node.attr.startswith('read_')
+                or node.attr in {'to_csv', 'to_json', 'to_excel', 'to_parquet', 'to_feather', 'to_sql', 'to_hdf', 'to_clipboard', 'to_stata'}):
+            raise AgentError('INVALID_CODE', 'Generated pipelines receive data from Runner; filesystem/dynamic IO is not allowed: '+node.attr)
     return tree
 
 

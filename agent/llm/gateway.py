@@ -89,6 +89,8 @@ class MockTransport:
             if purpose == "ResearchChoice-v1":
                 payload.pop("feature_steps")
                 payload.pop("code")
+            elif purpose == 'ResearchAction-v1':
+                payload.update(action='catalog', code=None, tuning=None, evidence_ids=[])
         return {"id": "mock-" + uuid.uuid4().hex[:12],
                 "choices": [{"message": {"role": "assistant", "content": json.dumps(payload, ensure_ascii=False)}, "finish_reason": "stop"}]}
 
@@ -104,6 +106,7 @@ class Gateway:
         self.semaphore = threading.BoundedSemaphore(config.max_workers)
         self.daily_budget_exhausted = threading.Event()
         self.provider_credits_exhausted = threading.Event()
+        self.analysis = None
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
@@ -131,6 +134,9 @@ class Gateway:
         if context["metadata"].get("graph_binding"):
             user = json.loads(context["messages"][1]["content"])
             byte_limit = min(byte_limit, self.config.graph_context_bytes, user["profile_summary"]["context_budget"]["max_api_request_bytes"])
+        if request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
+            self._compact_research_request(request, byte_limit)
+            request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
         if request_bytes > byte_limit:
             raise AgentError("CONTEXT_TOO_LARGE", "Complete API request including schema/tools/repair exceeds the byte budget",
                              details={"request_bytes": request_bytes, "limit_bytes": byte_limit})
@@ -243,6 +249,13 @@ class Gateway:
             tools.append({"type": "function", "function": {
                 "name": "write_code", "description": "Save Python source exporting make_pipeline(task_spec, params).",
                 "parameters": expanded(self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"])}})
+        if 'analyze_data' in payload['tool_schema_ids']:
+            from tools.analysis import ANALYSIS_SCHEMA
+            if self.analysis is None:
+                raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
+            tools.append({'type': 'function', 'function': {'name': 'analyze_data',
+                'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. At most 12 columns; [] selects defaults.',
+                'parameters': ANALYSIS_SCHEMA}})
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
@@ -288,17 +301,27 @@ class Gateway:
                 if message.get("tool_calls"):
                     prepared = []
                     for call in message["tool_calls"]:
-                        if call["function"]["name"] != "write_code" or not tools:
+                        name = call['function']['name']
+                        if name not in payload['tool_schema_ids'] or name not in {'write_code', 'analyze_data'}:
                             raise ValueError("Unexpected model tool call")
                         args = parse_json(call["function"]["arguments"])
-                        self.bus.schemas._check(args, self.bus.schemas.schema["$defs"]["C11_Request"]["properties"]["payload"], "$.tool")
-                        if args.get("researcher_id") != context["metadata"].get("researcher_id"):
+                        schema = (self.bus.schemas.schema['$defs']['C11_Request']['properties']['payload'] if name == 'write_code' else ANALYSIS_SCHEMA)
+                        self.bus.schemas._check(args, schema, "$.tool")
+                        if name == 'write_code' and args.get("researcher_id") != context["metadata"].get("researcher_id"):
                             raise ValueError("Tool call uses another researcher's namespace")
                         prepared.append((call, args))
                     messages.append({k: message[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in message})
                     for call, args in prepared:
-                        result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
-                        calls.append({"call_id": call["id"], "name": "write_code", "request_id": result["request_id"]})
+                        name = call['function']['name']
+                        if name == 'write_code':
+                            result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
+                            calls.append({"call_id": call["id"], "name": name, "request_id": result["request_id"]})
+                        else:
+                            try:
+                                result = self.analysis.analyze(args)
+                            except AgentError as error:
+                                result = {'error': error.as_dict()}
+                            calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')})
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
                     last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue
@@ -330,6 +353,34 @@ class Gateway:
                         messages.append({"role": "assistant", "content": content})
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
+
+    @staticmethod
+    def _compact_research_request(request, limit):
+        """Account for tool results and schemas without deleting the protected core or base."""
+        def size():
+            return len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
+        for message in request['messages']:
+            if message.get('role') != 'user':
+                continue
+            try:
+                user = json.loads(message['content'])
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(user, dict) or 'profile_summary' not in user:
+                continue
+            profile = user['profile_summary']
+            def refresh():
+                message['content'] = json.dumps(user, ensure_ascii=False)
+            data = profile.get('data', {})
+            for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
+                if size() <= limit:
+                    break
+                data.pop(field, None);refresh()
+            while size() > limit and user.get('facts'):
+                user['facts'].pop();refresh()
+            memory = profile.get('measured_search', {})
+            while size() > limit and len(memory.get('entries', [])) > 4:
+                memory['entries'].pop();memory['omitted_count'] += 1;refresh()
 
     @staticmethod
     def _digest(value):

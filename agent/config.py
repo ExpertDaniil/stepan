@@ -46,7 +46,7 @@ class Config:
     max_research_experiments: int = 12  # Legacy configuration metadata, never a stopping condition.
     research_series_size: int = 4
     catalog_warmup_experiments: int = 4
-    research_mode: str = "catalog"
+    research_mode: str = "adaptive"
     llm_max_calls: int = 32
     llm_timeout_seconds: int = 600
     llm_operation_timeout_seconds: int = 1200
@@ -96,7 +96,7 @@ class Config:
             max_research_experiments=integer("MAX_RESEARCH_EXPERIMENTS", 12, 0, 100),
             research_series_size=integer("RESEARCH_SERIES_SIZE", 4, 1, 16),
             catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
-            research_mode=os.environ.get("RESEARCH_MODE", "catalog"),
+            research_mode=os.environ.get("RESEARCH_MODE", "adaptive"),
             llm_max_calls=integer("LLM_MAX_CALLS", 32, 1, 1000),
             llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 600, 1, 1800),
             llm_operation_timeout_seconds=integer("LLM_OPERATION_TIMEOUT_SECONDS", 1200, 1, 3600),
@@ -133,7 +133,7 @@ class Config:
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
-        if cfg.research_mode not in {"catalog", "code"} or cfg.console_format not in {"human", "json"}:
+        if cfg.research_mode not in {"adaptive", "catalog", "code"} or cfg.console_format not in {"human", "json"}:
             raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
         if cfg.graph_peers > cfg.max_workers or cfg.graph_train_workers > cfg.max_workers:
             raise AgentError("INVALID_CONFIG", "GRAPH_PEERS/GRAPH_TRAIN_WORKERS must not exceed MAX_WORKERS")

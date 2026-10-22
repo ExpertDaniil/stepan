@@ -48,6 +48,9 @@ def profile_data(payload, artifacts):
     maximum = payload["max_report_bytes"]
     if maximum < 512:
         raise AgentError("INVALID_PLAN", "max_report_bytes must be at least 512")
+    if maximum >= 4096:
+        from tools.analysis import compact_profile
+        bounded['core_profile'] = compact_profile(summary)
     def size():
         return len(json.dumps(bounded, ensure_ascii=False, allow_nan=False).encode("utf-8"))
     if "data_dictionary" in bounded:

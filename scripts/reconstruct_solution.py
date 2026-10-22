@@ -86,6 +86,7 @@ def reconstruct(run_directory, experiment_id, destination, task_root=None):
             write(name,value)
         write("train_indices.json",protocol["train_indices"]);write("valid_indices.json",protocol["valid_indices"])
         job = {"job_id": "reconstructed-"+experiment_id, "phase": "refit", "task_spec": spec, "train_path": train_path, "test_path": test_path,
+               "guard_generated": plan['model']['family'] == 'custom',
                "code_path": str(destination/"candidate.py"), "hyperparameters": plan["model"]["hyperparameters"], "seed": plan["seed"],
                "cpu_threads": plan["resources"]["cpu_threads"], "memory_limit_mb": plan["resources"]["memory_limit_mb"],
                "timeout_seconds": plan["resources"]["timeout_seconds"], "prediction_path": str(destination/"candidate.csv"),

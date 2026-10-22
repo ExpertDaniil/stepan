@@ -358,19 +358,19 @@ class SearchPolicy(RefinementPolicy):
                 if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold and current_trials >= self.policy["plateau"]["window_full_evaluations"]) or remaining <= reserve):
                     alt = alternatives[0][0]
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve time for a counterfactual trial")
-            if decision["action"] == "CONTINUE" and not final_phase:
+            if decision["action"] == "CONTINUE" and not final_phase and self.config.research_mode != 'adaptive':
                 for row in self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? ORDER BY rowid DESC", (self.run_id,)):
                     idea = json.loads(row[0]);origin = self.checkpoint_record(idea["fork_checkpoint_id"])
                     already = self.db.execute("SELECT 1 FROM g_branches WHERE run_id=? AND decision_idea_id=?", (self.run_id, idea["idea_id"])).fetchone()
                     total = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=?", (self.run_id,)).fetchone()[0]
                     if idea["status"] == "confirmed" and origin["branch_id"] == branch["branch_id"] and origin["branch_revision"] == branch["branch_revision"] and not already and self.fork_victims(branch['branch_id']) is not None and total+2 <= self.policy["max_total_branches"] and remaining >= 2*self.policy["scheduling"]["minimum_alternative_trials"]:
                         decision.update(action="FORK", parameters={"parent_branch_id": branch["branch_id"], "expected_branch_revision": branch["branch_revision"], "checkpoint_id": idea["fork_checkpoint_id"], "idea_id": idea["idea_id"]}, reason="A controlled component and recipient pilot passed the transfer gate", evidence_ids=[idea["idea_id"]]);break
-            if decision["action"] == "CONTINUE" and not final_phase:
+            if decision["action"] == "CONTINUE" and not final_phase and self.config.research_mode != 'adaptive':
                 acceptance = self._acceptance_transfer(branch, free)
                 if acceptance:
                     decision.update(action="TRANSFER_COMPONENT", parameters=acceptance,
                                     reason="Apply the confirmed component to this peer's restored base before tuning", evidence_ids=[branch["decision_idea_id"]])
-            if decision["action"] == "CONTINUE" and not final_phase:
+            if decision["action"] == "CONTINUE" and not final_phase and self.config.research_mode != 'adaptive':
                 for row in self.db.execute("SELECT record_json FROM g_idea_candidates WHERE run_id=? ORDER BY rowid", (self.run_id,)):
                     offer = json.loads(row[0])
                     if offer["state"] == "pending" and offer["branch_id"] == branch["branch_id"]:

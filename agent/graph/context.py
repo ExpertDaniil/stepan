@@ -109,7 +109,7 @@ class WorkService:
 
     def search_memory(self, branch_id, head, limit=24):
         """Keep old model proposals visible after cheap local trials fill recent facts."""
-        ids = self.visible_history(branch_id, head['researcher_id'])
+        ids = self.visible_history(branch_id, None if self.config.research_mode == 'adaptive' else head['researcher_id'])
         base = self.store.get(head['experiment_id'])['plan'] if head['experiment_id'] else None
         proposal_ids = set()
         for line, cut in self.lineage_cuts(branch_id):
@@ -125,7 +125,19 @@ class WorkService:
             params = plan['model']['hyperparameters']
             record = {'experiment_id': eid, 'recipe_id': plan['recipe_id'], 'state': exp['state'],
                       'score': ev['primary_metric']['value'] if valid else None}
-            if base and plan['recipe_id'] == base['recipe_id']:
+            if self.config.research_mode == 'adaptive':
+                record['hypothesis'] = plan['hypothesis'][:240]
+                if plan['model']['family'] == 'custom':
+                    record['code_artifact_id'] = plan['code_artifact_id']
+                    record['feature_steps'] = plan['feature_steps']
+                try:
+                    intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+                    record['research_action'] = intent['action']
+                    record['evidence_ids'] = intent['evidence_ids']
+                except AgentError as error:
+                    if error.code != 'ARTIFACT_MISSING':
+                        raise
+            if base and plan['recipe_id'] == base['recipe_id'] and plan['model']['family'] != 'custom':
                 record['changes_from_base'] = {k: v for k, v in params.items() if v != base['model']['hyperparameters'].get(k)}
             else:
                 record['hyperparameters'] = params

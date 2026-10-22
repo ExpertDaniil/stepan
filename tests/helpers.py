@@ -29,7 +29,7 @@ class Harness:
                 frame["period"] = [i // 15 for i in range(len(frame))]
                 frame.to_csv(path, index=False)
         self.run = self.root / "run"
-        self.config = Config(llm_mode="mock", work_dir=self.root, time_budget_seconds=90, log_level="ERROR")
+        self.config = Config(llm_mode="mock", research_mode='catalog', work_dir=self.root, time_budget_seconds=90, log_level="ERROR")
         self.log = RunLogger(self.run, "unit-run", level="ERROR", secrets=["unit-private-secret"])
         self.artifacts = Artifacts(self.run, "unit-run", self.log)
         self.schemas = Schemas()

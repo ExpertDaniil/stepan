@@ -1,0 +1,433 @@
+{
+  "prepared_on": "2026-10-22",
+  "purpose": "Локальная исследовательская подборка; без подключения к агенту",
+  "official_membership_source": "https://raw.githubusercontent.com/openai/mle-bench/main/experiments/splits/split75.txt",
+  "official_known_issues_source": "https://github.com/openai/mle-bench#known-issues",
+  "evidence_limits": [
+    "Публикации авторов прочитаны в объёме, указанном у каждого источника; наличие ссылки не выдаётся за чтение исходного кода.",
+    "Места сверены с авторскими страницами; независимая выгрузка полных итоговых таблиц Kaggle не проводилась.",
+    "Разбор и репозиторий одной команды не считаются независимыми решениями.",
+    "Опыты обучения на данных хакатона и воспроизведение исходных результатов не выполнялись.",
+    "Время в карточках — предлагаемые пределы первого опыта, а не измеренные затраты.",
+    "Указанные адреса публичные, без временных подписанных ссылок и секретов."
+  ],
+  "competitions": [
+    {
+      "id": "new-york-city-taxi-fare-prediction",
+      "card": "cards/01-taxi.md",
+      "input_form": "таблица",
+      "portability": "высокая при наличии координат/времени",
+      "source_ids": [
+        "TAXI-1",
+        "TAXI-2"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "tabular-playground-series-dec-2021",
+      "card": "cards/02-dec2021.md",
+      "input_form": "таблица",
+      "portability": "высокая с заменой исходных вычислений на процессор",
+      "source_ids": [
+        "DEC-1",
+        "DEC-2"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "tabular-playground-series-may-2022",
+      "card": "cards/03-may2022.md",
+      "input_form": "таблица",
+      "portability": "высокая при составных строках/взаимодействиях",
+      "source_ids": [
+        "MAY-1",
+        "MAY-2",
+        "MAY-3"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "nomad2018-predict-transparent-conductors",
+      "card": "cards/04-nomad.md",
+      "input_form": "таблица и необязательная для адаптации геометрия",
+      "portability": "высокая для табличной части; геометрия условна",
+      "source_ids": [
+        "NOMAD-1",
+        "NOMAD-2",
+        "NOMAD-3"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "champs-scalar-coupling",
+      "card": "cards/05-champs.md",
+      "input_form": "пары объектов и таблица геометрии",
+      "portability": "средняя, дополнительные входы условны",
+      "source_ids": [
+        "CHAMPS-1",
+        "CHAMPS-2",
+        "CHAMPS-3"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "osic-pulmonary-fibrosis-progression",
+      "card": "cards/06-osic.md",
+      "input_form": "таблица повторных наблюдений; снимки исключены из адаптации",
+      "portability": "высокая для подходящей табличной постановки",
+      "source_ids": [
+        "OSIC-1",
+        "OSIC-2"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "ventilator-pressure-prediction",
+      "card": "cards/07-ventilator.md",
+      "input_form": "последовательности внутри таблицы",
+      "portability": "средняя, нужны последовательности",
+      "source_ids": [
+        "VENT-1",
+        "VENT-2",
+        "VENT-3"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "predict-volcanic-eruptions-ingv-oe",
+      "card": "cards/08-volcano.md",
+      "input_form": "сигналы, сводимые в таблицу",
+      "portability": "средняя, нужны значения сигналов",
+      "source_ids": [
+        "VOLC-1",
+        "VOLC-2",
+        "VOLC-3"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "h-and-m-personalized-fashion-recommendations",
+      "card": "cards/09-hm.md",
+      "input_form": "таблицы взаимодействий",
+      "portability": "средняя, история условна",
+      "source_ids": [
+        "HM-1",
+        "HM-2"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    },
+    {
+      "id": "leaf-classification",
+      "card": "cards/10-leaf.md",
+      "input_form": "готовые табличные описатели; изображения исключены из адаптации",
+      "portability": "высокая на малой выборке",
+      "source_ids": [
+        "LEAF-1",
+        "LEAF-2"
+      ],
+      "adaptation_status": "Предлагаемая гипотеза; обучением не проверена"
+    }
+  ],
+  "sources": [
+    {
+      "id": "TAXI-1",
+      "author": "Albert van Breemen",
+      "title": "NYC Taxi Fare — Data Exploration",
+      "url": "https://www.kaggle.com/code/breemen/nyc-taxi-fare-data-exploration",
+      "kind": "Авторский код и пояснения",
+      "primary": true,
+      "read_scope": "Прочитаны пояснения и код в браузере",
+      "result_evidence": "Автор сообщает о временном первом месте 2018-08-07 с отдельной моделью; итоговое место не установлено",
+      "solution_family": "breemen-taxi",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "TAXI-2",
+      "author": "Luke M",
+      "title": "NYC Taxi Fares — EDA + Modelling (2.93)",
+      "url": "https://www.kaggle.com/code/deepdivelm/nyc-taxi-fares-eda-modelling-2-93",
+      "kind": "Авторский код и пояснения",
+      "primary": true,
+      "read_scope": "Прочитаны пояснения и код в браузере, версия 16",
+      "result_evidence": "У записи показан RMSE 2.92883; итоговое место не установлено",
+      "solution_family": "luke-taxi",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "DEC-1",
+      "author": "SSS / Sergey Saharovskiy",
+      "title": "2# place winning solution",
+      "url": "https://www.kaggle.com/competitions/tabular-playground-series-dec-2021/writeups/sergey-saharovskiy-2-place-winning-solution",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный доступный текст",
+      "result_evidence": "Второе место указано на странице авторского решения",
+      "solution_family": "sss-dec2021",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "DEC-2",
+      "author": "rkaveland / kaaveland",
+      "title": "TPS202112 — Reasonable XGBoost model",
+      "url": "https://www.kaggle.com/code/kaaveland/tps202112-reasonable-xgboost-model",
+      "kind": "Авторский код и пояснения",
+      "primary": true,
+      "read_scope": "Прочитаны пояснения и код в браузере, версия 5",
+      "result_evidence": "Использование моделей автора во втором месте подтверждено DEC-1; отдельное итоговое место не установлено",
+      "solution_family": "rkaveland-dec2021",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "MAY-1",
+      "author": "AmbrosM; Laurent Pourchot",
+      "title": "#1 Solution: A Two-Branch Network",
+      "url": "https://www.kaggle.com/competitions/tabular-playground-series-may-2022/writeups/the-team-1-solution-a-two-branch-network",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "Первое место указано на странице авторского решения",
+      "solution_family": "the-team-may2022",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "MAY-2",
+      "author": "AmbrosM",
+      "title": "Engineering the top three feature interactions",
+      "url": "https://www.kaggle.com/competitions/tabular-playground-series-may-2022/discussion/323892",
+      "kind": "Авторское объяснение признаков",
+      "primary": true,
+      "read_scope": "Прочитаны текст, формулы и ответы автора",
+      "result_evidence": "Публикация участника победной команды MAY-1; не самостоятельная оценка решения",
+      "solution_family": "the-team-may2022",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "MAY-3",
+      "author": "Christophe Nicault",
+      "title": "How to predict the state of a machine?",
+      "url": "https://www.christophenicault.com/post/predict_machine_state/",
+      "kind": "Авторская статья с кодом",
+      "primary": true,
+      "read_scope": "Прочитана статья с кодом",
+      "result_evidence": "Автор отмечен восьмым в обсуждении MAY-2; результат примера в статье не равен итоговому месту",
+      "solution_family": "nicault-may2022",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "NOMAD-1",
+      "author": "Christopher Sutton; Luca M. Ghiringhelli; Takenori Yamamoto; Yury Lysogorskiy; Lars Blumenthal; Thomas Hammerschmidt; Jacek Golebiowski; Xiangyue Liu; Angelo Ziletti; Matthias Scheffler",
+      "title": "NOMAD 2018 Kaggle Competition: Solving Materials Science Challenges Through Crowd Sourcing",
+      "url": "https://arxiv.org/abs/1812.00085",
+      "kind": "Совместная статья организаторов и призёров",
+      "primary": true,
+      "read_scope": "Прочитаны аннотация, сопоставление результатов и разделы методов I–III полного PDF, страницы 7–25; приложения целиком не разбирались",
+      "result_evidence": "Аннотация прямо сопоставляет первое, второе и третье места",
+      "solution_family": "nomad-top-three-paper",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "NOMAD-2",
+      "author": "Christian Spethmann",
+      "title": "9th place solution with geometric features",
+      "url": "https://www.kaggle.com/competitions/nomad2018-predict-transparent-conductors/writeups/christian-spethmann-9th-place-solution-with-geomet",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "Девятое итоговое место указано на странице и в тексте автора; публичное место было 253",
+      "solution_family": "spethmann-nomad",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "NOMAD-3",
+      "author": "alabatie",
+      "title": "Nomad — SVR and model stacking",
+      "url": "https://github.com/alabatie/nomad",
+      "kind": "Авторский репозиторий",
+      "primary": true,
+      "read_scope": "Прочитан подробный README; сами блокноты не исполнялись",
+      "result_evidence": "Автор заявляет лучшие 1% публичной таблицы; итоговое место не установлено",
+      "solution_family": "alabatie-nomad",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "CHAMPS-1",
+      "author": "Zico Kolter; Devin Willmott; Shaojie Bai; Jonathan Mailoa; Mordechai Kornbluth",
+      "title": "#1 Solution — hybrid",
+      "url": "https://www.kaggle.com/competitions/champs-scalar-coupling/writeups/hybrid-1-solution-hybrid",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "Первое место указано на странице авторского решения",
+      "solution_family": "bosch-hybrid",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "CHAMPS-2",
+      "author": "Bosch Research / команда hybrid",
+      "title": "BCAI_kaggle_CHAMPS",
+      "url": "https://github.com/boschresearch/BCAI_kaggle_CHAMPS",
+      "kind": "Авторский репозиторий",
+      "primary": true,
+      "read_scope": "Прочитаны README, требования и схема воспроизведения; обучение не запускалось",
+      "result_evidence": "Связь с первым местом подтверждается прямой ссылкой CHAMPS-1",
+      "solution_family": "bosch-hybrid",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "CHAMPS-3",
+      "author": "Ashesh. / silence2; код ashesh-0",
+      "title": "62nd Place Solution",
+      "url": "https://www.kaggle.com/competitions/champs-scalar-coupling/writeups/ashesh-62nd-place-solution",
+      "kind": "Авторский разбор со ссылками на код",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "62-е место команды указано на странице; результат отдельного бустинга не равен результату команды",
+      "solution_family": "ashesh-champs",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "OSIC-1",
+      "author": "Art Kulakov / artkulak",
+      "title": "OSIC Pulmonary Fibrosis Progression — 1st place solution",
+      "url": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression",
+      "kind": "Авторский репозиторий",
+      "primary": true,
+      "read_scope": "Прочитан README; обучающие блокноты не исполнялись",
+      "result_evidence": "Первое место заявлено автором в репозитории и связано с авторским разбором Kaggle",
+      "solution_family": "artkulak-osic",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "OSIC-2",
+      "author": "Abhishek Bhat; соавтор с удалённой учётной записью",
+      "title": "4th Place Solution",
+      "url": "https://www.kaggle.com/competitions/osic-pulmonary-fibrosis-progression/writeups/trust-cv-4th-place-solution",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "Четвёртое место указано на странице авторского решения",
+      "solution_family": "trust-cv-osic",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VENT-1",
+      "author": "Shujun; Zidmie; Gilles Vandewiele; Kha Vo; Riccardo",
+      "title": "#1 Solution — The code",
+      "url": "https://www.kaggle.com/competitions/ventilator-pressure-prediction/writeups/shujun-kha-zidmie-gilles-b-1-solution-the-code",
+      "kind": "Авторская публикация кода",
+      "primary": true,
+      "read_scope": "Прочитан полный доступный текст",
+      "result_evidence": "Первое место указано на странице авторского решения",
+      "solution_family": "ventilator-winning-team",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VENT-2",
+      "author": "Riccardo / callmeBalloch",
+      "title": "Part of 1st place solution — Simple LSTM",
+      "url": "https://github.com/callmeBalloch/google-brain-ventilator-pressure-prediction",
+      "kind": "Авторский репозиторий",
+      "primary": true,
+      "read_scope": "Прочитан подробный README; обучение не запускалось",
+      "result_evidence": "Часть того же первого места, а не самостоятельное первое место модели",
+      "solution_family": "ventilator-winning-team",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VENT-3",
+      "author": "AmbrosM",
+      "title": "#2 Solution: The inverse of a PID controller",
+      "url": "https://www.kaggle.com/competitions/ventilator-pressure-prediction/writeups/ambrosm-2-solution-the-inverse-of-a-pid-controller",
+      "kind": "Авторский разбор с алгоритмом",
+      "primary": true,
+      "read_scope": "Прочитан полный текст и псевдокод в браузере",
+      "result_evidence": "Второе место указано на странице авторского решения",
+      "solution_family": "ambrosm-ventilator",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VOLC-1",
+      "author": "Jie Feng; Gui Ming Jiang",
+      "title": "1st Place — Mel Spectrogram + Blended ResNets",
+      "url": "https://www.kaggle.com/competitions/predict-volcanic-eruptions-ingv-oe/writeups/shallow-learning-1st-place-mel-spectrogram-blended",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст и уточнения авторов в браузере",
+      "result_evidence": "Первое место указано на странице авторского решения",
+      "solution_family": "shallow-learning-volcano",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VOLC-2",
+      "author": "Levente Lippenszky",
+      "title": "20th rank solution — public 18th",
+      "url": "https://www.kaggle.com/competitions/predict-volcanic-eruptions-ingv-oe/writeups/levente-lippenszky-20th-rank-solution-public-18th",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный доступный текст",
+      "result_evidence": "20-е итоговое место указано на странице; публичное 18-е выделено отдельно",
+      "solution_family": "lippenszky-volcano",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "VOLC-3",
+      "author": "Levente Lippenszky",
+      "title": "INGV-Volcanic-Eruption-Prediction — code",
+      "url": "https://github.com/leventelippenszky/INGV-Volcanic-Eruption-Prediction",
+      "kind": "Авторский репозиторий",
+      "primary": true,
+      "read_scope": "Прочитан README и организация обработки; обучение не запускалось",
+      "result_evidence": "Код того же 20-го места VOLC-2; не отдельное решение",
+      "solution_family": "lippenszky-volcano",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "HM-1",
+      "author": "senkin13; 30crmnsia / h4211819",
+      "title": "1st place solution",
+      "url": "https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/writeups/senkin13-30crmnsia-1st-place-solution",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный доступный текст",
+      "result_evidence": "Первое место подтверждено авторской страницей; не все компоненты подходят нашим ограничениям",
+      "solution_family": "senkin13-hm",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "HM-2",
+      "author": "wht1996; Paweł Jankiewicz",
+      "title": "2nd place solution",
+      "url": "https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/writeups/hello-world-2nd-place-solution",
+      "kind": "Авторский разбор",
+      "primary": true,
+      "read_scope": "Прочитан полный текст в браузере",
+      "result_evidence": "Второе место указано на странице авторского решения",
+      "solution_family": "hello-world-hm",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "LEAF-1",
+      "author": "Ivan Sosnovik; интервью Kaggle Team",
+      "title": "Leaf Classification — 1st Place Winner’s Interview",
+      "url": "https://medium.com/kaggle-blog/leaf-classification-competition-1st-place-winners-interview-ivan-sosnovik-d1bf7111c055",
+      "kind": "Интервью победителя",
+      "primary": true,
+      "read_scope": "Прочитано интервью; числовые детали с недоступных изображений не переносились",
+      "result_evidence": "Первое место подтверждено интервью официального блога Kaggle",
+      "solution_family": "sosnovik-leaf",
+      "checked_on": "2026-10-22"
+    },
+    {
+      "id": "LEAF-2",
+      "author": "Ivan Sosnovik; Computer Vision News / RSIP Vision",
+      "title": "Leaf Classification — comments by winner, May 2017, pages 12–13",
+      "url": "https://www.rsipvision.com/ComputerVisionNews-2017May/files/assets/common/downloads/Computer%20Vision%20News.pdf",
+      "kind": "Авторские комментарии в журнале",
+      "primary": true,
+      "read_scope": "Прочитаны страницы 12–13; остальные разделы журнала не использованы",
+      "result_evidence": "Вторая публикация того же победителя; обсуждается также опыт после окончания соревнования",
+      "solution_family": "sosnovik-leaf",
+      "checked_on": "2026-10-22"
+    }
+  ]
+}

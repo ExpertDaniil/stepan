@@ -1,0 +1,10 @@
+new-york-city-taxi-fare-prediction
+tabular-playground-series-dec-2021
+tabular-playground-series-may-2022
+nomad2018-predict-transparent-conductors
+champs-scalar-coupling
+osic-pulmonary-fibrosis-progression
+ventilator-pressure-prediction
+predict-volcanic-eruptions-ingv-oe
+h-and-m-personalized-fashion-recommendations
+leaf-classification

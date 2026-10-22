@@ -1,5 +1,9 @@
 # Наблюдаемость
 
+Порядок практического разбора запуска — [PROJECT_GUIDE.md](PROJECT_GUIDE.md).
+Названия старых выпусков ниже объясняют появление событий. При расхождении исторических формулировок
+с действующими режимами применяются правила первого раздела и актуальные события.
+
 В adaptive-режиме `research.analysis_completed` связывает запрос со scope, числом строк и полным
 артефактом отчёта; недоступные метки holdout не журналируются. `research.action_proposed` и
 `research.action_admitted` фиксируют тип действия, evidence IDs и явный бюджет локальной серии.
@@ -87,7 +91,8 @@ graph.branch_state_changed, graph.plateau_assessed и research.component_transfe
 research.constraints_applied раскрывает отличие предложенных и эффективных параметров;
 context.built показывает assignment, base_experiment_id и сохранённую/пропущенную историю.
 Числа плато учитывают только допустимые для ветки references и время после её запуска/возобновления.
-llm_call_limit и llm_output_budget в search.finished — штатные причины остановки, проверенные dispatcher.
+`llm_call_limit` и `llm_output_budget` могут быть явным основанием перехода к местному каталожному поиску,
+но не самостоятельной причиной завершить все обучения. Окончательную причину сообщает `search.finished`.
 
 
 ## Фазы поиска v0.5.1

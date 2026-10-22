@@ -1,5 +1,14 @@
 # Adaptive research v0.6
 
+Полное русское руководство по действующей реализации: [PROJECT_GUIDE.md](PROJECT_GUIDE.md).
+Ревизия границ и устранённые причины: [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md).
+
+Дополнение после ревизии: инструменты предоставляются явно через `ResearchTools`; Gateway не владеет данными
+и не выбирает вычислительную конфигурацию. Интерпретатор до закрепления задачи/проверки может читать страницы
+полного сохранённого профиля через `inspect_schema`. Исследователь видит основание и параметры замороженной
+проверки, размеры частей и хеш, но не индексы и ответы holdout. Стоимость ответа вычисляет Budget по плану,
+подготовленному диспетчером; интерфейс модели и прогноз времени разделены.
+
 ## Problem and scope
 
 The ab9dbc6c run spent 46 of 63 completed evaluations on program-generated local variants.
@@ -33,13 +42,15 @@ The core, task contract and measured base remain mandatory when verbose profile 
 redundant history are removed. Schemas and tool replies also count against the API request cap;
 the Gateway can compact duplicate profile/history without removing the core or base source.
 An oversized mandatory core fails explicitly instead of silently losing all data information.
-The compact core includes at most 128 columns and reports omissions; larger schemas are
-inspectable by explicit column names through the analysis tool.
+The compact core includes at most 128 columns and reports omissions. Larger schemas are
+discoverable using `kind=schema`, `offset`, `limit` and `next_offset`; knowing omitted column
+names in advance is unnecessary.
 
 `analyze_data` accepts at most 12 selected feature columns and these query kinds:
 
 | Kind | Information |
 |---|---|
+| schema | Complete paginated column names, train/test presence and roles; no values |
 | summary | Missingness, cardinality, numerical quantiles/zero counts, frequent categories |
 | association | Spearman correlations of selected numerical fit columns |
 | group | Fit-only target summaries by a selected categorical column or numerical bins |
@@ -47,13 +58,15 @@ inspectable by explicit column names through the analysis tool.
 | dictionary | Available feature metadata for selected columns |
 | report | Retrieve a saved analysis by report_id without recomputation |
 
-The service is constructed on the dispatcher and drops validation rows before accepting
-queries. Query execution does not touch SQLite or mutate the source frames. Holdout labels
-and raw labelled rows are never returned. Target summaries require `include_target=true`;
-feature comparisons reject that flag. Queries use at most 20,000 deterministic sampled rows
-per table, cap retained analysis frames at that size, report sampling, and save the full bounded report as an artifact. API replies have
-their own 6 KiB detail budget and state omissions. These limits are resource safeguards and
-starting heuristics, not statistically justified sampling rules or search allocations.
+The service is constructed on the dispatcher and reads selected columns in 4,096-row chunks.
+It drops holdout rows, optionally filters by equality on an input feature, counts the complete matching
+population and then keeps at most 20,000 uniformly sampled rows with a fixed seed. Rare groups therefore
+remain queryable before sampling. Query execution does not touch SQLite. Holdout labels and raw labelled
+rows are never returned. Target summaries require `include_target=true`; feature comparisons reject that flag.
+The service checks phase/global time between chunks and uses a 120-second read allowance; one chunk read is
+cooperative rather than preempted. It reports population/sample sizes and saves the bounded full report.
+API replies have their own 6 KiB detail budget and state omissions. These are resource safeguards,
+not statistically justified sampling rules or search allocations.
 
 ## Custom pipelines
 

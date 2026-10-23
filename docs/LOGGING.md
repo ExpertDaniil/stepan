@@ -65,6 +65,14 @@ exception-событиях. Redactor применяется до обоих пр
 
 LLM: call_no, attempt, purpose, model, max_output_tokens, отдельные request/operation seconds,
 finish_reason, content_chars, tool_calls, input/output/reasoning/cache tokens и общий token_budget.
+
+Optuna: optuna.loaded, optuna.series_started, optuna.trial_proposed, optuna.trial_finished,
+optuna.series_snapshot, optuna.series_finished. Серия показывает фактический search_space,
+source_plan_id/study_id/series_id, warm_start_trials и лимиты. Trial связывает plan_id с
+experiment_id; метрика появляется только после принятой оценки Evaluator. optuna/series-*.json
+сохраняет историю, ошибки, кэш, результаты и причину остановки. optuna.sync_failed отключает
+дальнейшие предложения оптимизатора, сохраняя уже проверенные ML-оценки. optuna.snapshot_failed
+показывает дополнительную ошибку сохранения снимка при аварийном отключении.
 llm.waiting каждые LLM_PROGRESS_SECONDS секунд показывает ожидание; это не оценка прогресса генерации.
 llm.output_truncated и llm.output_budget_increased отличают обрыв от синтаксической ошибки JSON.
 llm.output_validated означает, что структурированный ответ принят; llm.call_completed лишь фиксирует

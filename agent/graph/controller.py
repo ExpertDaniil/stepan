@@ -16,6 +16,10 @@ def lineage_for(work):
 
 
 def issue(controller, branch_id, peer, action="improve", donors=None):
+    optimizer = getattr(getattr(controller, 'local_search', None), 'optuna', None)
+    if optimizer is not None:
+        # Finalize an exhausted authorization before G03 builds the next context.
+        optimizer.has_series(peer, branch_id)
     graph = controller.graph;branch = graph.branch(branch_id)
     return graph.invoke("G03", {"branch_id": branch_id, "expected_branch_revision": branch["branch_revision"], "researcher_id": peer,
                                "action": action, "allowed_donor_experiment_ids": donors or [], "tools_catalog_version": "tools-v1",
@@ -65,6 +69,9 @@ def train(controller, plans, tickets):
         proposal = ticket.get("_proposal") or {"proposal_id": "trusted-"+uuid.uuid4().hex[:16], "researcher_id": work["researcher_id"], "plan": plan, "decision": "propose", "stop_reason": None}
         try:
             reply = graph.invoke("G04", {"work_order_id": work["work_order_id"], "proposal": proposal, "manifest": graph.constructor.build(plan), "lineage": lineage_for(work)}, key="submit/"+work["work_order_id"])
+            optimizer = getattr(getattr(controller, 'local_search', None), 'optuna', None)
+            if optimizer is not None:
+                optimizer.bind(plan, reply['lead_submission']['experiment_id'], work['work_order_id'])
             entries.append((ticket, reply))
             current = controller.store.get(reply["lead_submission"]["experiment_id"])
             if current["state"] == "evaluated":
@@ -76,6 +83,9 @@ def train(controller, plans, tickets):
             elif current["state"] in {"failed", "invalid", "timed_out", "cancelled"}:
                 graph.finish_pilot(work["work_order_id"], reply["lead_submission"]["experiment_id"])
         except AgentError as exc:
+            optimizer = getattr(getattr(controller, 'local_search', None), 'optuna', None)
+            if optimizer is not None:
+                optimizer.abandon(plan, str(exc))
             graph.abandon(work["work_order_id"], str(exc))
             if exc.code in {"SEARCH_CLOSED", "WORK_ORDER_EXPIRED"} and not controller.budget.snapshot()["search_allowed"]:
                 controller.log.event("search.time_reserve_reached", work_order_id=work["work_order_id"], reason=str(exc))
@@ -415,6 +425,10 @@ def search(controller):
                     plan = local_for_ticket(controller, ticket)
                     if plan:
                         trusted_plans.append(plan);trusted_tickets.append(ticket)
+                    elif controller.config.research_mode == 'adaptive' and controller.llm_available(len(llm_tickets)):
+                        # A sampler may exhaust/reject its remaining points after
+                        # admission. That does not exhaust research on the branch.
+                        llm_tickets.append(ticket)
                     else:
                         stop_ticket(controller, ticket, "No affordable untried catalogue candidate")
                 else:

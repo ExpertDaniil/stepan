@@ -94,6 +94,9 @@ class Orchestrator:
         return self.budget.snapshot()["search_allowed"]
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
+        optimizer = getattr(self.local_search, 'optuna', None)
+        if optimizer is not None and optimizer.has_series(peer, branch):
+            return optimizer.next_plan(peer, branch, constraints)
         choice = self.local_search.next_choice(peer, branch, base, constraints, assignment=assignment)
         if choice is None:
             return None
@@ -142,16 +145,18 @@ class Orchestrator:
 
     def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
         """Authorize an action before deduplicating its optional starting fit."""
-        intent = self.authorize_research(plan, branch)
+        try:
+            intent = self.authorize_research(plan, branch)
+        except AgentError as error:
+            if error.code not in {'OPTUNA_UNAVAILABLE', 'INVALID_TUNING_SPACE'}:
+                raise
+            self.record_research_feedback(plan['researcher_id'], branch, 'tuning_rejected', str(error), code=error.code)
+            return None
+        if intent['action'] == 'tune':
+            # The anchor is a reference, not an implicit fit outside the declared
+            # search space. Historical compatible evaluations warm-start Optuna.
+            return self.local_search.optuna.next_plan(plan['researcher_id'], branch, constraints)
         repeated = self.local_search.repeated(plan)
-        if intent['action'] == 'tune' and repeated:
-            self.log.event('search.tuning_base_reused', plan_id=plan['plan_id'], branch_id=branch,
-                           researcher_id=plan['researcher_id'], recipe_id=plan['recipe_id'])
-            replacement = self.local_plan(plan['researcher_id'], branch, plan, constraints, assignment)
-            if replacement is None:
-                self.record_research_feedback(plan['researcher_id'], branch, 'tuning_exhausted',
-                    'The base is already recorded and the authorized axes have no affordable untried continuation.')
-            return replacement
         if repeated:
             # Store/Graph deduplication will return the recorded result; never
             # replace an explicit adaptive choice with an unauthorized local series.
@@ -268,12 +273,23 @@ class Orchestrator:
         return results
 
     def run_training(self, plans, tickets=None):
+        try:
+            return self._run_training(plans, tickets)
+        finally:
+            optimizer = getattr(getattr(self, 'local_search', None), 'optuna', None)
+            if optimizer is not None:
+                optimizer.sync()
+
+    def _run_training(self, plans, tickets=None):
         if getattr(self, "graph", None):
             from agent.graph.controller import train
             return train(self, plans, tickets)
         jobs = []
         for plan in plans:
             record = self.call("C12", {"plan": plan}, self.submit_plan)
+            optimizer = getattr(self.local_search, 'optuna', None)
+            if optimizer is not None:
+                optimizer.bind(plan, record['experiment_id'])
             if record["disposition"] == "duplicate":
                 self.log.event("experiment.duplicate_skipped", experiment_id=record["experiment_id"])
                 continue
@@ -479,7 +495,9 @@ class Orchestrator:
                     plan = self.local_plan(researcher_id, base=base)
                     if plan:
                         plans.append(plan)
-                    continue
+                        continue
+                    if self.config.research_mode != 'adaptive' or not self.llm_available(len(requests)):
+                        continue
                 assignment = "exploit_incumbent" if index == 0 else "explore_alternative"
                 context = self.call("C08", {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"],
                                             "tools_catalog_version": "tools-v1", "researcher_id": researcher_id,
@@ -558,3 +576,7 @@ class Orchestrator:
                 raise
         if active:
             self.wait_jobs(active)
+        optimizer = getattr(getattr(self, 'local_search', None), 'optuna', None)
+        if optimizer is not None:
+            optimizer.sync()
+            optimizer.clear_all('runtime_cleanup')

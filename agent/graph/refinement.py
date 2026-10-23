@@ -106,7 +106,7 @@ class RefinementPolicy:
             return {'refinement': record, 'branch': self.branch(source['branch_id']), 'graph_revision': 0}
         result = self.commit('G15', p, key, mutate)
         if getattr(self.controller, 'local_search', None):
-            self.controller.local_search.series.clear()
+            self.controller.local_search.clear_all('final_refinement_started')
         if hasattr(self.controller, 'no_fit_branches'):
             self.controller.no_fit_branches.clear()
         self.apply_phase_caps()

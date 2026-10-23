@@ -66,10 +66,16 @@ class Researcher:
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
                         'plan': None, 'decision': 'stop', 'stop_reason': proposed['hypothesis']}
-            catalog_mode = proposed['action'] != 'pipeline'
+            catalog_mode = proposed['action'] != 'pipeline' and proposed['recipe_id'] != 'python-pipeline-v1'
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
         submitted_params = proposed['hyperparameters']
+        custom_base = None
+        if adaptive and proposed['action'] == 'tune' and not catalog_mode and proposed['code'] is None:
+            custom_base = user.get('base_result')
+            if not custom_base or custom_base['recipe_id'] != 'python-pipeline-v1' or not user.get('base_code'):
+                raise AgentError('INVALID_RESEARCH_ACTION', 'To tune custom source, provide code or reuse the current measured custom base_code')
+            submitted_params = {**custom_base['hyperparameters'], **submitted_params}
         if catalog_mode and context['metadata'].get('graph_binding'):
             branch_user = json.loads(context['messages'][1]['content'])
             base = branch_user.get('base_result')
@@ -87,7 +93,7 @@ class Researcher:
                 self.log.event("research.constraints_applied", researcher_id=payload["researcher_id"], context_id=payload["context_id"],
                                branch_id=branch_user["branch_id"], work_order_id=branch_user["work_order_id"], changes=constraint_changes)
             params = effective
-        source = factory_source(proposed["recipe_id"]) if catalog_mode else proposed["code"]
+        source = factory_source(proposed["recipe_id"]) if catalog_mode else user['base_code'] if custom_base else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
         code = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
                              key="code/" + hashlib.sha256(canonical(args).encode()).hexdigest())["data"]["artifact"]
@@ -97,7 +103,7 @@ class Researcher:
                 "task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
                 "validation_id": self.validation_id, "seed": self.config.seed, "fidelity": "full",
                 "model": {"family": self.catalog.recipes[proposed["recipe_id"]]["family"], "hyperparameters": params},
-                "feature_steps": self.catalog.feature_steps(params) if catalog_mode else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
+                "feature_steps": self.catalog.feature_steps(params) if catalog_mode else custom_base['feature_steps'] if custom_base else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
                 "resources": {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                               "timeout_seconds": self.config.experiment_timeout_seconds}}
         if constraint_changes:
@@ -105,6 +111,8 @@ class Researcher:
             plan["hypothesis"] += note
             plan["expected_effect"] += note
         if adaptive and proposed['action'] == 'tune':
+            from agent.tuning_space import normalize_space
+            normalize_space(self.catalog, plan, proposed['tuning'], user.get('restrictions'))
             plan['resources']['timeout_seconds'] = min(plan['resources']['timeout_seconds'], proposed['tuning']['budget_seconds'])
         if context["metadata"].get("graph_binding") and branch_user["restrictions"]["required_capability_ids"]:
             plan["parent_ids"] = list(dict.fromkeys(plan["parent_ids"]+branch_user["allowed_donor_experiment_ids"]))
@@ -139,6 +147,7 @@ class Researcher:
                 'fingerprint_core': Store.fingerprint_core(plan, self.artifacts.meta(plan['code_artifact_id'])['sha256'])}
         record = {key: proposed[key] for key in ('action', 'hypothesis', 'expected_effect', 'evidence_ids')}
         record.update(research_notes=proposed.get('research_notes'), knowledge_ids=proposed.get('knowledge_ids', []),
+            tuning=proposed['tuning'],
             researcher_id=payload['researcher_id'], context_id=payload['context_id'],
             work_order_id=binding.get('work_order_id'), branch_id=binding.get('branch_id'),
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)

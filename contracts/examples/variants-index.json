@@ -43,5 +43,10 @@
     "contract_id": "C10",
     "file": "examples/research-action-with-notes.json",
     "schema": "ResearchAction"
+  },
+  {
+    "contract_id": "C10",
+    "file": "examples/research-action-optuna.json",
+    "schema": "ResearchAction"
   }
 ]

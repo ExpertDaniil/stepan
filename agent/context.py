@@ -1,6 +1,7 @@
 import json
 import re
 import uuid
+import importlib.util
 
 from agent.config import ROOT
 from agent.errors import AgentError
@@ -42,6 +43,7 @@ class ContextBuilder:
                 "recipes": [self.catalog.recipes[key] for key in allowed], "recent_experiments": recent,
                 "assignment": payload["assignment"], "researcher_id": payload["researcher_id"]}
         if self.catalog.config.research_mode == 'adaptive':
+            user['optimizer_facts'] = optimizer_facts()
             if getattr(self, 'store', None):
                 from agent.research_memory import build_research_memory
                 ids = [row[0] for row in self.store.db.execute('SELECT experiment_id FROM experiments WHERE run_id=?', (self.store.run_id,))]
@@ -140,6 +142,7 @@ class ContextBuilder:
                 'provider_context_window_tokens': graph['policy']['context'].get('provider_context_window_tokens'),
                 'max_output_tokens': self.catalog.config.llm_max_output_tokens}
             user['profile_summary']['current_pipeline_facts'] = self.catalog.pipeline_facts(user.get('base_result'))
+            user['profile_summary']['optimizer_facts'] = optimizer_facts()
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
             if getattr(self, 'knowledge', None):
                 user['profile_summary']['knowledge'] = self.knowledge.seed(user.get('base_result'),
@@ -184,6 +187,13 @@ class ContextBuilder:
                        estimated_input_tokens=(size()+2)//3)
         return {"context_id": art["artifact_id"], "context_version": self.round_no+1, "messages_artifact_id": art["artifact_id"],
                 "estimated_input_tokens": (size()+2)//3, "omitted_experiment_count": graph["total_recent"]-len(facts), "provider_prefix_cache_required": False}
+
+
+def optimizer_facts():
+    return {'optimizer': 'optuna', 'expected_version': '4.2.1',
+            'availability': 'discoverable_not_import_tested' if importlib.util.find_spec('optuna') else 'absent',
+            'typed_search_space': True, 'custom_source_tuning': True, 'pruning': False,
+            'execution': 'Dispatcher ask/tell; existing Runner and independent Evaluator'}
 
 
 def knowledge_focus(memory):

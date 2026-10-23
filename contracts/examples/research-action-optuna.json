@@ -1,0 +1,19 @@
+{
+  "action": "tune",
+  "recipe_id": "hist-gradient-regressor-v1",
+  "hyperparameters": {"max_iter": 300, "learning_rate": 0.1},
+  "hypothesis": "Test a declared lower-learning-rate and larger-iteration region together.",
+  "expected_effect": "Measure the sampled complete configurations on the unchanged validation.",
+  "feature_steps": [],
+  "code": null,
+  "tuning": {
+    "search_space": {
+      "max_iter": {"type": "int", "low": 500, "high": 1500, "step": 100},
+      "learning_rate": {"type": "float", "low": 0.02, "high": 0.1, "log": true}
+    },
+    "max_trials": 12,
+    "budget_seconds": 300
+  },
+  "evidence_ids": [],
+  "knowledge_ids": []
+}

@@ -23,12 +23,23 @@ RESEARCH_NOTES_SCHEMA = {
         'alternatives': {'type': 'array', 'items': IDEA_SCHEMA, 'maxItems': 8}},
     'required': ['idea_id', 'question', 'mechanism', 'decision_reason', 'previous_result_interpretation', 'alternatives'],
     'additionalProperties': False}
+DISTRIBUTION_SCHEMA = {'anyOf': [
+    {'type': 'object', 'properties': {'type': {'const': 'int'}, 'low': {'type': 'integer'}, 'high': {'type': 'integer'},
+        'step': {'type': 'integer', 'minimum': 1}, 'log': {'type': 'boolean'}},
+     'required': ['type', 'low', 'high'], 'additionalProperties': False},
+    {'type': 'object', 'properties': {'type': {'const': 'float'}, 'low': {'type': 'number'}, 'high': {'type': 'number'},
+        'step': {'type': 'number', 'exclusiveMinimum': 0}, 'log': {'type': 'boolean'}},
+     'required': ['type', 'low', 'high'], 'additionalProperties': False},
+    {'type': 'object', 'properties': {'type': {'const': 'categorical'}, 'choices': {'type': 'array', 'minItems': 1, 'maxItems': 64,
+        'items': {'anyOf': [{'type': 'string'}, {'type': 'number'}, {'type': 'boolean'}, {'type': 'null'}]}}},
+     'required': ['type', 'choices'], 'additionalProperties': False}]}
 TUNING_SCHEMA = {
     'type': 'object', 'properties': {
         'parameters': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'minItems': 1, 'maxItems': 12},
+        'search_space': {'type': 'object', 'additionalProperties': DISTRIBUTION_SCHEMA},
         'max_trials': {'type': 'integer', 'minimum': 2, 'maximum': 16},
         'budget_seconds': {'type': 'integer', 'minimum': 1, 'maximum': 3600}},
-    'required': ['parameters', 'max_trials', 'budget_seconds'], 'additionalProperties': False}
+    'required': ['max_trials', 'budget_seconds'], 'additionalProperties': False}
 ACTION_SCHEMA = {
     'type': 'object', 'properties': {
         'action': {'enum': ['catalog', 'pipeline', 'tune', 'stop']},
@@ -69,12 +80,16 @@ def validate_action(action, catalog):
     if kind == 'pipeline':
         if action['recipe_id'] != CUSTOM_RECIPE or not action['code'] or action['tuning'] is not None:
             raise AgentError('INVALID_RESEARCH_ACTION', 'A custom pipeline needs explicit source and the custom recipe ID')
+    elif kind == 'tune' and action['recipe_id'] == CUSTOM_RECIPE:
+        if not action['tuning'] or not action['tuning'].get('search_space'):
+            raise AgentError('INVALID_RESEARCH_ACTION', 'Custom tuning needs an explicit typed search_space')
     elif action['code'] is not None or action['recipe_id'] == CUSTOM_RECIPE:
         raise AgentError('INVALID_RESEARCH_ACTION', 'Catalogue/tuning actions execute only the owned constructor')
     if (kind == 'tune') != (action['tuning'] is not None):
         raise AgentError('INVALID_RESEARCH_ACTION', 'Only tune can authorize a local series')
     if kind == 'tune':
+        request = action['tuning']
+        axes = request.get('parameters', list(request.get('search_space', {})))
         domains = catalog.recipes.get(action['recipe_id'], {}).get('parameters', {})
-        axes = action['tuning']['parameters']
-        if len(set(axes)) != len(axes) or not set(axes) <= set(domains):
-            raise AgentError('INVALID_RESEARCH_ACTION', 'Tuning axes must be distinct declared parameters')
+        if not axes or len(set(axes)) != len(axes) or (action['recipe_id'] != CUSTOM_RECIPE and not set(axes) <= set(domains)):
+            raise AgentError('INVALID_RESEARCH_ACTION', 'Tuning axes must be distinct declared parameters; supply search_space')

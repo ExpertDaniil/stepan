@@ -1,5 +1,9 @@
 # Реализация и соответствие ТЗ
 
+Adaptive-тюнинг: [OPTUNA.md](OPTUNA.md). `agent/optuna_search.py` владеет ask/tell и снимками
+серий в dispatcher; `agent/tuning_space.py` проверяет декларативные домены. Исследовательские
+потоки не обучают модели и не пишут SQLite. Runner/Evaluator/Finalizer сохраняют прежние роли.
+
 Актуальные исправления tool-протокола и память исследовательских решений:
 [RESEARCH-DECISION-FIXES.md](RESEARCH-DECISION-FIXES.md). Артефакты решений неизменяемы;
 проекция фактов/идей строится dispatcher-ом без новой таблицы и дополнительных LLM-вызовов.

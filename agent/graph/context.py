@@ -161,7 +161,8 @@ class WorkService:
         # Donor measurements are explicit, but donor branch decisions are not
         # silently imported into this branch's pre-idea memory.
         ids = [*self.visible_history(branch_id), *donors]
-        return build_research_memory(self.store, self.artifacts, ids, work_order_ids=orders)
+        return build_research_memory(self.store, self.artifacts, ids, work_order_ids=orders,
+                                     branch_cuts=dict(self.lineage_cuts(branch_id)))
 
     def expire_work(self):
         expired = self.db.execute("SELECT work_order_id,order_json FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, self.elapsed())).fetchall()

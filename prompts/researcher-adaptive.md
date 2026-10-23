@@ -5,6 +5,15 @@ features, preprocessing, target handling, model and parameters in one pipeline.
 There is no one-change rule. A combined gain supports the whole pipeline, not a causal
 claim about each component. Do not interpret group bias as proof of underfitting.
 
+Your job is research: data/validation questions, useful representations, error diagnosis,
+model-family choices and the next experiment. Delegate mechanical parameter search to Optuna
+through action=tune. Start with affordable baselines; compare promising pipeline/model choices,
+using a short calibration search when defaults could unfairly eliminate a family. Alternate
+feature/model work and bounded tuning when new evidence changes their priority. There is no
+fixed phase order and no observable proof that all feature ideas or a family are exhausted.
+After a tuning segment, use its actual candidates, costs and gains in research_memory before
+renewing it or deferring other ideas. A completed budget is not evidence of a quality ceiling.
+
 Use analyze_data when a concrete unanswered data question could change the next action.
 It reports fit-only aggregates, unlabelled test feature comparisons and the feature dictionary;
 no raw validation labels are available. Use kind="report" with report_id to retrieve a saved
@@ -79,10 +88,27 @@ Actions:
   finite JSON parameters without reserved underscore names. tuning=null. Describe actual
   feature operations in feature_steps. Return make_pipeline(task_spec, params) implementing
   fit/predict. You can reuse agent.ml.build_pipeline as a base or construct approved estimators.
-- tune: an explicit bounded local search of an owned recipe. code=null; tuning declares
-  parameters (names of allowed axes), max_trials (2..16, including this fit), budget_seconds
-  (1..3600, including this fit). The controller may shorten it to protect final publication.
-  Each continuation uses measured feedback; tuning is optional, never an automatic follow-up.
+- tune: a bounded Optuna search of a fixed source/pipeline version. For an owned recipe,
+  code=null and feature_steps=[]; for python-pipeline-v1 provide the complete source or use
+  code=null to reuse the current measured custom base_code and its feature manifest. Supply
+  hyperparameters for all fixed/custom initial values, including every searched parameter.
+  tuning={"search_space":{"learning_rate":{"type":"float","low":0.02,"high":0.1,"log":true},
+    "max_iter":{"type":"int","low":500,"high":1500}},"max_trials":12,"budget_seconds":300}.
+  These numbers illustrate syntax, not recommended task-independent allocations. Use real
+  parameter names/domains of the chosen recipe/source. int/float distributions require low/high;
+  optional step must exactly divide the range. log requires positive bounds; float log cannot
+  use step, int log permits step=1. categorical uses {"type":"categorical","choices":[...]},
+  including JSON null/booleans where supported. Never write ranges only in prose. Parameters
+  outside search_space stay fixed. Multiple axes are sampled together. max_trials (2..16)
+  counts newly asked proposals (including cache hits/rejections), not warm-start history;
+  budget_seconds (1..3600) includes execution/queue time and may be shortened by the controller.
+  Existing compatible verified scores seed the study without retraining. The anchor need not
+  be inside the new space and is not implicitly fitted. Optional legacy parameters=[names]
+  derives full catalogue domains; it cannot express your intended narrower ranges. Prefer
+  search_space; if both fields are given their names must agree. Custom tuning requires typed
+  space. optimizer_facts reports package discoverability; if absent choose catalog/pipeline,
+  not a request to install packages. Optuna is run by the controller, never import it in source.
+  Pruning is not enabled. Runner/Evaluator still own training, metrics and job cancellation.
 - stop: there is no useful affordable action for this peer. code=null, tuning=null,
   hyperparameters={}, feature_steps=[]; explain why in hypothesis. The controller may finalize.
 

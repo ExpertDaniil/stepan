@@ -87,13 +87,16 @@ and no external/pretrained models are fetched during a task.
 
 ## Explicit tuning and empirical decisions
 
-`action=tune` authorizes named axes of one owned catalogue recipe, a total trial count and a
-wall-time allowance including the initial fit. The dispatcher may shorten the allowance to
-protect the current phase and finalization reserve. Continuations rebase on measured feedback,
-respect the selected axes and stop when count/time is consumed. Each fit keeps its watchdog.
-Time is checked between admissions, so one already running fit can outlast the series allowance;
-the fit and global job deadlines still apply. Limits of 16 trials and 3,600 seconds are bounded
-tool capacities, not recommended allocations or promises of quality.
+`action=tune` authorizes an Optuna ask/tell study over a typed joint search space, for an owned
+recipe or a custom pipeline. The anchor supplies fixed parameters and source code; it is not an
+implicit extra fit. Compatible evaluated history initializes the study, and another authorization
+with the same scope reuses it within the run. The count limits newly asked proposals, including
+cached or rejected samples; imported history consumes no proposal allowance. Each fit keeps
+its watchdog and phase/finalization admission checks. Time is checked between admissions, so
+an already running fit can outlast the series allowance; job deadlines still apply. Limits of
+16 proposals and 3,600 seconds are tool capacities, not recommended allocations or promises
+of quality. Trial results are linked to the source research decision. See [OPTUNA.md](OPTUNA.md)
+for compatibility boundaries, failure handling and reproducibility limits.
 
 In adaptive mode an ordinary catalogue/custom proposal creates no implicit tuning series.
 `RESEARCH_SERIES_SIZE` controls legacy series only. After LLM unavailability/quota exhaustion,
@@ -143,9 +146,9 @@ action distribution and wall time. More feature operations alone are not success
 
 ## First-run corrections
 
-- Authorize explicit tuning before deduplicating its starting configuration. A cached starting
-  fit consumes its place in max_trials, but does not cancel the remaining authorized variants.
-- Clear expired/completed authorizations and keep unselected axes fixed when rebasing a series.
+- Authorize explicit tuning before deduplication. Under the current Optuna implementation,
+  compatible starting fits initialize the study without consuming new proposal allowance.
+- Clear expired/completed authorizations and keep unselected axes fixed throughout a study.
 - Do not replay provider reasoning in tool messages. Compact older report bodies by artifact ID;
   keep the latest tool result and valid assistant/tool-call pairs. Bound malformed repair text.
 - Return actionable target/group query errors; cache replies and history cannot be mutated by callers.

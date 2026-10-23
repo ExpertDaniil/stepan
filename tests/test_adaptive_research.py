@@ -142,7 +142,7 @@ class AdaptiveResearchTests(unittest.TestCase):
         self.assertFalse(local.has_series('researcher-1', self.h.root))
         request = {'parameters': ['alpha'], 'max_trials': 3, 'budget_seconds': 30}
         local.start_series('researcher-1', self.h.root, plan, request=request)
-        for _ in range(2):
+        for _ in range(3):
             recipe, params = local.next_choice('researcher-1', self.h.root, plan)
             self.assertEqual(recipe, plan['recipe_id'])
             self.assertEqual([k for k in params if params[k] != plan['model']['hyperparameters'][k]], ['alpha'])

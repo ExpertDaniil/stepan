@@ -1,4 +1,4 @@
-"""Small related catalogue trials. No additional agent or optimizer dependency."""
+"""Adaptive Optuna authorizations plus the legacy/emergency catalogue fallback."""
 from collections import Counter, deque
 import hashlib
 import json
@@ -22,6 +22,11 @@ class LocalSearch:
         self.parameter_turn = Counter()
         self.rowid = 0
         self.authorizations = {}
+        self.optuna = None
+        if controller.config.research_mode == 'adaptive':
+            from agent.optuna_search import OptunaSearch
+            self.optuna = OptunaSearch(controller)
+            self.authorizations = self.optuna.active
 
     @staticmethod
     def key(recipe, params):
@@ -48,6 +53,8 @@ class LocalSearch:
         return self.key(plan["recipe_id"], plan["model"]["hyperparameters"]) in self.seen
 
     def has_series(self, peer, branch):
+        if self.optuna is not None:
+            return self.optuna.has_series(peer, branch)
         if self.c.config.research_mode == 'adaptive':
             auth = self.authorizations.get((branch, peer))
             if not auth or time.monotonic() >= auth['deadline']:
@@ -57,8 +64,17 @@ class LocalSearch:
         return bool(item and item[0] > 0 and item[1])
 
     def clear_series(self, peer, branch):
+        if self.optuna is not None:
+            self.optuna.stop(peer, branch)
+            return
         self.series.pop((branch, peer), None)
         self.authorizations.pop((branch, peer), None)
+
+    def clear_all(self, reason='phase_changed'):
+        if self.optuna is not None:
+            self.optuna.clear_all(reason)
+        self.series.clear()
+        self.authorizations.clear()
 
     def refining(self, branch, base):
         if self.c.config.research_mode == 'adaptive':
@@ -114,6 +130,10 @@ class LocalSearch:
                     yield axis[index]
 
     def start_series(self, peer, branch, plan, *, request=None):
+        if self.optuna is not None:
+            if request is not None:
+                self.optuna.start_series(peer, branch, plan, request)
+            return
         adaptive = self.c.config.research_mode == 'adaptive'
         if adaptive and request is None:
             return
@@ -162,6 +182,9 @@ class LocalSearch:
                 "resources": self.c.resources()}
 
     def next_choice(self, peer, branch, base=None, constraints=None, *, assignment=None):
+        if self.optuna is not None and self.optuna.has_series(peer, branch):
+            plan = self.optuna.next_plan(peer, branch, constraints)
+            return (plan['recipe_id'], plan['model']['hyperparameters']) if plan else None
         self.refresh()
         constraints = constraints or {"required_capability_ids": [], "forbidden_capability_ids": []}
         tried = set()

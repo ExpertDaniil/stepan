@@ -26,7 +26,8 @@ class Researcher:
                                         "response_schema_id": research_schema(self.config.research_mode),
                                         "tool_schema_ids": (['analyze_data'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
-                                        "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 8 if adaptive else 4}, self.gateway.complete)["data"]
+                                        "deadline_seconds": self.config.llm_operation_timeout_seconds,
+                                        "attempt_limit": self.config.llm_research_tool_turns + 2 if adaptive else 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
         if adaptive:
             validate_action(proposed, self.catalog)
@@ -42,6 +43,9 @@ class Researcher:
             evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
             evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
             evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id') and call.get('name') != 'search_knowledge')
+            for delivery in answer['tool_calls']:
+                if delivery.get('name') == 'research_updates':
+                    evidence.update(delivery['evidence_ids'])
             for decision in memory.get('decisions', []):
                 evidence.update(decision['evidence_ids'])
                 for observation in decision['observations']:
@@ -151,6 +155,7 @@ class Researcher:
             researcher_id=payload['researcher_id'], context_id=payload['context_id'],
             work_order_id=binding.get('work_order_id'), branch_id=binding.get('branch_id'),
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)
+        record['delivered_feedback'] = [call for call in answer.get('tool_calls', []) if call.get('name') == 'research_updates']
         art = self.artifacts.write_json('research/decision-'+uuid.uuid4().hex[:16]+'.json', record, 'research_decision')
         self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
             action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,

@@ -17,10 +17,10 @@ class RefinementPolicy:
     def phase_limits(self):
         fraction = self.policy['scheduling'].get('search_fraction', self.config.graph_search_fraction)
         def kept(total):
-            return max(0, total-math.ceil(total*(1-fraction)-1e-9))
+            return max(0, total-math.ceil(total*(1-fraction)-1e-9)) if total is not None else None
         return {'search_fraction': fraction,
-                'call_limit': min(self.config.llm_max_calls, max(2, kept(self.config.llm_max_calls))),
-                'output_limit': min(self.config.llm_max_total_output_tokens, max(2*self.config.llm_bootstrap_output_tokens, kept(self.config.llm_max_total_output_tokens)))}
+                'call_limit': min(self.config.llm_max_calls, max(2, kept(self.config.llm_max_calls))) if self.config.llm_max_calls is not None else None,
+                'output_limit': min(self.config.llm_max_total_output_tokens, max(2*self.config.llm_bootstrap_output_tokens, kept(self.config.llm_max_total_output_tokens))) if self.config.llm_max_total_output_tokens is not None else None}
 
     def apply_phase_caps(self):
         if self.refinement_enabled() and not self.refinement():
@@ -46,7 +46,7 @@ class RefinementPolicy:
             train = sum(costs)/self.policy['max_train_workers'] if costs else 1
             publication = max((self.budget.candidate_reserve(self.store.get(h['experiment_id'])['plan']) for h in heads),
                               default=self.budget.reserve_seconds())
-            api = self.budget.snapshot()['llm_calls_remaining'] > 0 and self.budget.token_snapshot()['output_available'] >= self.config.llm_max_output_tokens
+            api = self.budget.llm_unavailable_reason() is None
             reason = self.budget.reasoning_estimate() if api else 0
             if left <= train+reason+publication+1:
                 return 'next_research_batch_would_cross_phase_boundary'

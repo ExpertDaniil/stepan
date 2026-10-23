@@ -35,8 +35,16 @@ def real(name, default, low, high):
     return value
 
 
+def optional_limit(name, default, low, high):
+    value = os.environ.get(name)
+    if value is not None and value.strip().lower() in {'0', 'none', 'unlimited'}:
+        return None
+    return integer(name, default, low, high) if value is not None or default is not None else None
+
+
 @dataclass(frozen=True)
 class Config:
+    profile: str = 'development'
     llm_mode: str = "live"
     time_budget_seconds: int = 10800
     max_workers: int = 2
@@ -47,13 +55,20 @@ class Config:
     research_series_size: int = 4
     catalog_warmup_experiments: int = 4
     research_mode: str = "adaptive"
-    llm_max_calls: int = 32
+    llm_max_calls: int | None = 32
     llm_timeout_seconds: int = 600
     llm_operation_timeout_seconds: int = 1200
     llm_max_output_tokens: int = 16384
     llm_bootstrap_output_tokens: int = 4096
     llm_max_output_tokens_limit: int = 32768
-    llm_max_total_output_tokens: int = 262144
+    llm_max_total_output_tokens: int | None = 262144
+    llm_research_tool_turns: int = 8
+    llm_request_max_bytes: int = 196608
+    llm_context_window_tokens: int = 262144
+    llm_reasoning_protocol: str = 'compatible'
+    llm_reasoning_effort: str | None = None
+    llm_reasoning_field: str = 'reasoning_content'
+    llm_reasoning_history_bytes: int = 32768
     llm_progress_seconds: int = 15
     max_context_tokens: int = 16000
     log_level: str = "INFO"
@@ -82,11 +97,16 @@ class Config:
     worker_log_max_bytes: int = 1048576
 
     @classmethod
-    def from_env(cls, *, llm_mode=None, work_dir=None):
+    def from_env(cls, *, llm_mode=None, work_dir=None, profile=None):
+        profile = profile or os.environ.get('AUTOML_PROFILE', 'platform')
+        if profile not in {'development', 'platform'}:
+            raise AgentError('INVALID_CONFIG', 'AUTOML_PROFILE must be development or platform')
+        platform = profile == 'platform'
         mode = llm_mode or os.environ.get("LLM_MODE", "live")
         if mode not in {"live", "mock"}:
             raise AgentError("INVALID_CONFIG", "LLM_MODE must be live or mock")
         cfg = cls(
+            profile=profile,
             llm_mode=mode,
             time_budget_seconds=integer("TIME_BUDGET_SECONDS", 10800, 5, 10800),
             max_workers=integer("MAX_WORKERS", 2, 1, 2),
@@ -97,13 +117,20 @@ class Config:
             research_series_size=integer("RESEARCH_SERIES_SIZE", 4, 1, 16),
             catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
             research_mode=os.environ.get("RESEARCH_MODE", "adaptive"),
-            llm_max_calls=integer("LLM_MAX_CALLS", 32, 1, 1000),
+            llm_max_calls=optional_limit("LLM_MAX_CALLS", None if platform else 32, 1, 1000000),
             llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 600, 1, 1800),
             llm_operation_timeout_seconds=integer("LLM_OPERATION_TIMEOUT_SECONDS", 1200, 1, 3600),
             llm_max_output_tokens=integer("LLM_MAX_OUTPUT_TOKENS", 16384, 128, 131072),
             llm_bootstrap_output_tokens=integer("LLM_BOOTSTRAP_OUTPUT_TOKENS", 4096, 128, 131072),
             llm_max_output_tokens_limit=integer("LLM_MAX_OUTPUT_TOKENS_LIMIT", 32768, 128, 131072),
-            llm_max_total_output_tokens=integer("LLM_MAX_TOTAL_OUTPUT_TOKENS", 262144, 1024, 4000000),
+            llm_max_total_output_tokens=optional_limit("LLM_MAX_TOTAL_OUTPUT_TOKENS", None if platform else 262144, 1024, 1000000000),
+            llm_research_tool_turns=integer('LLM_RESEARCH_TOOL_TURNS', 8, 0, 32),
+            llm_request_max_bytes=integer('LLM_REQUEST_MAX_BYTES', 196608, 16000, 2000000),
+            llm_context_window_tokens=integer('LLM_CONTEXT_WINDOW_TOKENS', 262144, 4096, 1000000),
+            llm_reasoning_protocol=os.environ.get('LLM_REASONING_PROTOCOL', 'compatible'),
+            llm_reasoning_effort=os.environ.get('LLM_REASONING_EFFORT') or None,
+            llm_reasoning_field=os.environ.get('LLM_REASONING_FIELD', 'reasoning_content'),
+            llm_reasoning_history_bytes=integer('LLM_REASONING_HISTORY_BYTES', 32768, 0, 262144),
             llm_progress_seconds=integer("LLM_PROGRESS_SECONDS", 15, 1, 60),
             max_context_tokens=integer("MAX_CONTEXT_TOKENS", 16000, 1000, 32768),
             log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -118,7 +145,7 @@ class Config:
             graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
             graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 4, 1, 20),
             graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 900, 0, 10800),
-            graph_refinement_enabled=boolean("GRAPH_REFINEMENT_ENABLED", True),
+            graph_refinement_enabled=boolean("GRAPH_REFINEMENT_ENABLED", not platform),
             graph_search_fraction=real("GRAPH_SEARCH_FRACTION", 0.85, 0.8, 0.9),
             graph_plateau_absolute_epsilon=real("GRAPH_PLATEAU_ABSOLUTE_EPSILON", 0.001, 0, 1000000),
             graph_plateau_relative_epsilon=real("GRAPH_PLATEAU_RELATIVE_EPSILON", 0.001, 0, 1),
@@ -133,6 +160,14 @@ class Config:
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
+        if cfg.llm_reasoning_protocol not in {'compatible', 'qwen_chat_template'}:
+            raise AgentError('INVALID_CONFIG', 'LLM_REASONING_PROTOCOL must be compatible or qwen_chat_template')
+        if cfg.llm_reasoning_effort not in {None, 'low', 'medium', 'xhigh'}:
+            raise AgentError('INVALID_CONFIG', 'LLM_REASONING_EFFORT must be low, medium or xhigh')
+        if cfg.llm_reasoning_field not in {'reasoning_content', 'reasoning'}:
+            raise AgentError('INVALID_CONFIG', 'LLM_REASONING_FIELD must be reasoning_content or reasoning')
+        if cfg.llm_reasoning_effort is not None and cfg.llm_reasoning_protocol == 'compatible':
+            raise AgentError('INVALID_CONFIG', 'Reasoning controls require an explicitly selected provider protocol; proxy support is not inferred')
         if cfg.research_mode not in {"adaptive", "catalog", "code"} or cfg.console_format not in {"human", "json"}:
             raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
         if cfg.graph_peers > cfg.max_workers or cfg.graph_train_workers > cfg.max_workers:

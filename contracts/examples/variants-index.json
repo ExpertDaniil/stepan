@@ -48,5 +48,10 @@
     "contract_id": "C10",
     "file": "examples/research-action-optuna.json",
     "schema": "ResearchAction"
+  },
+  {
+    "contract_id": "C09",
+    "file": "examples/C09/platform-request.json",
+    "schema": "C09_Request"
   }
 ]

@@ -277,8 +277,16 @@
           "minimum": 0
         },
         "llm_calls_remaining": {
-          "type": "integer",
-          "minimum": 0
+          "description": "null means no numeric API-call quota; wall time and per-dialogue bounds still apply",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "search_allowed": {
           "type": "boolean"
@@ -13599,12 +13607,26 @@
               "maximum": 0.9
             },
             "call_limit": {
-              "type": "integer",
-              "minimum": 0
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "output_limit": {
-              "type": "integer",
-              "minimum": 0
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [

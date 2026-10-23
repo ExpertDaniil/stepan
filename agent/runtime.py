@@ -147,6 +147,7 @@ def write_summary(root, store, budget, config, champion, state):
              f"Published experiment: {champion['experiment_id']}\n", f"Published metric: {champion['primary_metric']['value']}\n",
              f"Metric: {champion['primary_metric']['metric_id']} ({champion['primary_metric']['direction']})\n",
              f"Research mode: {config.research_mode}\n", f"Token accounting: {json.dumps(budget.token_snapshot())}\n",
+             f"Budget profile: {config.profile}; numeric limits: calls={config.llm_max_calls}, output={config.llm_max_total_output_tokens}\n",
              "\n| Experiment | State | Recipe | Metric | Hypothesis |\n|---|---|---|---|---|\n"]
     for row in rows:
         plan = json.loads(row["plan"])
@@ -155,6 +156,11 @@ def write_summary(root, store, budget, config, champion, state):
         hypothesis = plan["hypothesis"].replace("|", "/").replace("\n", " ")
         lines.append(f"| {row['experiment_id']} | {row['state']} | {plan['recipe_id']} | {score} | {hypothesis} |\n")
     lines.append("\nFull redacted protocol: events.jsonl, messages/, llm/, contexts/, artifacts-index.json.\n")
+    confirmation = root/'validation/final-confirmation.json'
+    if confirmation.is_file():
+        report = json.loads(confirmation.read_text(encoding='utf-8'))
+        lines.append('\nFinal comparison: validation/final-confirmation.json; chosen experiment: '+report['chosen_experiment_id']+'.\n')
+        lines.append(report['limitations']+'\n')
     if config.graph_enabled:
         row = store.db.execute("SELECT value FROM g_metadata WHERE run_id=? AND name='latest_export'", (store.run_id,)).fetchone()
         branches = store.db.execute("SELECT branch_id,decision,state,revision FROM g_branches WHERE run_id=? ORDER BY rowid", (store.run_id,)).fetchall()
@@ -176,11 +182,12 @@ def main(argv=None, *, started_monotonic=None):
     parser.add_argument("--llm-mode", choices=["live", "mock"], default=None)
     parser.add_argument("--work-dir", type=Path, default=None)
     parser.add_argument("--env-file", type=Path, help="Explicit .env; existing environment values take precedence")
+    parser.add_argument('--profile', choices=['development', 'platform'], default=None)
     args = parser.parse_args(argv)
     try:
         if args.env_file:
             load_env_file(args.env_file)
-        config = Config.from_env(llm_mode=args.llm_mode, work_dir=args.work_dir)
+        config = Config.from_env(llm_mode=args.llm_mode, work_dir=args.work_dir, profile=args.profile)
     except Exception as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
@@ -195,7 +202,25 @@ def main(argv=None, *, started_monotonic=None):
         signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt("SIGTERM")))
     try:
         log.event("run.started", config=config.public_dict(), task_path=str(args.task.resolve()), run_directory=str(root))
-        return bootstrap(config, started, args.task.resolve(), run_id, root, log)
+        log.event('llm.configuration', profile=config.profile, call_limit=config.llm_max_calls,
+                  total_output_limit=config.llm_max_total_output_tokens, reasoning_protocol=config.llm_reasoning_protocol,
+                  reasoning_effort=config.llm_reasoning_effort, provider_parameter_application='unverified',
+                  request_max_bytes=config.llm_request_max_bytes, refinement_enabled=config.graph_refinement_enabled)
+        # Two native threads for profiling/analysis/evaluation, plus at most six
+        # leased training threads. The platform cgroup remains the hard limit.
+        from threadpoolctl import threadpool_limits
+        native_names = ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS')
+        previous_threads = {name: os.environ.get(name) for name in native_names}
+        try:
+            os.environ.update({name: '2' for name in native_names})
+            with threadpool_limits(limits=2):
+                return bootstrap(config, started, args.task.resolve(), run_id, root, log)
+        finally:
+            for name, value in previous_threads.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)

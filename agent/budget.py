@@ -54,10 +54,30 @@ class Budget:
                     min(self.config.llm_operation_timeout_seconds, max(1, self.config.time_budget_seconds*.01)))
 
     def call_limit(self):
-        return min(self.config.llm_max_calls, self.phase_call_limit if self.phase_call_limit is not None else self.config.llm_max_calls)
+        return min(self.global_call_limit(), self.phase_call_limit if self.phase_call_limit is not None else math.inf)
 
     def output_limit(self):
-        return min(self.config.llm_max_total_output_tokens, self.phase_output_limit if self.phase_output_limit is not None else self.config.llm_max_total_output_tokens)
+        return min(self.global_output_limit(), self.phase_output_limit if self.phase_output_limit is not None else math.inf)
+
+    def global_call_limit(self):
+        return self.config.llm_max_calls if self.config.llm_max_calls is not None else math.inf
+
+    def global_output_limit(self):
+        return self.config.llm_max_total_output_tokens if self.config.llm_max_total_output_tokens is not None else math.inf
+
+    @staticmethod
+    def bounded_count(value):
+        return max(0, value) if math.isfinite(value) else None
+
+    def llm_unavailable_reason(self, pending=0):
+        with self.lock:
+            if self.phase_remaining() <= self.reserve_seconds()+1 or self.remaining() <= self.reserve_seconds()+1:
+                return 'time_reserve'
+            if self.call_limit()-self.calls-self._dialogue_calls() <= pending:
+                return 'llm_call_limit'
+            if self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens() < (pending+1)*self.config.llm_max_output_tokens:
+                return 'llm_output_budget'
+            return 'search_closed' if self.search_stopped else None
 
     def remaining(self):
         return max(0.0, self.deadline - time.monotonic())
@@ -114,7 +134,7 @@ class Budget:
             memory = sum(v["lease"]["memory_limit_mb"] for v in self.leases.values())
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
                     "cpu_threads_available": max(0, 6 - cpu), "memory_mb_available": max(0, 20480 - memory),
-                    "llm_calls_remaining": max(0, self.call_limit() - self.calls - self._dialogue_calls()),
+                    "llm_calls_remaining": self.bounded_count(self.call_limit() - self.calls - self._dialogue_calls()),
                     "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
     def _dialogue_calls(self):
@@ -127,10 +147,10 @@ class Budget:
         """Protect future final/repair requests; no HTTP attempt is charged yet."""
         with self.lock:
             calls = self.call_limit()-self.calls-self._dialogue_calls()
-            tokens = min(self.output_limit(), self.config.llm_max_total_output_tokens)-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens()
-            slots = min(2 if repair else 1, calls, tokens//max_tokens)
+            tokens = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens()
+            slots = min(2 if repair else 1, calls, tokens//max_tokens if math.isfinite(tokens) else math.inf)
             if slots < 1:
-                phase = self.call_limit() < self.config.llm_max_calls or self.output_limit() < self.config.llm_max_total_output_tokens
+                phase = self.call_limit() < self.global_call_limit() or self.output_limit() < self.global_output_limit()
                 raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase else 'BUDGET_EXHAUSTED',
                                  'No unreserved capacity for a final research decision')
             ident = 'dialogue-'+uuid.uuid4().hex[:16]
@@ -140,6 +160,16 @@ class Budget:
     def release_dialogue(self, ident):
         with self.lock:
             return self.llm_dialogues.pop(ident, None)
+
+    def affordable_dialogue_output(self, ident, requested):
+        with self.lock:
+            item = self.llm_dialogues[ident]
+            free = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens()
+            if item['slots'] < 1:
+                return item['max_tokens']
+            growth = (requested-item['max_tokens'])*item['slots']
+            return (requested if growth <= free else
+                    item['max_tokens']+max(0, int(free//item['slots'])))
 
     def prepare_dialogue_turn(self, ident, max_tokens, *, allow_tools):
         """Atomically fund an optional tool request or use the protected final slot."""
@@ -164,11 +194,11 @@ class Budget:
         with self.lock:
             if self.phase_deadline and self.phase_remaining() < 1:
                 raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Branch exploration reached its time boundary')
-            if self.calls >= self.config.llm_max_calls or self.remaining() < 1:
+            if self.calls >= self.global_call_limit() or self.remaining() < 1:
                 raise AgentError("BUDGET_EXHAUSTED", "LLM budget exhausted")
             own = 1 if dialogue_id is not None and self.llm_dialogues[dialogue_id]['slots'] > 0 else 0
             if self.calls+self._dialogue_calls()-own >= self.call_limit():
-                phase = self.call_limit() < self.config.llm_max_calls
+                phase = self.call_limit() < self.global_call_limit()
                 raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase else 'BUDGET_EXHAUSTED',
                                  'No unreserved API attempts remain; active dialogue and phase reservations are protected')
             self.calls += 1
@@ -183,7 +213,7 @@ class Budget:
             if dialogue_id is not None and (owner is None or owner['slots'] < 1 or max_tokens > owner['max_tokens']):
                 raise AgentError('BUDGET_EXHAUSTED', 'No funded request remains in this dialogue')
             held = self._dialogue_tokens()-(owner['max_tokens'] if owner else 0)
-            available = self.config.llm_max_total_output_tokens - self.output_tokens_charged - sum(self.pending_llm_tokens.values()) - held
+            available = self.global_output_limit() - self.output_tokens_charged - sum(self.pending_llm_tokens.values()) - held
             if max_tokens > available:
                 raise AgentError("BUDGET_EXHAUSTED", "Per-run output token budget cannot reserve this request",
                                  details={"requested": max_tokens, "available": max(0, available)})
@@ -217,8 +247,8 @@ class Budget:
                     "output_reported": self.output_tokens_reported, "output_reserved": reserved,
                     "output_reserved_inflight": inflight, "output_reserved_dialogues": dialogues,
                     "llm_calls_reserved_dialogues": self._dialogue_calls(),
-                    "output_available": max(0, self.output_limit() - self.output_tokens_charged - reserved),
-                    "output_available_global": max(0, self.config.llm_max_total_output_tokens - self.output_tokens_charged - reserved),
+                    "output_available": self.bounded_count(self.output_limit() - self.output_tokens_charged - reserved),
+                    "output_available_global": self.bounded_count(self.global_output_limit() - self.output_tokens_charged - reserved),
                     "phase_call_limit": self.phase_call_limit, "phase_output_limit": self.phase_output_limit,
                     "input_reported": self.input_tokens_reported, "cached_input_reported": self.cached_tokens_reported}
 

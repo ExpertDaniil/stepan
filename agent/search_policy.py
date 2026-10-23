@@ -383,10 +383,7 @@ class SearchPolicy(RefinementPolicy):
                 # Assignments are issued before the parallel API calls start. Account for them now.
                 pending = self.db.execute("SELECT count(*) FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND (order_json IS NULL OR json_extract(order_json,'$.action') NOT IN ('baseline','transfer'))", (self.run_id,)).fetchone()[0]
                 stop_reason = None
-                if self.budget.snapshot()["llm_calls_remaining"] <= pending:
-                    stop_reason = "llm_call_limit"
-                elif self.budget.token_snapshot()["output_available"] < (pending+1)*self.config.llm_max_output_tokens:
-                    stop_reason = "llm_output_budget"
+                stop_reason = self.budget.llm_unavailable_reason(pending)
                 gateway = getattr(getattr(self.controller, "researcher", None), "gateway", None)
                 if gateway is not None:
                     try:

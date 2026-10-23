@@ -90,6 +90,8 @@ class Gateway:
         self.provider_credits_exhausted = threading.Event()
         self.analysis = None
         self.knowledge = None
+        self.feedback = None
+        self.cancelled = threading.Event()
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
@@ -112,9 +114,28 @@ class Gateway:
 
     def _request(self, request, context, payload, attempt, deadline, dialogue_id=None):
         from contextvars import copy_context
+        if self.cancelled.is_set():
+            raise AgentError('RESEARCH_CANCELLED', 'Research was cancelled before request dispatch')
+        delivered = None
+        if payload['purpose'] == 'research_proposal' and self.feedback is not None:
+            scope = context['metadata'].get('graph_binding', {}).get('branch_id', 'legacy')
+            delivered = self.feedback.latest(scope)
+            if delivered:
+                request['messages'].append({'role': 'user', 'content': json.dumps(
+                    {'research_updates': delivered}, ensure_ascii=False)})
+        if self.config.llm_reasoning_protocol == 'qwen_chat_template':
+            # Explicit opt-in only. This is a documented self-hosted Qwen format,
+            # not a claim that the organizers' proxy applies these fields.
+            request['extra_body'] = {'chat_template_kwargs': {'enable_thinking': True, 'preserve_thinking': True}}
+            if self.config.llm_reasoning_effort:
+                request['extra_body']['reasoning_effort'] = self.config.llm_reasoning_effort
+        self._bound_reasoning_history(request['messages'])
         request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8"))
-        byte_limit = None if self.config.research_mode == 'adaptive' else self.config.max_context_tokens * 3
-        if byte_limit is not None and context["metadata"].get("graph_binding"):
+        byte_limit = min(self.config.llm_request_max_bytes,
+                         self.config.llm_context_window_tokens-request['max_tokens']-1024)
+        if self.config.research_mode != 'adaptive':
+            byte_limit = min(byte_limit, self.config.max_context_tokens * 3)
+        if self.config.research_mode != 'adaptive' and context["metadata"].get("graph_binding"):
             user = json.loads(context["messages"][1]["content"])
             byte_limit = min(byte_limit, self.config.graph_context_bytes, user["profile_summary"]["context_budget"]["max_api_request_bytes"])
         if byte_limit is not None and request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
@@ -124,7 +145,7 @@ class Gateway:
             raise AgentError("CONTEXT_TOO_LARGE", "Complete API request including schema/tools/repair exceeds the byte budget",
                              details={"request_bytes": request_bytes, "limit_bytes": byte_limit})
         self.log.event("llm.request_budget_checked", level="DEBUG", request_bytes=request_bytes, limit_bytes=byte_limit,
-                       input_limit_owner='provider' if byte_limit is None else 'client')
+                       input_limit_owner='client_bytes_and_provider', tokenizer_estimate=False)
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
@@ -143,6 +164,16 @@ class Gateway:
                            request_timeout_seconds=round(timeout, 1), operation_seconds_remaining=round(deadline-time.monotonic(), 1),
                            context_artifact_id=payload["context_artifact_id"], mode=self.config.llm_mode,
                            destination=self._destination(), token_budget=self.budget.token_snapshot())
+            if delivered:
+                evidence_ids = [delivered['artifact_id']]
+                for result in delivered['results']:
+                    evidence_ids.extend(result[k] for k in ('experiment_id', 'evaluation_id', 'diagnostics_artifact_id'))
+                evidence_ids.extend(s['artifact_id'] for s in delivered['series'])
+                self.log.event('research.feedback_delivered', call_no=call_no,
+                    context_id=payload['context_artifact_id'], branch_id=delivered['branch_id'],
+                    revision=delivered['revision'], feedback_artifact_id=delivered['artifact_id'],
+                    experiment_ids=[v['experiment_id'] for v in delivered['results']],
+                    series_ids=[s['series_id'] for s in delivered['series']])
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
             if payload['purpose'] == 'research_proposal':
@@ -160,9 +191,19 @@ class Gateway:
                            duration_ms=round((time.monotonic()-started)*1000, 1), finish_reason=choice.get("finish_reason"),
                            content_chars=len(message.get("content") or ""), tool_calls=len(message.get("tool_calls") or []),
                            input_tokens=token_data.get("prompt_tokens"), output_tokens=output, reasoning_tokens=reasoning,
+                           reasoning_field=self.config.llm_reasoning_field,
+                           reasoning_field_present=isinstance(message.get(self.config.llm_reasoning_field), str),
                            cached_input_tokens=(token_data.get("prompt_tokens_details") or {}).get("cached_tokens"),
                            usage_inconsistent=isinstance(reasoning, int) and isinstance(output, int) and reasoning > output,
                            token_budget=self.budget.token_snapshot())
+            if self.cancelled.is_set() or time.monotonic() >= deadline:
+                self.log.event('llm.late_result_discarded', call_no=call_no, reason='cancelled' if self.cancelled.is_set() else 'operation_deadline')
+                raise AgentError('RESEARCH_CANCELLED' if self.cancelled.is_set() else 'LLM_OPERATION_TIMEOUT',
+                                 'Late provider result was charged and archived but cannot become an experiment')
+            if delivered:
+                response['_delivered_feedback'] = {'name': 'research_updates', 'call_no': call_no,
+                    'artifact_id': delivered['artifact_id'], 'revision': delivered['revision'],
+                    'evidence_ids': list(dict.fromkeys(evidence_ids))}
             return response, call_no
         except AgentError:
             raise
@@ -198,6 +239,21 @@ class Gateway:
                 # A timed-out request may have been billed without returning usage.
                 # Charge its reservation conservatively; never fabricate reported usage.
                 self.budget.finish_llm_call(call_no)
+
+    def _bound_reasoning_history(self, messages):
+        field = self.config.llm_reasoning_field
+        retained = sum(len(m.get(field, '').encode('utf-8')) for m in messages)
+        dropped = 0
+        cap = self.config.llm_reasoning_history_bytes if self.config.llm_reasoning_protocol == 'qwen_chat_template' else 0
+        for message in messages:
+            if retained <= cap:
+                break
+            value = message.pop(field, '')
+            retained -= len(value.encode('utf-8'))
+            dropped += len(value.encode('utf-8'))
+        if dropped:
+            self.log.event('llm.reasoning_history_compacted', retained_bytes=retained, omitted_bytes=dropped,
+                           protocol=self.config.llm_reasoning_protocol)
 
     def complete(self, payload):
         context = self.artifacts.read_json(payload["context_artifact_id"])
@@ -321,6 +377,8 @@ class Gateway:
             finally:
                 self.semaphore.release()
             token_data = response.get("usage") or {}
+            if response.get('_delivered_feedback'):
+                calls.append(response.pop('_delivered_feedback'))
             completion_id = response.get("id", completion_id)
             for dst, src in (("input_tokens", "prompt_tokens"), ("output_tokens", "completion_tokens")):
                 value = token_data.get(src)
@@ -336,12 +394,13 @@ class Gateway:
                         raise ValueError('The provider returned a tool call although no tools were offered on the final decision turn')
                     prepared = prepare_tool_calls(message['tool_calls'], schema_by_name, self.bus.schemas._check,
                         context['metadata'].get('researcher_id'), at_cap=at_cap or finish_reason == 'length')
-                    # Provider reasoning is telemetry, not conversation state. Replaying it
-                    # both exhausts the byte cap and relies on nonstandard request fields.
-                    # Raw provider output remains in the response snapshot. Repeated
-                    # calls and their repeated content never become conversation state.
-                    messages.append({"role": "assistant", "content": None,
-                                     "tool_calls": [item['call'] for item in prepared]})
+                    assistant = {'role': 'assistant', 'content': message.get('content'),
+                                 'tool_calls': [item['call'] for item in prepared]}
+                    field = self.config.llm_reasoning_field
+                    if self.config.llm_reasoning_protocol == 'qwen_chat_template' and isinstance(message.get(field), str):
+                        assistant[field] = message[field]
+                    messages.append(assistant)
+                    self._bound_reasoning_history(messages)
                     new_calls = 0
                     for item in prepared:
                         call, args, key = item['call'], item['args'], item['key']
@@ -420,11 +479,19 @@ class Gateway:
                                max_output_tokens=token_limit)
                 if truncated:
                     new_limit = min(token_limit*2, self.config.llm_max_output_tokens_limit)
-                    if new_limit <= token_limit or attempt == payload["attempt_limit"]:
+                    if dialogue_id is not None:
+                        new_limit = self.budget.affordable_dialogue_output(dialogue_id, new_limit)
+                    if (new_limit <= token_limit and dialogue_id is None) or attempt == payload["attempt_limit"]:
                         raise last_error
-                    self.log.event("llm.output_budget_increased", level="WARNING", call_no=call_no,
-                                   previous_limit=token_limit, next_limit=new_limit, reason="truncated_generation")
+                    if new_limit > token_limit:
+                        self.log.event("llm.output_budget_increased", level="WARNING", call_no=call_no,
+                                       previous_limit=token_limit, next_limit=new_limit, reason="truncated_generation")
                     token_limit = new_limit
+                    if dialogue_id is not None:
+                        rejected = self.artifacts.write_json('llm/truncated-'+uuid.uuid4().hex[:12]+'.json',
+                            {'call_no': call_no, 'content': (choice.get('message') or {}).get('content'), 'error': str(exc)}, 'llm_rejected_output')
+                        self.log.event('llm.compact_final_retry', call_no=call_no, dialogue_id=dialogue_id,
+                                       rejected_output_artifact_id=rejected['artifact_id'], max_output_tokens=token_limit)
                     messages.append({"role": "user", "content": "Generation was truncated. Return a compact complete final JSON matching the schema; avoid unnecessary code or prose."})
                 else:
                     content = (choice.get("message") or {}).get("content")
@@ -436,17 +503,24 @@ class Gateway:
                         self.log.event('llm.json_repair_prepared', call_no=call_no, dialogue_id=dialogue_id,
                                        rejected_output_artifact_id=rejected['artifact_id'])
                     if isinstance(content, str) and content.strip() and (dialogue_id is not None or len(content.encode('utf-8')) <= 2000):
-                        messages.append({"role": "assistant", "content": content})
+                        assistant = {'role': 'assistant', 'content': content}
+                        field = self.config.llm_reasoning_field
+                        reasoning = (choice.get('message') or {}).get(field)
+                        if self.config.llm_reasoning_protocol == 'qwen_chat_template' and isinstance(reasoning, str):
+                            assistant[field] = reasoning
+                        messages.append(assistant)
+                        self._bound_reasoning_history(messages)
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
                 if dialogue_id is not None:
                     force_decision = True
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
 
-    @staticmethod
-    def _compact_research_request(request, limit):
+    def _compact_research_request(self, request, limit):
         """Account for tool results and schemas without deleting the protected core or base."""
         def size():
             return len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
+        previous_size = size()
+        omissions = []
         for message in request['messages']:
             if message.get('role') != 'user':
                 continue
@@ -463,9 +537,12 @@ class Gateway:
             for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
                 if size() <= limit:
                     break
-                data.pop(field, None);refresh()
+                if field in data:
+                    data.pop(field);omissions.append(field);refresh()
             while size() > limit and user.get('facts'):
-                user['facts'].pop();refresh()
+                fact = user['facts'].pop()
+                user.setdefault('compacted_fact_source_ids', []).append(fact['source_id'])
+                omissions.append('older_fact_details');refresh()
             memory = profile.get('measured_search', {})
             while size() > limit and len(memory.get('entries', [])) > 4:
                 memory['entries'].pop();memory['omitted_count'] = memory.get('omitted_count', 0)+1;refresh()
@@ -486,6 +563,10 @@ class Gateway:
                 'scope': report.get('scope'), 'query': report.get('query'), 'details_omitted': True,
                 'detail_hint': 'Earlier report compacted; retrieve by kind=report and report_id or query fewer columns.'}},
                 ensure_ascii=False)
+            omissions.append('older_tool_report_details')
+        self.log.event('llm.context_compacted', previous_bytes=previous_size, request_bytes=size(),
+                       limit_bytes=limit, omitted_fields=omissions, retained_tool_call_ids=[
+                           m.get('tool_call_id') for m in request['messages'] if m.get('role') == 'tool'])
 
     @staticmethod
     def _digest(value):
@@ -504,4 +585,5 @@ class Gateway:
         return parsed.scheme+"://"+host+parsed.path
 
     def close(self):
+        self.cancelled.set()
         self.transport.close()

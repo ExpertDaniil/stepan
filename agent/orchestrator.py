@@ -83,15 +83,21 @@ class Orchestrator:
         return decision["allowed"]
 
     def llm_available(self, pending=0):
-        if self.budget.snapshot()["llm_calls_remaining"] <= pending:
-            return False
-        if self.budget.token_snapshot()["output_available"] < (pending + 1) * self.config.llm_max_output_tokens:
+        if self.budget.llm_unavailable_reason(pending):
             return False
         try:
             self.researcher.gateway.check_availability()
         except AgentError:
             return False
         return self.budget.snapshot()["search_allowed"]
+
+
+    def llm_unavailable_reason(self, pending=0):
+        try:
+            self.researcher.gateway.check_availability()
+        except AgentError as error:
+            return error.code.lower()
+        return self.budget.llm_unavailable_reason(pending)
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
         optimizer = getattr(self.local_search, 'optuna', None)

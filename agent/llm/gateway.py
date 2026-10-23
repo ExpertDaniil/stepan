@@ -304,6 +304,9 @@ class Gateway:
             after_response = self.budget.reserve_seconds()
             if recipe:
                 probe = {'recipe_id': recipe['id'], 'model': {'family': recipe['family'], 'hyperparameters': base['hyperparameters']},
+                         # Old saved contexts omit this optional identity. Use a
+                         # cold unknown-source estimate, never another source's history.
+                         'code_artifact_id': base.get('code_artifact_id') or 'unresolved-source',
                          'resources': {'cpu_threads': self.config.train_cpu_threads}}
                 after_response = self.budget.duration.estimate(probe)+self.budget.candidate_reserve(probe)
             phase_deadline = self.budget.phase_deadline-after_response

@@ -13622,6 +13622,10 @@
         "diagnostics": {
           "type": "object",
           "additionalProperties": true
+        },
+        "code_artifact_id": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [

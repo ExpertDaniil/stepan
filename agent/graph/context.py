@@ -84,6 +84,7 @@ class WorkService:
             raw = self.artifacts.read_json(ev["diagnostics_artifact_id"])
             diagnostics = {k: raw[k] for k in ("mae", "absolute_error_p50", "absolute_error_p90", "class_summary", "hard_groups", "prediction_behavior") if k in raw}
         return {"experiment_id": experiment_id, "state": exp["state"], "recipe_id": plan["recipe_id"],
+                "code_artifact_id": plan["code_artifact_id"],
                 "hypothesis": plan["hypothesis"][:600], "metric": ev["primary_metric"] if trusted else None,
                 "hyperparameters": plan["model"]["hyperparameters"], "feature_steps": plan["feature_steps"],
                 "seed": plan["seed"], "is_incumbent": bool(head and experiment_id == head["experiment_id"]),

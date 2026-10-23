@@ -218,6 +218,9 @@ class BoosterIntegrationTests(unittest.TestCase):
                 output = pd.read_csv(task.parent/'submission.csv')
                 self.assertEqual(len(output), 16)
                 self.assertTrue(np.isfinite(output.label).all())
+                events = [json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
+                self.assertTrue(any(e['event'] == 'worker.data_prepared' and e.get('format') == 'numpy-columns-v1'
+                                    for e in events))
                 rebuilt = root/'reconstructed'
                 report = reconstruct(run, rows[0][0], rebuilt, task.parent)
                 # Execute its frozen refit, rather than trusting the presence of files.

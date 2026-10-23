@@ -538,10 +538,18 @@ class Orchestrator:
                            remaining_seconds=self.budget.remaining())
             return
         evaluation = self.store.experiment_evaluation(ident)
+        confirmation = getattr(self.submission, 'final_confirmation', None)
+        confirmation_id = (confirmation['artifact_id']
+                           if confirmation and confirmation['chosen_experiment_id'] == ident else None)
+        champion_version = champion['champion_version'] if champion else 0
+        # The same evaluated model can become the final choice after another
+        # champion was published. That is a new refit/publication transaction,
+        # not a replay of its earlier job or a skipped primary-score decision.
+        selection_scope = str(champion_version)+'/'+(confirmation_id or 'research')
         prepared = self.call("C18", {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"],
                                      "task_spec_id": self.spec["task_spec_id"], "mode": "refit_full_train",
-                                     "expected_champion_version": champion["champion_version"] if champion else 0}, self.submission.prepare,
-                             key="prepare/" + ident)
+                                     "expected_champion_version": champion_version}, self.submission.prepare,
+                             key="prepare/" + ident + '/' + selection_scope)
         subjob = prepared["submission_job_id"]
         lease_reply = self.lease(subjob, "refit", self.resources(max(self.config.experiment_timeout_seconds, math.ceil(predicted))))
         if not lease_reply["granted"]:
@@ -577,11 +585,10 @@ class Orchestrator:
         publication_payload = {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"], "candidate_artifact_id": candidate,
                            "validation_report_id": report["validation_report_id"], "candidate_sha256": report["candidate_sha256"],
                            "expected_champion_version": current["champion_version"] if current else 0}
-        confirmation = getattr(self.submission, 'final_confirmation', None)
-        if confirmation and confirmation['chosen_experiment_id'] == ident:
-            publication_payload['confirmation_report_id'] = confirmation['artifact_id']
+        if confirmation_id:
+            publication_payload['confirmation_report_id'] = confirmation_id
         publication = self.call("C21", publication_payload, self.submission.publish,
-                  key="publish/" + ident + "/" + report["candidate_sha256"])
+                  key="publish/" + ident + "/" + report["candidate_sha256"] + '/' + selection_scope)
         self.submission.change_state(subjob, "skipped_not_better" if publication["disposition"] == "skipped_not_better" else "published")
         self.update_final_reserve()
 

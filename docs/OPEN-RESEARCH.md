@@ -118,7 +118,11 @@ an accept/reject fork in adaptive mode. A solution remains available in history 
 its transformations mandatory for descendants. G06/G02 remain available for deliberately
 requested controlled component studies. Explicit restrictions retain their existing enforcement.
 Final refinement restores the measured best but does not force empirical feature settings to
-remain fixed in adaptive mode. Legacy catalog/code modes retain their previous branch policy.
+remain fixed in adaptive mode. G04 admits custom pipelines and recipe changes in this phase
+under the normal code/manifest, explicit-constraint and lineage checks. Dispatcher time/resource
+admission and independent evaluation still apply; an unsuccessful candidate cannot replace the
+checked output. Legacy catalog/code modes retain their previous branch policy, including their
+recipe/feature locks in refinement.
 
 An explicit finite tuning allowance prevents a single authorization from running indefinitely.
 It does **not** guarantee semantic novelty or prevent the planner from repeatedly requesting

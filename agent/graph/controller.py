@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from copy import deepcopy
 import json
 import uuid
@@ -233,6 +233,32 @@ def warmup_ticket(controller, branch_id, peer, recipe, params):
     return bind_trusted(controller.warmup_plan(recipe, params), ticket), ticket
 
 
+def advance_authorized_tuning(controller, futures, branch_ids):
+    """Dispatcher-only progress while other peers await API replies; no new research action."""
+    optimizer = getattr(getattr(controller, 'local_search', None), 'optuna', None)
+    if optimizer is None or not controller.budget.snapshot()['search_allowed']:
+        return 0, False
+    busy = {ticket['work_order']['researcher_id'] for ticket in futures.values()}
+    for branch_id, peer in list(optimizer.active):
+        if branch_id not in branch_ids or peer in busy or controller.graph.branch(branch_id)['state'] != 'active':
+            continue
+        if not optimizer.has_series(peer, branch_id):
+            continue
+        ticket = issue(controller, branch_id, peer)
+        try:
+            plan = local_for_ticket(controller, ticket)
+        except Exception:
+            controller.graph.abandon(ticket['work_order']['work_order_id'], 'Authorized tuning continuation could not be prepared')
+            raise
+        if plan is None:
+            stop_ticket(controller, ticket, 'Authorized tuning segment has no remaining affordable candidate')
+            continue
+        controller.log.event('search.tuning_while_reasoning', branch_id=branch_id, researcher_id=peer,
+                             work_order_id=ticket['work_order']['work_order_id'], waiting_peers=sorted(busy))
+        return controller.run_training([plan], [ticket]), True
+    return 0, False
+
+
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     """Keep all SQL on the dispatcher while overlapping serial training with other peers' API work."""
     graph = controller.graph
@@ -249,7 +275,24 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
         if streaming and plans:
             accepted += controller.run_training(plans, tickets)
             plans, tickets = [], []
-        for future in as_completed(futures):
+        def completed_replies():
+            nonlocal accepted, activity
+            if not streaming or not adaptive:
+                yield from as_completed(futures)
+                return
+            pending = dict(futures)
+            branches = {ticket['work_order']['branch_id'] for ticket in llm_tickets+trusted_tickets}
+            while pending:
+                ready, _ = wait(pending, timeout=.1, return_when=FIRST_COMPLETED)
+                if ready:
+                    for future in ready:
+                        del pending[future]
+                        yield future
+                else:
+                    count, progressed = advance_authorized_tuning(controller, pending, branches)
+                    accepted += count
+                    activity |= progressed
+        for future in completed_replies():
             ticket = futures[future]
             try:
                 proposal = future.result()

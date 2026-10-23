@@ -1,5 +1,10 @@
 # Реализация и соответствие ТЗ
 
+Завершение диалогов и продвижение разрешённых серий во время API-ожидания:
+[DIALOGUE-PROGRESS.md](DIALOGUE-PROGRESS.md). Budget атомарно защищает финальные запросы
+и output tokens; Gateway освобождает неизрасходованные резервы в finally. Graph controller
+продолжает ask/train/evaluate/tell на dispatcher, не создавая исследовательских действий.
+
 Adaptive-тюнинг: [OPTUNA.md](OPTUNA.md). `agent/optuna_search.py` владеет ask/tell и снимками
 серий в dispatcher; `agent/tuning_space.py` проверяет декларативные домены. Исследовательские
 потоки не обучают модели и не пишут SQLite. Runner/Evaluator/Finalizer сохраняют прежние роли.

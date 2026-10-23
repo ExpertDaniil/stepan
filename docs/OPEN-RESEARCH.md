@@ -104,9 +104,10 @@ owned catalogue fallback remains possible and is logged; it never runs generated
 A voluntary adaptive `stop` is respected. Two peers may propose different actions and see
 compact measured results from their shared visible lineage.
 
-The last attempt of a dialogue with tools offers no tools and requests the final action JSON.
-This uses the existing attempt allowance (at most seven tool rounds then one decision with
-the current eight-attempt setting), rather than executing a last tool call with no return turn.
+Adaptive dialogues protect a final API request and, when capacity permits, one JSON repair.
+Within the existing eight-attempt allowance, at most six turns can offer tools when both
+terminal slots are protected. Tool availability ends earlier if free API/token capacity or
+estimated response time cannot support more analysis. See [DIALOGUE-PROGRESS.md](DIALOGUE-PROGRESS.md).
 The controller cannot guarantee that the model produces valid JSON or that the API remains
 available. A provider tool call on this final turn is rejected without executing it.
 Recipe metadata describes the owned preprocessing so estimator capabilities are not confused

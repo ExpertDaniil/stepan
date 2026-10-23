@@ -21,6 +21,7 @@ class Budget:
         self.input_tokens_reported = 0
         self.cached_tokens_reported = 0
         self.pending_llm_tokens = {}
+        self.llm_dialogues = {}
         self.last_train_duration = 0.0
         self.duration = DurationModel(config)
         self.final_plan = None
@@ -113,32 +114,84 @@ class Budget:
             memory = sum(v["lease"]["memory_limit_mb"] for v in self.leases.values())
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
                     "cpu_threads_available": max(0, 6 - cpu), "memory_mb_available": max(0, 20480 - memory),
-                    "llm_calls_remaining": max(0, self.call_limit() - self.calls),
+                    "llm_calls_remaining": max(0, self.call_limit() - self.calls - self._dialogue_calls()),
                     "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
-    def llm_call(self):
+    def _dialogue_calls(self):
+        return sum(d['slots'] for d in self.llm_dialogues.values())
+
+    def _dialogue_tokens(self):
+        return sum(d['slots']*d['max_tokens'] for d in self.llm_dialogues.values())
+
+    def reserve_dialogue(self, max_tokens, *, repair=True):
+        """Protect future final/repair requests; no HTTP attempt is charged yet."""
+        with self.lock:
+            calls = self.call_limit()-self.calls-self._dialogue_calls()
+            tokens = min(self.output_limit(), self.config.llm_max_total_output_tokens)-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens()
+            slots = min(2 if repair else 1, calls, tokens//max_tokens)
+            if slots < 1:
+                phase = self.call_limit() < self.config.llm_max_calls or self.output_limit() < self.config.llm_max_total_output_tokens
+                raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase else 'BUDGET_EXHAUSTED',
+                                 'No unreserved capacity for a final research decision')
+            ident = 'dialogue-'+uuid.uuid4().hex[:16]
+            self.llm_dialogues[ident] = {'slots': slots, 'max_tokens': max_tokens, 'terminal': False}
+            return ident, slots
+
+    def release_dialogue(self, ident):
+        with self.lock:
+            return self.llm_dialogues.pop(ident, None)
+
+    def prepare_dialogue_turn(self, ident, max_tokens, *, allow_tools):
+        """Atomically fund an optional tool request or use the protected final slot."""
+        with self.lock:
+            item = self.llm_dialogues[ident]
+            if item['slots'] < 1:
+                raise AgentError('BUDGET_EXHAUSTED', 'The reserved final/repair requests have been consumed')
+            free_tokens = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-self._dialogue_tokens()
+            growth = item['slots']*(max_tokens-item['max_tokens'])
+            if growth > free_tokens:
+                raise AgentError('BUDGET_EXHAUSTED', 'Cannot enlarge reserved final output without consuming another dialogue reservation')
+            item['max_tokens'] = max_tokens
+            free_tokens -= growth
+            calls = self.call_limit()-self.calls-self._dialogue_calls()
+            if allow_tools and not item['terminal'] and calls > 0 and free_tokens >= max_tokens:
+                item['slots'] += 1
+                return False
+            item['terminal'] = True
+            return True
+
+    def llm_call(self, dialogue_id=None):
         with self.lock:
             if self.phase_deadline and self.phase_remaining() < 1:
                 raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Branch exploration reached its time boundary')
             if self.calls >= self.config.llm_max_calls or self.remaining() < 1:
                 raise AgentError("BUDGET_EXHAUSTED", "LLM budget exhausted")
-            if self.calls >= self.call_limit():
-                raise AgentError("SEARCH_PHASE_BUDGET_EXHAUSTED", "Reserved API attempts belong to final refinement")
+            own = 1 if dialogue_id is not None and self.llm_dialogues[dialogue_id]['slots'] > 0 else 0
+            if self.calls+self._dialogue_calls()-own >= self.call_limit():
+                phase = self.call_limit() < self.config.llm_max_calls
+                raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase else 'BUDGET_EXHAUSTED',
+                                 'No unreserved API attempts remain; active dialogue and phase reservations are protected')
             self.calls += 1
+            if own:
+                self.llm_dialogues[dialogue_id]['slots'] -= 1
             return self.calls
 
-    def begin_llm_call(self, max_tokens):
+    def begin_llm_call(self, max_tokens, dialogue_id=None):
         """Reserve per-run token capacity and one API attempt atomically."""
         with self.lock:
-            available = self.config.llm_max_total_output_tokens - self.output_tokens_charged - sum(self.pending_llm_tokens.values())
+            owner = self.llm_dialogues.get(dialogue_id) if dialogue_id is not None else None
+            if dialogue_id is not None and (owner is None or owner['slots'] < 1 or max_tokens > owner['max_tokens']):
+                raise AgentError('BUDGET_EXHAUSTED', 'No funded request remains in this dialogue')
+            held = self._dialogue_tokens()-(owner['max_tokens'] if owner else 0)
+            available = self.config.llm_max_total_output_tokens - self.output_tokens_charged - sum(self.pending_llm_tokens.values()) - held
             if max_tokens > available:
                 raise AgentError("BUDGET_EXHAUSTED", "Per-run output token budget cannot reserve this request",
                                  details={"requested": max_tokens, "available": max(0, available)})
-            phase_available = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())
+            phase_available = self.output_limit()-self.output_tokens_charged-sum(self.pending_llm_tokens.values())-held
             if max_tokens > phase_available:
                 raise AgentError("SEARCH_PHASE_BUDGET_EXHAUSTED", "Reserved output tokens belong to final refinement",
                                  details={"requested": max_tokens, "available": max(0, phase_available)})
-            call_no = self.llm_call()
+            call_no = self.llm_call(dialogue_id)
             self.pending_llm_tokens[call_no] = max_tokens
             return call_no
 
@@ -158,9 +211,12 @@ class Budget:
 
     def token_snapshot(self):
         with self.lock:
-            reserved = sum(self.pending_llm_tokens.values())
+            inflight, dialogues = sum(self.pending_llm_tokens.values()), self._dialogue_tokens()
+            reserved = inflight+dialogues
             return {"output_limit": self.config.llm_max_total_output_tokens, "output_charged": self.output_tokens_charged,
                     "output_reported": self.output_tokens_reported, "output_reserved": reserved,
+                    "output_reserved_inflight": inflight, "output_reserved_dialogues": dialogues,
+                    "llm_calls_reserved_dialogues": self._dialogue_calls(),
                     "output_available": max(0, self.output_limit() - self.output_tokens_charged - reserved),
                     "output_available_global": max(0, self.config.llm_max_total_output_tokens - self.output_tokens_charged - reserved),
                     "phase_call_limit": self.phase_call_limit, "phase_output_limit": self.phase_output_limit,

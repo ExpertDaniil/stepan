@@ -110,7 +110,7 @@ class Gateway:
                            elapsed_seconds=round(time.monotonic() - started, 1), request_timeout_seconds=round(timeout, 1),
                            run_seconds_remaining=round(self.budget.remaining(), 1))
 
-    def _request(self, request, context, payload, attempt, deadline):
+    def _request(self, request, context, payload, attempt, deadline, dialogue_id=None):
         from contextvars import copy_context
         request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8"))
         byte_limit = None if self.config.research_mode == 'adaptive' else self.config.max_context_tokens * 3
@@ -129,7 +129,7 @@ class Gateway:
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
         self.check_availability()
-        call_no = self.budget.begin_llm_call(request["max_tokens"])
+        call_no = self.budget.begin_llm_call(request["max_tokens"], dialogue_id)
         settled = False
         started = time.monotonic()
         done = threading.Event()
@@ -248,6 +248,22 @@ class Gateway:
                 'description': 'Search offline Kaggle experience and complete project-authored pipeline examples. Returns content, source IDs and current-pipeline cautions, not just links. Use ids to read a known item. External experience is not current-task evidence; cite its IDs only in knowledge_ids. No network.',
                 'parameters': KNOWLEDGE_SCHEMA}})
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
+        dialogue_id, slots = None, 0
+        if payload['response_schema_id'] == 'ResearchAction-v1':
+            dialogue_id, slots = self.budget.reserve_dialogue(token_limit, repair=payload['attempt_limit'] > 1)
+            self.log.event('llm.dialogue_reserved', dialogue_id=dialogue_id, slots=slots,
+                           final_request_reserved=True, repair_request_reserved=slots > 1,
+                           max_output_tokens=token_limit)
+        try:
+            return self._complete_dialogue(payload, context, messages, expected, tools, deadline, phase_limited,
+                                           token_limit, dialogue_id, slots)
+        finally:
+            if dialogue_id is not None:
+                unused = self.budget.release_dialogue(dialogue_id)
+                self.log.event('llm.dialogue_released', dialogue_id=dialogue_id, unused_slots=unused['slots'] if unused else 0)
+
+    def _complete_dialogue(self, payload, context, messages, expected, tools, deadline, phase_limited,
+                           token_limit, dialogue_id, reserved_slots):
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
         tool_cache, force_decision = {}, False
@@ -264,6 +280,20 @@ class Gateway:
             try:
                 request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
                 terminal = bool(tools and (force_decision or attempt == payload['attempt_limit']))
+                if dialogue_id is not None:
+                    # Keep the existing attempt cap, reserving its last turns
+                    # for final JSON and (when funded) one repair. Time is only
+                    # an estimate; server latency can still consume the deadline.
+                    allow_tools = bool(reserved_slots > 1 and tools and not force_decision and attempt <= payload['attempt_limit']-reserved_slots
+                                       and deadline-time.monotonic() > self.budget.reasoning_estimate()*reserved_slots)
+                    try:
+                        terminal = self.budget.prepare_dialogue_turn(dialogue_id, token_limit, allow_tools=allow_tools)
+                    except AgentError as capacity_error:
+                        self.log.event('llm.dialogue_capacity_exhausted', dialogue_id=dialogue_id,
+                                       code=capacity_error.code, message=str(capacity_error), attempt=attempt)
+                        if last_error is not None:
+                            raise last_error
+                        raise
                 if terminal:
                     instruction = ('The analysis/tool phase is complete. Return one final JSON object matching the output schema '
                         'using the evidence already available. No tools are available on this final turn.')
@@ -274,10 +304,10 @@ class Gateway:
                             compact_facts = {k: v for k, v in facts.items() if k != 'effective_parameters'}
                             instruction += '\nAuthoritative current-base facts (external experience cannot override them): '+json.dumps(compact_facts, ensure_ascii=False)
                     request['messages'].append({'role': 'user', 'content': instruction})
-                    self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'])
+                    self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'], dialogue_id=dialogue_id)
                 elif tools:
                     request.update(tools=tools, parallel_tool_calls=False)
-                response, call_no = self._request(request, context, payload, attempt, deadline)
+                response, call_no = self._request(request, context, payload, attempt, deadline, dialogue_id)
             except AgentError as exc:
                 if phase_limited and time.monotonic() >= deadline:
                     raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Response window ended with time reserved for training and publication') from exc
@@ -398,12 +428,18 @@ class Gateway:
                     messages.append({"role": "user", "content": "Generation was truncated. Return a compact complete final JSON matching the schema; avoid unnecessary code or prose."})
                 else:
                     content = (choice.get("message") or {}).get("content")
-                    # A malformed full pipeline can be larger than the next request's
-                    # entire budget. Its raw response is already logged; retain only a
-                    # small invalid reply, with the bounded repair error below.
-                    if isinstance(content, str) and content.strip() and len(content.encode('utf-8')) <= 2000:
+                    # Adaptive repair needs the actual malformed source/JSON.
+                    # Legacy modes keep the previous bounded replay behavior.
+                    if dialogue_id is not None:
+                        rejected = self.artifacts.write_json('llm/rejected-'+uuid.uuid4().hex[:12]+'.json',
+                            {'call_no': call_no, 'content': content, 'error': str(exc)}, 'llm_rejected_output')
+                        self.log.event('llm.json_repair_prepared', call_no=call_no, dialogue_id=dialogue_id,
+                                       rejected_output_artifact_id=rejected['artifact_id'])
+                    if isinstance(content, str) and content.strip() and (dialogue_id is not None or len(content.encode('utf-8')) <= 2000):
                         messages.append({"role": "assistant", "content": content})
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
+                if dialogue_id is not None:
+                    force_decision = True
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
 
     @staticmethod

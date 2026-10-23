@@ -66,6 +66,16 @@ exception-событиях. Redactor применяется до обоих пр
 LLM: call_no, attempt, purpose, model, max_output_tokens, отдельные request/operation seconds,
 finish_reason, content_chars, tool_calls, input/output/reasoning/cache tokens и общий token_budget.
 
+llm.dialogue_reserved показывает число защищённых финальных/repair запросов, а
+llm.dialogue_released — освобождённые неиспользованные slots. Резервирование не увеличивает
+счётчик реальных API-попыток. token_budget.output_reserved включает текущие запросы и будущие
+запросы диалогов; output_reserved_inflight/output_reserved_dialogues разделяют их,
+llm_calls_reserved_dialogues показывает защищённые API-попытки. llm_calls_remaining в budget
+показывает свободные, не зарезервированные попытки. llm.dialogue_capacity_exhausted фиксирует
+отказ расширить или продолжить резерв. llm.json_repair_prepared связывает исходный ответ с
+llm/rejected-*.json; фактический запрос подтверждается отдельным llm.call_started.
+search.tuning_while_reasoning связывает продолжение разрешённой серии с ожидающими peers.
+
 Optuna: optuna.loaded, optuna.series_started, optuna.trial_proposed, optuna.trial_finished,
 optuna.series_snapshot, optuna.series_finished. Серия показывает фактический search_space,
 source_plan_id/study_id/series_id, warm_start_trials и лимиты. Trial связывает plan_id с

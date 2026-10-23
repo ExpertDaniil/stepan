@@ -62,7 +62,7 @@ class AdaptiveToolRegressions(unittest.TestCase):
         self.assertEqual(result['attempts_used'], 3)
         error = json.loads(requests[1]['messages'][-1]['content'])['error']
         self.assertIn('include_target', error['message'])
-        report = json.loads(requests[2]['messages'][-1]['content'])
+        report = json.loads(next(m['content'] for m in reversed(requests[2]['messages']) if m['role'] == 'tool'))
         self.assertTrue(report['report']['groups'])
         self.assertEqual(len(self.service.recent()), 1)
         for request in requests[1:]:

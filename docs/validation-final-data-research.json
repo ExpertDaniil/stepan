@@ -1,0 +1,324 @@
+{
+  "date": "2026-10-23",
+  "base_commit": "9e384f3023206f62a621b9e0dfb2863318b4f81f",
+  "reviewed_heads": {
+    "main": "63fd5aa3d1136fafed4209f435ed385e53dfef1d",
+    "feat/open-research-loop": "9e384f3023206f62a621b9e0dfb2863318b4f81f",
+    "fix/adaptive-refinement-admission": "a2d57b15a4ec4d360e53cfb382abf8be512c4608",
+    "feat/architecture-guide": "9d18d374920a7e0839aba4758a8a5682af343636"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "packages": {
+      "numpy": "2.3.5",
+      "pandas": "2.2.3",
+      "scipy": "1.17.0",
+      "scikit-learn": "1.8.0",
+      "joblib": "1.5.3",
+      "threadpoolctl": "3.6.0",
+      "catboost": null,
+      "optuna": null,
+      "openai": null,
+      "httpx": null
+    }
+  },
+  "full_check": {
+    "command": "python3 scripts/check.py --jobs 3",
+    "executed_cases": 340,
+    "passed_cases": 328,
+    "unique_nonpassing_cases": 12,
+    "wall_seconds": 527.94,
+    "result": "not_passed",
+    "cases": [
+      {
+        "status": "ERROR",
+        "case": "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tuning_rebase_preserves_axes_that_were_not_authorized",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_declared_increase_region_is_sampled_jointly_and_anchor_is_unchanged",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_pending_duplicate_does_not_release_another_trials_claim",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_verified_history_warms_only_the_same_fixed_pipeline_and_resumes_study",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "FAIL",
+        "case": "tests.test_dialogue_progress.TuningProgressTests.test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_expired_tuning_authorization_does_not_poison_catalogue_fallback",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_adaptive_research.AdaptiveResearchTests.test_local_tuning_requires_authorization_and_respects_axes_count_and_time",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_completed_trial_reaches_optuna_and_research_memory",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_expired_authorization_proposes_no_new_work",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "ERROR",
+        "case": "tests.test_optuna_search.OptunaSearchTests.test_optimizer_tell_failure_preserves_the_committed_evaluation",
+        "dependency": "optuna",
+        "verified_pass": false
+      },
+      {
+        "status": "FAIL",
+        "case": "tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers",
+        "dependency": "optuna",
+        "verified_pass": false
+      }
+    ],
+    "limitation": "Optuna is absent. Direct optimizer cases and two dependent integration cases cannot pass; these are failures/errors, not skipped or verified."
+  },
+  "targeted_check": {
+    "command": "python3 -m unittest tests.test_feature_admission tests.test_final_data_research tests.test_evidence_scopes -v",
+    "result": "passed",
+    "overlaps_full_suite": true,
+    "executed_cases": 16,
+    "wall_seconds": 1.927
+  },
+  "zip": {
+    "exit_code": 0,
+    "zip_sha256": "c6981ef894fffb6ea4e4a3858f47f1940ff7560685907823b678c7db621aeee9",
+    "flat_files": 66,
+    "owned_python_bytes_match": true,
+    "requirements_bytes_match": true,
+    "output_exists": true,
+    "live_api": false,
+    "run_state": "completed",
+    "research_summary": {
+      "evaluated_configurations": 9,
+      "by_recipe": {
+        "dummy-regressor-v1": {
+          "evaluations": 1,
+          "best_score": 13.242127076266211,
+          "best_experiment_id": "exp-fcefefa01a4f"
+        },
+        "hist-gradient-regressor-v1": {
+          "evaluations": 2,
+          "best_score": 1.932627243071823,
+          "best_experiment_id": "exp-4bfa4e507fb8"
+        },
+        "python-pipeline-v1": {
+          "evaluations": 2,
+          "best_score": 0.4884711540224675,
+          "best_experiment_id": "exp-ad92991d4a0e"
+        },
+        "linear-regressor-v1": {
+          "evaluations": 2,
+          "best_score": 0.5562184331317064,
+          "best_experiment_id": "exp-9affc719fa66"
+        },
+        "random-forest-regressor-v1": {
+          "evaluations": 2,
+          "best_score": 3.230611965352793,
+          "best_experiment_id": "exp-ad4161d72794"
+        }
+      },
+      "proposed_llm_actions": {
+        "features": 2,
+        "catalog": 2
+      },
+      "evaluated_owned_feature_programs": 2,
+      "observed_constant_like_outputs": 1,
+      "completed_data_analyses": 0,
+      "rejected_reference_optimizations": 0,
+      "interpretation": "Proposals are not executions. Counts describe recorded behavior; a feature program can regress, and custom pipelines without an owned program need their code/fitted report inspected."
+    },
+    "unfinished_jobs": 0
+  },
+  "synthetic_demonstrations": [
+    {
+      "kind": "classification",
+      "state": "completed",
+      "selected_experiment_id": "exp-4a304d75d754",
+      "output_rows": 48,
+      "research_summary": {
+        "evaluated_configurations": 3,
+        "by_recipe": {
+          "dummy-classifier-v1": {
+            "evaluations": 1,
+            "best_score": 0.20512820512820515,
+            "best_experiment_id": "exp-496ab9367b54"
+          },
+          "hist-gradient-classifier-v1": {
+            "evaluations": 1,
+            "best_score": 0.9084267079845562,
+            "best_experiment_id": "exp-22c51c691c19"
+          },
+          "python-pipeline-v1": {
+            "evaluations": 1,
+            "best_score": 0.9737103174603176,
+            "best_experiment_id": "exp-4a304d75d754"
+          }
+        },
+        "proposed_llm_actions": {
+          "features": 1
+        },
+        "evaluated_owned_feature_programs": 1,
+        "observed_constant_like_outputs": 1,
+        "completed_data_analyses": 1,
+        "rejected_reference_optimizations": 0,
+        "interpretation": "Proposals are not executions. Counts describe recorded behavior; a feature program can regress, and custom pipelines without an owned program need their code/fitted report inspected."
+      },
+      "job_occupancy": {
+        "elapsed_seconds": 8.51,
+        "job_present_seconds": 7.619,
+        "no_train_or_refit_seconds": 0.891,
+        "unfinished_jobs": 0,
+        "interpretation": "Job presence from saved events, not CPU utilization."
+      },
+      "interpretation": "Scripted LLM choices; real training/evaluation/output. Not a live-LLM or competition score."
+    },
+    {
+      "kind": "regression",
+      "state": "completed",
+      "selected_experiment_id": "exp-263e60635c5b",
+      "output_rows": 48,
+      "research_summary": {
+        "evaluated_configurations": 3,
+        "by_recipe": {
+          "dummy-regressor-v1": {
+            "evaluations": 1,
+            "best_score": 11.338811207800944,
+            "best_experiment_id": "exp-f69a868e3467"
+          },
+          "hist-gradient-regressor-v1": {
+            "evaluations": 1,
+            "best_score": 1.9616068111202234,
+            "best_experiment_id": "exp-cd08ad231852"
+          },
+          "python-pipeline-v1": {
+            "evaluations": 1,
+            "best_score": 0.012124510295950653,
+            "best_experiment_id": "exp-263e60635c5b"
+          }
+        },
+        "proposed_llm_actions": {
+          "features": 1
+        },
+        "evaluated_owned_feature_programs": 1,
+        "observed_constant_like_outputs": 1,
+        "completed_data_analyses": 1,
+        "rejected_reference_optimizations": 0,
+        "interpretation": "Proposals are not executions. Counts describe recorded behavior; a feature program can regress, and custom pipelines without an owned program need their code/fitted report inspected."
+      },
+      "job_occupancy": {
+        "elapsed_seconds": 8.702,
+        "job_present_seconds": 7.217,
+        "no_train_or_refit_seconds": 1.485,
+        "unfinished_jobs": 0,
+        "interpretation": "Job presence from saved events, not CPU utilization."
+      },
+      "interpretation": "Scripted LLM choices; real training/evaluation/output. Not a live-LLM or competition score."
+    }
+  ],
+  "not_verified": [
+    "live Qwen/proxy behavior",
+    "competition/public/private score",
+    "native CatBoost execution",
+    "full suite with Optuna",
+    "official pinned container"
+  ],
+  "approval_review": "Installing missing development dependencies was rejected automatically, citing the AGENTS.md ban on dependency installation during task runs. No alternate installation was attempted.",
+  "runtime_sha256": {
+    "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent/artifacts.py": "6a1e25701827e3e3a337be73a1d4a516d8e1db360e637c4e79aa4ac9f86eb472",
+    "agent/budget.py": "32d9fd676924648eb615c985f80fee20d94fe7562f13e79329a6a43f1e3562ee",
+    "agent/catalog.py": "c1714b09372c488d445f7df2972c7fa0bb1503f2bdcc852a4e31c574aab26eec",
+    "agent/config.py": "da98b1f3c2ab0389da90575e06cfbe00ffd8edb9002eb6fb1d974e9b6f6efb51",
+    "agent/confirmation.py": "711cb808cf64a77e65015b301bd6ae81e707c35d9467b45a7bc1344b50171017",
+    "agent/context.py": "71780ef5822a6121b0814c72fe33a525a68274ac6003123ea9ea4ab05e9bc25f",
+    "agent/contracts.py": "7963e6db27253f41737b0e265ffaaf540682b134b4e7d22f46754a40ac0e5c8b",
+    "agent/duration.py": "810907b5579946f705b8376a2158c87d78375f764a82efaa5bb61ff27809b363",
+    "agent/errors.py": "50a2a38d0eadde3f8b961de0dddd3171609d1724b34bd38ff434e3597cab5ab0",
+    "agent/evaluation.py": "0d60b29a9be0b0fd5f007dc9bd358ed837d18e3d1fe64b1ca93f34198c6c5606",
+    "agent/evidence.py": "1394d4187bbe247fe82684207de2b927f53851e55db3fac9ceb97e67764be180",
+    "agent/feature_engineering.py": "cb42ebbce0468174d8898c8abb800a870723601a2225f4de3f84c9a06ebdcd42",
+    "agent/feature_memory.py": "3b46c64c1e0cc26b94d85808454188ad1f7971fee8da3ca8539e14eade087f35",
+    "agent/feature_schema.py": "75882f60f080c446db603a15c60f9533781ddd541c8ace1f51ba84c8e39726f4",
+    "agent/feature_search.py": "7f09b48deb8b89daf71f72fdf39e7526eb83b22482dbebc065d3d6847a34de9b",
+    "agent/graph/__init__.py": "01fac84fdd6e5ab57f25e01609f85c886496d08d160ad54541df3b1456f376d1",
+    "agent/graph/artifacts.py": "cab8029551b491f83a521694d14f70331bb38a84c5ca47ba220b6d5a065c869d",
+    "agent/graph/constraints.py": "a8475e5a95767a086dd9f5f04558ac095e886b9dc8eaf4f256b2a9758a8b31cb",
+    "agent/graph/constructor.py": "7e279d7edcae2f9949e97a7256fb4badaf84373e9104fc55725035626dd53e4c",
+    "agent/graph/context.py": "17c685871f4d3f5ae9cd0ce503cda19b0a82ac3122b935ac46dc9237cb9c43dd",
+    "agent/graph/controller.py": "38f20f6a38f5f3ca7933b046cb6bc4f0fdac49b5ff064ddc03d374f2d4670688",
+    "agent/graph/export.py": "1841bb7a389129d14f177e9ef22ac147631978088c001c3164a2722441e19f29",
+    "agent/graph/identity.py": "4e2ea0ab88394f1cdf9ee9c3d5179c1e546336e7edb77443af38985da92822cf",
+    "agent/graph/recovery.py": "30c54febcf621ac7ee2d667faa2ec5776331a078fb06a21c69742945dc455414",
+    "agent/graph/refinement.py": "f9f4d8784aec5fa42d314063c4b9d0634b210a05d3d12782ece8458de1f3e752",
+    "agent/graph/research_scheduler.py": "9bd5afcdaad6b49aee24c0193fdca7b0c6deb47ebb605a419ebfbc241ffe4b2c",
+    "agent/graph/service.py": "7d15a08802be0cbf10210106ec647fd6706733130fc68c73d24b7e98fab49916",
+    "agent/llm/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent/llm/gateway.py": "acb041cce904e9dce880223e77d8b8cef70915c3bb75823409bed7a53aaf2412",
+    "agent/llm/protocol.py": "32731bca8f33607d46116307149daa45a415822e1ba1fefe9d69e98f5c968f76",
+    "agent/local_search.py": "2e3995b8abaf25f8f1c8b7a8f6abfa847fa2c57041778ba139efaf2778196c90",
+    "agent/ml.py": "befc876d56bbe1977a809b87b4c02bd5dd6c299cc4829be77ee014cb14d6820a",
+    "agent/observability/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent/observability/logging.py": "c18169cfd889fe5dbc48553cd1f2819401eab8ef137cdf45af73a72d290c733f",
+    "agent/optuna_search.py": "99843c683b0b28e873e9170a25113a40aa8ee5201c4274f32da699e03fce1256",
+    "agent/orchestrator.py": "531917179e7e510656a1d3ee7d06c9fba77fdaf1bad4078f58e3dcc30ff5b591",
+    "agent/predictions.py": "4c95a2071316b96ea06d3fc46fdf97c5c72fe1f9d2122d5dafe584385a25aca7",
+    "agent/preprocessing.py": "d7834b1ec56490c68c10fd1fa15af5723e1b084b1ddb7c7bda3cce225edacb7b",
+    "agent/research_actions.py": "cb48bdf13e2200e9f7c49e8101511bf159150faad04924e1235d8ccc8ec9ca38",
+    "agent/research_coordination.py": "8217e326f7a52d7ad194b853237d1ca10de441008c900f78c195c69fa8306a90",
+    "agent/research_feedback.py": "5a7df8a27a15996d9052b438b197b27c9b751efaedc057ecf5d560e1027061fb",
+    "agent/research_landscape.py": "0eea40830fc79e3a8d1717da2853a76c6e7bc1d70bee6f56815905baeb73587f",
+    "agent/research_memory.py": "5328cdee5dd8d33e3d962ded984f93e482b93a6be05d465b3d91cff41c9312d8",
+    "agent/researcher.py": "3d0303ac7415ad0a2064cdca0c27f318123e8818f5dc6615101bc9ec1eeaf3b5",
+    "agent/runner.py": "468bf7469c54810f9c40f0c90f2b63d49c77de66b426993ce94f312056e719fa",
+    "agent/runtime.py": "42ed928fe1f7434645356ddde29d952cf78bcd7c4fd509feb613214151b3200a",
+    "agent/search_policy.py": "782d2819e74b71bdfeebe037ea307468c84d3db94b577bbc623167174933a18a",
+    "agent/store.py": "4cb4c4ce1d6ac49996597bce730a01717b77e26ca186cc2b9720934fb3707e4b",
+    "agent/submission.py": "9c87eee4174ffe5007178fc42271b44910419f7fc36554ca29b6cb5435bb28bd",
+    "agent/task.py": "7e284cd2c3be8a2181ceb70056f55aa64f36986f786d5fb770330066e52bd959",
+    "agent/task_interpreter.py": "5dd021864a7436b2ba71154314c7157656257f7e3d308ff73c49e16e36d72fb8",
+    "agent/tool_arguments.py": "9dc655e3f78d783a07e12906fa83f7578e54593127c00aebaab015102af406aa",
+    "agent/tuning_space.py": "f43cf6385827707c3e154bcce1e8aecb058c48af5c7e667d1f26b9a8c4fee1e1",
+    "agent/worker.py": "04a3ae6416e5fdca7115d6918661afb4f2c9d9aaa7cfc6485f6055582b5f4fd3",
+    "tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tools/analysis.py": "16cddb6f96854450858faf03db4c98d81b21ae157e64f2b013d835ce6ce42817",
+    "tools/code.py": "beb821fb5d2f67192e7db935c8a5851b9057daa673f3487e905fd6dac2c922b6",
+    "tools/data.py": "de3145b082c36c1e988d3adeab2bfc47f27e7daac2a5a7c1977fdfd769f02f4c",
+    "tools/files.py": "90f83940b4d2d13ae6948b992e5647a0462822a274f81d295516114737ba5665",
+    "tools/knowledge.py": "ce47812d8682add79631d25b03bf2feda35ca2a616cdd73609a18fcec7457fb6",
+    "tools/knowledge_content.py": "e29c25b3e2d9880d89aadc61a1519a07937069ad265ae5e1351189b733678a71",
+    "tools/runtime_guard.py": "e1ddfc4a3e78413eda1211b83f2d4397e1df80ce65ae2a436e00880d73961298"
+  }
+}

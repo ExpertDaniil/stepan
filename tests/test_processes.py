@@ -63,6 +63,7 @@ class ProcessTests(unittest.TestCase):
 
     def controller(self):
         controller = Orchestrator.__new__(Orchestrator)
+        controller.local_search = None
         for key, value in {"config": self.h.config, "bus": self.h.bus, "budget": self.budget,
                            "runner": self.runner, "store": self.h.store, "log": self.h.log}.items():
             setattr(controller, key, value)
@@ -119,6 +120,7 @@ class ProcessTests(unittest.TestCase):
     def test_timeout_routes_through_cancel_event_and_resource_release(self):
         job = self.make_job(timeout=1)
         controller = Orchestrator.__new__(Orchestrator)
+        controller.local_search = None
         for key, value in {"config": self.h.config, "bus": self.h.bus, "budget": self.budget,
                            "runner": self.runner, "store": self.h.store, "log": self.h.log}.items():
             setattr(controller, key, value)
@@ -160,6 +162,7 @@ class ProcessTests(unittest.TestCase):
 
     def test_failed_spawn_releases_unstarted_lease(self):
         controller = Orchestrator.__new__(Orchestrator)
+        controller.local_search = None
         train = self.h.artifacts.write_json("validation/train.json", [0, 1])
         valid = self.h.artifacts.write_json("validation/valid.json", [2])
         for key, value in {"config": self.h.config, "bus": self.h.bus, "budget": self.budget,

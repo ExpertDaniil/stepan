@@ -42,8 +42,10 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
 
 
 class PipelineGuard:
-    def __init__(self, code_path):
+    def __init__(self, code_path, trusted_thread=None):
+        import agent.ml
         self.active = False
+        self.trusted_thread = trusted_thread
         self.code = Path(code_path).resolve()
         # A venv's packages need not live under base_prefix (e.g. /usr).
         # Trust installation directories, not the whole venv/project directory.
@@ -58,7 +60,7 @@ class PipelineGuard:
     def check(self, event, args):
         if not self.active:
             return
-        if threading.current_thread().name == 'worker-watchdog':
+        if threading.current_thread() is self.trusted_thread:
             return
         if event.startswith(('socket.', 'subprocess.', 'ctypes.')) or event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}:
             raise PermissionError('Generated pipeline cannot start processes or use network/native loaders')

@@ -35,19 +35,27 @@ class FeatureAdmissionTests(unittest.TestCase):
     def tearDown(self):
         self.h.close()
 
-    def propose(self, column):
+    def propose(self, column, compacted=False, extra_evidence=None):
         g = self.h.g
-        proposed = action('features', feature_program=[{'op': 'missing', 'name': 'missing_feature', 'columns': [column]}])
+        proposed = action('features', evidence_ids=extra_evidence or [], feature_program=[{'op': 'missing', 'name': 'missing_feature', 'columns': [column]}])
         class Transport:
             def complete(self, request, timeout, context):
                 return {'choices': [{'message': {'content': json.dumps(proposed)}, 'finish_reason': 'stop'}],
                         'usage': {'completion_tokens': 100}}
         gateway = Gateway(g.config, g.budget, g.artifacts, g.bus, g.log, output_schemas(g.bus), Transport())
         gateway.analysis = AnalysisService(g.spec, g.validation, g.artifacts, g.budget, g.log)
-        researcher = Researcher(g.bus, gateway, g.artifacts, g.spec, g.catalog, g.config, g.log)
+        researcher = Researcher(g.bus, gateway, g.artifacts, g.spec, g.catalog, g.config, g.log,
+                                feature_columns=g.context.profile['train_columns'])
         researcher.validation_id = g.validation['validation_id']
         ticket = self.h.issue()
-        return researcher.propose(ticket['researcher_request']['payload'])['plan']
+        payload = dict(ticket['researcher_request']['payload'])
+        if compacted:
+            context = g.artifacts.read_json(payload['context_id'])
+            user = json.loads(context['messages'][1]['content'])
+            user['profile_summary']['data'].pop('train_columns', None)
+            context['messages'][1]['content'] = json.dumps(user)
+            payload['context_id'] = g.artifacts.write_json('contexts/compacted-fixture.json', context, 'llm_context')['artifact_id']
+        return researcher.propose(payload)['plan']
 
     def test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies(self):
         g = self.h.g
@@ -67,3 +75,21 @@ class FeatureAdmissionTests(unittest.TestCase):
         with self.assertRaises(AgentError) as error:
             self.propose(self.h.g.spec['target_column'])
         self.assertEqual(error.exception.code, 'INVALID_FEATURE_PROGRAM')
+
+    def test_authoritative_schema_survives_provider_context_compaction(self):
+        plan = self.propose('x_numeric', compacted=True)
+        self.assertEqual(plan['model']['hyperparameters']['feature_program'][0]['columns'], ['x_numeric'])
+
+    def test_unknown_feature_still_rejected_with_compacted_provider_context(self):
+        with self.assertRaises(AgentError) as error:
+            self.propose('nonexistent_input', compacted=True)
+        self.assertEqual(error.exception.code, 'INVALID_FEATURE_PROGRAM')
+
+    def test_other_peers_measured_landscape_is_valid_visible_evidence(self):
+        g = self.h.g
+        g.context.store = g.store
+        self.h.result('researcher-2', {'alpha': .1}, 3)
+        ident = g.store.best()
+        plan = self.propose('x_numeric', extra_evidence=[ident])
+        intent = g.artifacts.read_json('intent-'+plan['plan_id'])
+        self.assertIn(ident, intent['evidence_ids'])

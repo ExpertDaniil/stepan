@@ -478,7 +478,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if p["manifest"] is None or p["lineage"] is None or proposal["plan"] is None:
             raise AgentError("INVALID_PROPOSAL", "A proposed plan requires a manifest and typed lineage")
         plan = self.catalog.validate_plan(proposal["plan"], self.spec, self.validation["validation_id"], self.artifacts)
-        if self.refinement() and order['base_experiment_id']:
+        if self.config.research_mode != 'adaptive' and self.refinement() and order['base_experiment_id']:
             base = self.store.get(order['base_experiment_id'])['plan']
             if base['model']['family'] != 'dummy' and plan['recipe_id'] != base['recipe_id']:
                 raise AgentError('REFINEMENT_FAMILY_CHANGED', 'Final refinement keeps the measured model family')

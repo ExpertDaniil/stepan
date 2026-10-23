@@ -34,7 +34,8 @@ class ContextBuilder:
         recent = self.artifacts.read_json(snapshot["summary_artifact_id"])
         catalog_mode = self.catalog.config.research_mode == "catalog"
         system = research_prompt(self.catalog.config.research_mode)
-        allowed = list(self.catalog.recipes)
+        allowed = [key for key, recipe in self.catalog.recipes.items()
+                   if self.catalog.config.research_mode != 'adaptive' or recipe['family'] != 'dummy']
         if catalog_mode:
             allowed = self.catalog.assignment_recipes(payload["assignment"], recent)
         compact_profile = dict(self.profile)
@@ -57,6 +58,8 @@ class ContextBuilder:
                 from agent.research_feedback import compact_memory
                 user['research_memory'] = compact_memory(user['research_memory'])
                 user['feature_memory'] = archive(self.store, self.artifacts, ids)
+                from agent.research_landscape import build_landscape
+                user['research_landscape'] = build_landscape(self.store, self.artifacts, ids)
                 from agent.evidence import comparison_context
                 user['comparison_evidence'] = comparison_context(self.store, self.artifacts, ids)
             user['recipes'] = self.catalog.branch_recipes(allowed, {'required_capability_ids': [], 'forbidden_capability_ids': []})
@@ -103,7 +106,8 @@ class ContextBuilder:
         from copy import deepcopy
         recent = deepcopy(graph["recent"])
         adaptive = self.catalog.config.research_mode == 'adaptive'
-        allowed = list(self.catalog.recipes)
+        allowed = [key for key, recipe in self.catalog.recipes.items()
+                   if self.catalog.config.research_mode != 'adaptive' or recipe['family'] != 'dummy']
         if graph["action"] != "baseline" and self.catalog.config.research_mode == "catalog":
             assigned = self.catalog.assignment_recipes(payload["assignment"], recent)
             allowed = assigned or allowed
@@ -174,6 +178,9 @@ class ContextBuilder:
                     'parameter-only tuning/catalog actions will be rejected. Stop with a reason if none is useful.')
             if getattr(self, 'store', None):
                 user['profile_summary']['feature_memory'] = archive(self.store, self.artifacts,
+                    graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
+                from agent.research_landscape import build_landscape
+                user['profile_summary']['research_landscape'] = build_landscape(self.store, self.artifacts,
                     graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
                 from agent.evidence import comparison_context
                 user['profile_summary']['comparison_evidence'] = comparison_context(self.store, self.artifacts,

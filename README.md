@@ -1,5 +1,11 @@
 # AutoML Agent · Adaptive Research
 
+Финальная ревизия: [FINAL-DATA-RESEARCH.md](docs/FINAL-DATA-RESEARCH.md).
+Сравнены все ветки команды; объединены adaptive feature research, потоковый анализ
+и исправление приёмки финальных pipeline. Dummy оставлен ранним аварийным ответом,
+исследователь получает сильнейшую измеренную обучаемую конфигурацию.
+Проверки, сквозные примеры и ограничения приведены в отчёте.
+
 Feature research now has executable composable programs, fit-only grouped statistics,
 a measured representation archive, rotating assignments and a small background seed bank.
 Details: [FEATURE-RESEARCH.md](docs/FEATURE-RESEARCH.md). Separate fixes cover

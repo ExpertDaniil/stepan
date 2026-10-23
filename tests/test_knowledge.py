@@ -77,8 +77,7 @@ class KnowledgeTests(unittest.TestCase):
         self.assertFalse(reply['no_matches'])
         self.assertIn('method-frequency-features', self.service._rank('frequency encoding categorical counts train only',
                       ['frequency_encoding', 'interactions', 'boosting']))
-        method = self.service.search({'query': '', 'ids': ['method-frequency-features'],
-                                     'tags': ['frequency_encoding', 'interactions', 'boosting']})['results'][0]
+        method = next(r for r in reply['results'] if r['id'] == 'method-frequency-features')
         self.assertIn('frequency_encoding', method['match_info']['matched_tags'])
         self.assertIn('boosting', method['match_info']['unmatched_requested_tags'])
 

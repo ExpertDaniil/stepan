@@ -119,7 +119,7 @@ class AdaptiveSearchRegressions(unittest.TestCase):
             settings = dict(LLM_MODE='mock', RESEARCH_MODE='adaptive', TIME_BUDGET_SECONDS='120',
                 GRAPH_ENABLED=str(int(graph)), GRAPH_REFINEMENT_ENABLED='0', MAX_WORKERS='1', GRAPH_PEERS='1',
                 GRAPH_TRAIN_WORKERS='1', CATALOG_WARMUP_EXPERIMENTS='0', LLM_MAX_CALLS='10', LOG_LEVEL='ERROR',
-                MODEL_SNAPSHOT_MAX_BYTES='0', GRAPH_MIN_FREE_DISK_BYTES='0')
+                MODEL_SNAPSHOT_MAX_BYTES='0', GRAPH_MIN_FREE_DISK_BYTES='0', FEATURE_RESEARCH_ENABLED='0')
             settings.update(extra or {})
             with patch.dict(os.environ, settings), patch.object(MockTransport, 'complete', transport), redirect_stderr(io.StringIO()) as stderr:
                 code = main([str(task), '--llm-mode', 'mock', '--work-dir', str(root/'runs')])

@@ -14384,7 +14384,8 @@
             "group",
             "compare",
             "dictionary",
-            "report"
+            "report",
+            "schema"
           ]
         },
         "report_id": {
@@ -14405,7 +14406,7 @@
             "minLength": 1
           },
           "maxItems": 12,
-          "description": "Input features only; never include the target. [] chooses bounded defaults."
+          "description": "Existing non-target input columns, including identifiers for diagnosis. [] chooses bounded model-feature defaults, or an empty schema/report request."
         },
         "group_by": {
           "anyOf": [
@@ -14421,7 +14422,54 @@
         },
         "include_target": {
           "type": "boolean",
-          "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report."
+          "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report/schema."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "column",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

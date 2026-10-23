@@ -12,6 +12,8 @@ def job_occupancy(events):
     """Wall intervals with a train/refit job; this is not measured CPU utilization."""
     if not events:
         return {}
+    if any('timestamp' not in e for e in events):
+        return {'timing_available': False, 'interpretation': 'This metadata has no complete timestamp history; wall occupancy is unknown.'}
     start, end = (datetime.fromisoformat(events[i]['timestamp']).timestamp() for i in (0, -1))
     opened, intervals = {}, []
     for event in events:
@@ -31,6 +33,38 @@ def job_occupancy(events):
     return {'elapsed_seconds': round(end-start, 3), 'job_present_seconds': round(busy, 3),
             'no_train_or_refit_seconds': round(max(0, end-start-busy), 3),
             'unfinished_jobs': len(opened), 'interpretation': 'Job presence from saved events, not CPU utilization.'}
+
+
+def research_summary(events):
+    """Summarize measured development, not tokens as a proxy for intelligence."""
+    evaluations = {}
+    for event in events:
+        if event.get('event') == 'experiment.evaluated' and event.get('experiment_id'):
+            evaluations[event['experiment_id']] = event
+    by_recipe = {}
+    owned_features = constant = 0
+    for event in evaluations.values():
+        recipe = event.get('recipe_id', 'unknown')
+        row = by_recipe.setdefault(recipe, {'evaluations': 0, 'best_score': None, 'best_experiment_id': None})
+        row['evaluations'] += 1
+        score = event.get('score')
+        if isinstance(score, (int, float)) and math.isfinite(score):
+            if row['best_score'] is None or ((score < row['best_score']) if event.get('direction') == 'minimize' else (score > row['best_score'])):
+                row.update(best_score=score, best_experiment_id=event['experiment_id'])
+        owned_features += bool(event.get('hyperparameters', {}).get('feature_program'))
+        constant += bool(event.get('prediction_behavior', {}).get('constant_like'))
+    actions = {}
+    for event in events:
+        if event.get('event') == 'research.action_proposed':
+            kind = event.get('action', 'unknown')
+            actions[kind] = actions.get(kind, 0)+1
+    return {'evaluated_configurations': len(evaluations), 'by_recipe': by_recipe,
+            'proposed_llm_actions': actions, 'evaluated_owned_feature_programs': owned_features,
+            'observed_constant_like_outputs': constant,
+            'completed_data_analyses': sum(e.get('event') == 'research.analysis_completed' for e in events),
+            'rejected_reference_optimizations': sum(e.get('code') == 'REFERENCE_ONLY_RECIPE' and e.get('event') == 'research.proposal_failed' for e in events),
+            'interpretation': 'Proposals are not executions. Counts describe recorded behavior; a feature program can regress, '
+                'and custom pipelines without an owned program need their code/fitted report inspected.'}
 
 
 def inspect_run(source):
@@ -114,6 +148,7 @@ def inspect_run(source):
                             "research_decisions":sum(e.get('event') == 'research.decision_saved' for e in events),
                             "feedback_deliveries":sum(e.get('event') == 'research.feedback_delivered' for e in events),
                             "job_occupancy":job_occupancy(events),
+                            "research_summary":research_summary(events),
                             "dialogues":[e for e in events if e.get('event') == 'research.dialogue_summary'],
                             "feature_seed_proposals":sum(e.get('event') == 'features.seed_proposed' for e in events),
                             "overlap_deferrals":sum(e.get('event') == 'research.admission_reconsidered' for e in events),
@@ -144,7 +179,7 @@ def main():
             print(f"Output reported={report['reported_output_tokens']}; input={report['reported_input_tokens']}; cached input={report['reported_cached_input_tokens']}; truncated={report['truncated_responses']}")
             print('Storage: '+json.dumps(report['storage'], ensure_ascii=False))
             print('Research: '+json.dumps({k: report[k] for k in ('research_decisions', 'feedback_deliveries',
-                'rolling_peer_resumptions', 'search_stop_reason', 'fallback_seconds', 'published_pipeline')}, ensure_ascii=False))
+                'rolling_peer_resumptions', 'search_stop_reason', 'fallback_seconds', 'published_pipeline', 'research_summary')}, ensure_ascii=False))
             for row in report['calls']:
                 print('  '+json.dumps(row,ensure_ascii=False))
             print(f"Suggested initial/ceiling: {report['suggested_initial_output_tokens']}/{report['suggested_output_ceiling']}")

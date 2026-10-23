@@ -75,7 +75,7 @@ def watch_job(job, done):
         done.wait(0.1)
 
 
-def execute(job):
+def execute(job, trusted_thread=None):
     import numpy as np
     import pandas as pd
     from threadpoolctl import threadpool_limits
@@ -117,7 +117,7 @@ def execute(job):
     if job.get('guard_generated'):
         from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
         prepare_pipeline_imports(job['code_path'], job['hyperparameters'].get('base_recipe_id'))
-        guard = PipelineGuard(job['code_path'])
+        guard = PipelineGuard(job['code_path'], trusted_thread=trusted_thread)
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))
     if job.get('guard_generated'):
@@ -202,7 +202,7 @@ def main():
     watchdog = threading.Thread(target=watch_job, args=(job, done), daemon=True, name='worker-watchdog')
     watchdog.start()
     try:
-        result = execute(job)
+        result = execute(job, trusted_thread=watchdog)
         result["peak_memory_mb"] = self_peak_mb()
         exit_code = 0
     except BaseException as exc:

@@ -49,7 +49,7 @@ def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction):
         result["class_summary"] = {"class_count": len(counts), "worst_classes": sorted(classes, key=lambda c: (c["recall"], -c["rows"]))[:6],
                                    "omitted_classes": max(0, len(counts)-len(labels))}
     groups, used = [], 0
-    excluded = set(task["excluded_features"]) | {task["target_column"]}
+    excluded = set(task["excluded_features"]) | set(targets(task))
     for column in data:
         if column in excluded or used >= 4:
             continue
@@ -205,9 +205,21 @@ class Evaluator:
                        "improvement_percent": 100*improvement/abs(self.baseline_value) if self.baseline_value and improvement is not None else None}
         if self.spec["task_kind"] == "regression":
             errors = np.abs(np.asarray(y, dtype=float)-prediction)
-            diagnostics.update(mae=float(mean_absolute_error(y, prediction)), target_mean=float(np.mean(y)),
-                               target_std=float(np.std(y)), absolute_error_p50=float(np.quantile(errors, 0.5)),
+            diagnostics.update(mae=float(mean_absolute_error(y, prediction)), target_mean=float(np.mean(np.asarray(y, dtype=float))),
+                               target_std=float(np.std(np.asarray(y, dtype=float))), absolute_error_p50=float(np.quantile(errors, 0.5)),
                                absolute_error_p90=float(np.quantile(errors, 0.9)))
+        # Describe the actual output; source inspection cannot prove that custom code learns.
+        if self.spec['task_kind'] == 'regression':
+            spread = np.std(np.asarray(prediction, dtype=float), axis=0)
+            scale = np.maximum(1.0, np.mean(np.abs(np.asarray(prediction, dtype=float)), axis=0))
+            constant_like = bool(np.all(spread <= 1e-12*scale))
+            diagnostics['prediction_behavior'] = {'constant_like': constant_like,
+                'prediction_std': np.atleast_1d(spread).astype(float).tolist(),
+                'note': 'Constant-like predictions are observed, not proof of a code defect; compare learned alternatives.' if constant_like else 'Predictions vary across validation inputs.'}
+        elif self.spec['metric']['prediction_kind'] != 'probabilities':
+            values, counts = np.unique(prediction, return_counts=True)
+            diagnostics['prediction_behavior'] = {'constant_like': len(values) == 1,
+                'predicted_class_count': len(values), 'largest_predicted_class_fraction': float(counts.max()/len(prediction))}
         diagnostics.update(error_diagnostics(data, self.spec, protocol["train_indices"], selection, y, prediction))
         diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json", diagnostics, "diagnostics")
         record = {"evaluation_id": "eval-" + uuid.uuid4().hex[:12], "experiment_id": payload["experiment_id"], "valid": True,

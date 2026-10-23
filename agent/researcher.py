@@ -11,9 +11,10 @@ from agent.research_actions import validate_action, validate_research_notes
 
 
 class Researcher:
-    def __init__(self, bus, gateway, artifacts, spec, catalog, config, log):
+    def __init__(self, bus, gateway, artifacts, spec, catalog, config, log, feature_columns=None):
         self.bus, self.gateway, self.artifacts, self.spec, self.catalog, self.config, self.log = bus, gateway, artifacts, spec, catalog, config, log
         self.validation_id = None
+        self.feature_columns = list(feature_columns) if feature_columns is not None else None
 
     def propose(self, payload):
         if not payload["budget"]["search_allowed"]:
@@ -48,6 +49,14 @@ class Researcher:
             for delivery in answer['tool_calls']:
                 if delivery.get('name') == 'research_updates':
                     evidence.update(delivery['evidence_ids'])
+            projection = user.get('profile_summary', user)
+            landscape = projection.get('research_landscape', {})
+            for result in [*landscape.get('best_per_family', []), *projection.get('feature_memory', {}).get('representations', [])]:
+                evidence.add(result['experiment_id'])
+            if landscape.get('strongest_measured_learned'):
+                evidence.add(landscape['strongest_measured_learned']['experiment_id'])
+            for comparison in projection.get('comparison_evidence', {}).get('comparisons', []):
+                evidence.update(comparison.get('experiment_ids', []))
             for decision in memory.get('decisions', []):
                 evidence.update(decision['evidence_ids'])
                 for observation in decision['observations']:
@@ -108,7 +117,9 @@ class Researcher:
             excluded = [*targets(self.spec), *self.spec['excluded_features']]
             try:
                 program = validate_program(proposed['feature_program'],
-                    [c for c in profile['train_columns'] if c not in excluded], excluded)
+                    ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
+                     else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
+                     else None), excluded)
             except (ValueError, KeyError) as error:
                 raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
             params = {'base_recipe_id': plan_recipe, 'model_parameters': params, 'feature_program': program}

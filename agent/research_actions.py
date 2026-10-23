@@ -86,6 +86,8 @@ def validate_research_notes(notes, memory, evidence, knowledge):
 
 def validate_action(action, catalog):
     kind = action['action']
+    if kind in {'catalog', 'tune'} and catalog.recipes.get(action['recipe_id'], {}).get('family') == 'dummy':
+        raise AgentError('REFERENCE_ONLY_RECIPE', 'Dummy is the emergency mean/majority reference, not a research/tuning direction. Choose a learned model, features, pipeline or stop.')
     if kind == 'features':
         if (action['code'] is not None or action['tuning'] is not None
                 or action['recipe_id'] == CUSTOM_RECIPE or action['recipe_id'].startswith('dummy-')

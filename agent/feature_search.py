@@ -94,7 +94,7 @@ class FeatureSearch:
         base = deepcopy(min(eligible, key=lambda item: item[0])[1])
         if branch not in self.banks:
             from agent.predictions import targets
-            fit = c.context.analysis.fit
+            fit = c.context.analysis.feature_frame()
             columns = [name for name in fit if name not in {*targets(c.spec), *c.spec['excluded_features']}]
             self.banks[branch] = deque(seed_programs(fit[columns]))
         while self.banks[branch]:

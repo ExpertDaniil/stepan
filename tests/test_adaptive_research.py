@@ -72,7 +72,7 @@ class AdaptiveResearchTests(unittest.TestCase):
         self.assertIn('train_missing', core['column_fields'])
         self.assertTrue(any(row[0] == 'x_numeric' and row[2] > 0 for row in core['columns']))
         request = {'messages': [{'role': 'user', 'content': json.dumps(user)}]}
-        Gateway._compact_research_request(request, 1)
+        Gateway._compact_research_request(type('Fixture', (), {'log': self.g.log})(), request, 1)
         compacted = json.loads(request['messages'][0]['content'])
         self.assertEqual(compacted['profile_summary']['data']['core_profile'], core)
         self.assertEqual(compacted['base_code'], user['base_code'])

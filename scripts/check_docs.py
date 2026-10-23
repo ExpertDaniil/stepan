@@ -18,11 +18,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent.contracts import Schemas
+from tools.notebooks import NOTEBOOK_SCHEMA
 
 
 ACTIVE = [ROOT / 'README.md', *(ROOT / 'docs' / name for name in (
     'PROJECT_GUIDE.md', 'ARCHITECTURE_REVIEW.md', 'IMPLEMENTATION.md',
-    'GRAPH.md', 'LOGGING.md', 'OPEN-RESEARCH.md', 'HISTORY.md'))]
+    'GRAPH.md', 'LOGGING.md', 'OPEN-RESEARCH.md', 'HISTORY.md',
+    'PLATFORM.md', 'research/notebooks/README.md'))]
 
 
 def heading_ids(body):
@@ -37,7 +39,7 @@ def heading_ids(body):
 
 def check(mermaid_cli=None):
     schemas, errors, diagrams = Schemas(), [], []
-    links = examples = 0
+    links = examples = notebook_examples = 0
     for document in ACTIVE:
         body = document.read_text(encoding='utf-8')
         fences = list(re.finditer(r'^```([^\n]*)\n(.*?)^```\s*$', body, re.M | re.S))
@@ -64,10 +66,20 @@ def check(mermaid_cli=None):
             elif language == 'json' and document.name == 'PROJECT_GUIDE.md':
                 try:
                     value = json.loads(content)
-                    schemas.validate(value, 'AnalysisQuery')
-                    examples += 1
+                    if isinstance(value, dict) and value.get('kind') in {'search', 'read'}:
+                        schemas._check(value, NOTEBOOK_SCHEMA, '$.notebook')
+                        permitted = ({'kind', 'keywords', 'offset', 'limit'} if value['kind'] == 'search'
+                                     else {'kind', 'approach_id', 'cell_index', 'offset', 'max_chars'})
+                        if set(value) - permitted:
+                            raise ValueError('Notebook query mixes search/read fields')
+                        if value['kind'] == 'read' and not {'approach_id', 'cell_index'} <= set(value):
+                            raise ValueError('Notebook read needs approach_id and cell_index')
+                        notebook_examples += 1
+                    else:
+                        schemas.validate(value, 'AnalysisQuery')
+                        examples += 1
                 except Exception as exc:
-                    errors.append(f'{document.name}: invalid AnalysisQuery example: {exc}')
+                    errors.append(f'{document.name}: invalid query example: {exc}')
     if mermaid_cli:
         with tempfile.TemporaryDirectory(prefix='stepan-doc-diagrams-') as folder:
             for number, (name, source) in enumerate(diagrams, 1):
@@ -82,6 +94,7 @@ def check(mermaid_cli=None):
                 except Exception as exc:
                     errors.append(f'{name}: Mermaid render {number}: {exc}')
     return {'documents': len(ACTIVE), 'local_links': links, 'analysis_examples': examples,
+            'notebook_examples': notebook_examples,
             'mermaid_blocks': len(diagrams), 'full_mermaid_render': bool(mermaid_cli), 'errors': errors}
 
 

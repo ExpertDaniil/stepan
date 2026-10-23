@@ -22,6 +22,7 @@ class Orchestrator:
         self.runner, self.evaluator, self.submission, self.researcher = runner, evaluator, submission, researcher
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
+        self.context.store = store
         self.researcher.validation_id = validation["validation_id"]
         if config.research_mode == 'adaptive':
             from tools.analysis import AnalysisService

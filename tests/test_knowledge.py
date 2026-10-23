@@ -71,6 +71,29 @@ class KnowledgeTests(unittest.TestCase):
         self.assertEqual(row['excerpt_offset'], 5000)
         self.assertEqual(row['source_sha256'], doc['source_sha256'])
 
+    def test_combined_tags_are_soft_hints_and_show_partial_matches(self):
+        reply = self.service.search({'query': 'frequency encoding categorical counts train only',
+                                     'tags': ['frequency_encoding', 'interactions', 'boosting']})
+        self.assertFalse(reply['no_matches'])
+        self.assertIn('method-frequency-features', self.service._rank('frequency encoding categorical counts train only',
+                      ['frequency_encoding', 'interactions', 'boosting']))
+        method = self.service.search({'query': '', 'ids': ['method-frequency-features'],
+                                     'tags': ['frequency_encoding', 'interactions', 'boosting']})['results'][0]
+        self.assertIn('frequency_encoding', method['match_info']['matched_tags'])
+        self.assertIn('boosting', method['match_info']['unmatched_requested_tags'])
+
+    def test_unknown_tag_does_not_hide_a_useful_text_match(self):
+        reply = self.service.search({'query': 'missing indicators', 'tags': ['an_unknown_tag']})
+        self.assertFalse(reply['no_matches'])
+        self.assertEqual(reply['unknown_tags'], ['an_unknown_tag'])
+
+    def test_seed_includes_the_current_research_question(self):
+        self.service.seed(focus='frequency encoding rare categories')
+        with self.artifacts.lock:
+            ids = [ident for ident, entry in self.artifacts.entries.items() if entry['meta']['kind'] == 'knowledge_retrieval']
+        saved = self.artifacts.read_json(ids[-1])
+        self.assertTrue(saved['query']['query'].startswith('frequency encoding rare categories'))
+
     def test_tampered_corpus_fails_closed_as_a_knowledge_source(self):
         copy = self.root/'corpus'
         shutil.copytree(ROOT/'recipes/knowledge', copy)

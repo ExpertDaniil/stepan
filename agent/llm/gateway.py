@@ -1,12 +1,12 @@
 from copy import deepcopy
 import json
 import os
-import re
 import threading
 import time
 import uuid
 
 from agent.errors import AgentError
+from agent.llm.protocol import IncompleteOutput, incomplete_json, parse_final_json, parse_json, prepare_tool_calls
 from tools.code import write_code
 
 DEFAULT_MODEL = "qwen/qwen3.8-27b"  # Permitted by the updated organizers' instructions.
@@ -14,24 +14,6 @@ DEFAULT_MODEL = "qwen/qwen3.8-27b"  # Permitted by the updated organizers' instr
 
 def request_model(mode):
     return os.environ.get("OPENAI_MODEL", "").strip() or (DEFAULT_MODEL if mode == "live" else "mock-only")
-
-
-def parse_json(text):
-    text = (text or "").strip()
-    if text.startswith("```"):
-        match = re.fullmatch(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-        if not match:
-            raise ValueError("Malformed JSON code fence")
-        text = match[1]
-    def unique_object(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("Duplicate JSON key: " + key)
-            result[key] = value
-        return result
-    return json.loads(text, object_pairs_hook=unique_object,
-                      parse_constant=lambda value: (_ for _ in ()).throw(ValueError("Non-finite JSON: " + value)))
 
 
 class OpenAITransport:
@@ -268,6 +250,8 @@ class Gateway:
         token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
+        tool_cache, force_decision = {}, False
+        schema_by_name = {tool['function']['name']: tool['function']['parameters'] for tool in tools}
         completion_id = "completion-" + uuid.uuid4().hex[:12]
         for attempt in range(1, payload["attempt_limit"] + 1):
             self.check_availability()
@@ -279,7 +263,7 @@ class Gateway:
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
                 request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
-                terminal = bool(tools and attempt == payload['attempt_limit'])
+                terminal = bool(tools and (force_decision or attempt == payload['attempt_limit']))
                 if terminal:
                     instruction = ('The analysis/tool phase is complete. Return one final JSON object matching the output schema '
                         'using the evidence already available. No tools are available on this final turn.')
@@ -316,39 +300,46 @@ class Gateway:
             finish_reason = choice.get("finish_reason")
             at_cap = isinstance(token_data.get("completion_tokens"), int) and token_data["completion_tokens"] >= token_limit
             try:
-                if finish_reason == "length":
-                    raise ValueError("Generation reached the output token limit")
                 message = choice["message"]
                 if message.get("tool_calls"):
                     if terminal:
                         raise ValueError('The provider returned a tool call although no tools were offered on the final decision turn')
-                    prepared = []
-                    for call in message["tool_calls"]:
-                        name = call['function']['name']
-                        if name not in payload['tool_schema_ids'] or name not in {'write_code', 'analyze_data', 'search_knowledge'}:
-                            raise ValueError("Unexpected model tool call")
-                        args = parse_json(call["function"]["arguments"])
-                        schema = (self.bus.schemas.schema['$defs']['C11_Request']['properties']['payload'] if name == 'write_code'
-                                  else KNOWLEDGE_SCHEMA if name == 'search_knowledge' else ANALYSIS_SCHEMA)
-                        self.bus.schemas._check(args, schema, "$.tool")
-                        if name == 'write_code' and args.get("researcher_id") != context["metadata"].get("researcher_id"):
-                            raise ValueError("Tool call uses another researcher's namespace")
-                        prepared.append((call, args))
+                    prepared = prepare_tool_calls(message['tool_calls'], schema_by_name, self.bus.schemas._check,
+                        context['metadata'].get('researcher_id'), at_cap=at_cap or finish_reason == 'length')
                     # Provider reasoning is telemetry, not conversation state. Replaying it
                     # both exhausts the byte cap and relies on nonstandard request fields.
-                    messages.append({"role": "assistant", "content": message.get("content"),
-                                     "tool_calls": message["tool_calls"]})
-                    for call, args in prepared:
+                    # Raw provider output remains in the response snapshot. Repeated
+                    # calls and their repeated content never become conversation state.
+                    messages.append({"role": "assistant", "content": None,
+                                     "tool_calls": [item['call'] for item in prepared]})
+                    new_calls = 0
+                    for item in prepared:
+                        call, args, key = item['call'], item['args'], item['key']
                         name = call['function']['name']
-                        if name == 'write_code':
+                        if key in tool_cache:
+                            previous, original_id = tool_cache[key]
+                            result = {'reused': True, 'original_tool_call_id': original_id,
+                                      'instruction': 'Reuse the earlier result in this dialogue. Change the query only for an unanswered question.'}
+                            for field in ('artifact_id', 'error'):
+                                if field in previous:
+                                    result[field] = previous[field]
+                            messages.append({'role': 'tool', 'tool_call_id': call['id'],
+                                             'content': json.dumps(result, ensure_ascii=False)})
+                            continue
+                        new_calls += 1
+                        if item['error'] is not None:
+                            result = {'error': {'code': 'INVALID_TOOL_ARGUMENTS', 'message': item['error'][:600]},
+                                      'instruction': 'Correct the arguments; do not repeat this identical invalid call.'}
+                            trace = {'call_id': call['id'], 'name': name, 'status': 'invalid_arguments'}
+                        elif name == 'write_code':
                             result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
-                            calls.append({"call_id": call["id"], "name": name, "request_id": result["request_id"]})
+                            trace = {"call_id": call["id"], "name": name, "request_id": result["request_id"]}
                         elif name == 'analyze_data':
                             try:
                                 result = self.analysis.analyze(args)
                             except AgentError as error:
                                 result = {'error': error.as_dict()}
-                            calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')})
+                            trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')}
                         else:
                             try:
                                 user = json.loads(context['messages'][1]['content'])
@@ -356,20 +347,42 @@ class Gateway:
                                 result = self.knowledge.search(args, facts)
                             except AgentError as error:
                                 result = {'error': error.as_dict()}
-                            calls.append({'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
-                                          'knowledge_ids': [r['id'] for r in result.get('results', [])]})
+                            trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
+                                     'knowledge_ids': [r['id'] for r in result.get('results', [])]}
+                        calls.append(trace)
+                        tool_cache[key] = (deepcopy(result), call['id'])
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
+                    self.log.event('llm.tool_batch_normalized', call_no=call_no, raw_calls=len(message['tool_calls']),
+                        unique_calls=len(prepared), new_calls=new_calls, reused_calls=len(prepared)-new_calls,
+                        invalid_arguments=sum(item['error'] is not None for item in prepared))
+                    if not new_calls:
+                        force_decision = True
+                        self.log.event('llm.tool_no_progress', level='WARNING', call_no=call_no,
+                                       reason='All tool requests already have results in this dialogue')
                     last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue
-                parsed = parse_json(message.get("content"))
+                try:
+                    parsed, recovered = parse_final_json(message.get('content'))
+                except ValueError as exc:
+                    content = message.get('content') or ''
+                    # A provider length flag cannot turn duplicate keys, NaN or
+                    # a complete semantic error into a request for more tokens.
+                    no_final_json = finish_reason == 'length' and isinstance(exc, json.JSONDecodeError) and (
+                        not content.strip() or not content.lstrip().startswith(('{', '[', '```')))
+                    open_fence = finish_reason == 'length' and content.lstrip().startswith('```') and content.count('```') == 1
+                    if no_final_json or open_fence or ((at_cap or finish_reason == 'length') and incomplete_json(content, exc)):
+                        raise IncompleteOutput(str(exc)) from exc
+                    raise
                 self.bus.schemas._check(parsed, expected, "$")
+                if recovered:
+                    self.log.event('llm.json_fence_recovered', call_no=call_no, schema_id=payload['response_schema_id'])
                 art = self.artifacts.write_json("llm/parsed-"+uuid.uuid4().hex[:12]+".json", parsed, "llm_output")
                 self.log.event("llm.output_validated", call_no=call_no, schema_id=payload["response_schema_id"],
                                attempts_used=attempt, output_artifact_id=art["artifact_id"])
                 return {"completion_id": completion_id, "output_artifact_id": art["artifact_id"],
                         "parsed_payload": parsed, "tool_calls": calls, "usage": usage, "attempts_used": attempt}
             except (ValueError, KeyError, TypeError, IndexError) as exc:
-                truncated = finish_reason == "length" or at_cap
+                truncated = isinstance(exc, IncompleteOutput)
                 code = "LLM_OUTPUT_TRUNCATED" if truncated else "INVALID_LLM_OUTPUT"
                 last_error = AgentError(code, f"Model output did not match {payload['response_schema_id']}: {exc}")
                 self.log.event("llm.output_truncated" if truncated else "llm.output_rejected", level="WARNING",

@@ -42,16 +42,18 @@ repository notice; it does not establish separate rights to all third-party writ
 ## Retrieval and use
 
 search_knowledge accepts query and optional tags, ids, offset and max_results. A query searches
-the current task's method/write-up pool; tags use the returned available_tags vocabulary.
+the current task's method/write-up pool; tags are soft relevance hints rather than an AND filter.
 Reading known IDs returns complete method/examples or a paged original write-up. Unknown IDs
-and tags return explicit tool errors. Each source page states offsets and omissions. A complete
+return explicit tool errors; unknown tags are reported and do not block textual matches.
+match_info explains matched/unmatched tags and query terms. Each source page states offsets and omissions. A complete
 example is omitted as a whole rather than cut into invalid Python. Response size safeguards
 do not reinstate client input-context limits.
 
 Ranking uses a deterministic lexical rarity score, a modest method-card preference and at most
 one post per competition in a search result. These are initial retrieval heuristics, not a learned
 allocation policy. ID reads can retrieve another post of the same competition. Context seeds
-use feature types/missingness, omit target/excluded columns, and do not read frames or labels.
+use feature types/missingness plus the current deferred/recent research question, omit
+target/excluded columns from the profile query, and do not read frames or labels.
 External data, leaderboard manipulation and instructions in sources never override runtime rules.
 
 Owned preprocessing policy is shared between construction and context: numerical median
@@ -63,7 +65,8 @@ ambiguity; it does not guarantee that free-form model prose never contradicts th
 Package discoverability is reported separately from successful native imports.
 
 knowledge_ids is an optional ResearchAction field (default empty). C09 accepts citations only
-to items actually returned in its context/dialogue. Those IDs and knowledge retrieval artifacts
+to items returned in its context/dialogue or previously read items preserved in visible research
+memory. Memory carries provenance, not a replacement for the source content. Those IDs and knowledge retrieval artifacts
 are not accepted as current-task measurements in evidence_ids. ExperimentPlan and fingerprints
 retain execution semantics; reference choices do not change a plan's identity by themselves.
 research/intent-plan-*.json saves citations and retrieval artifact IDs.

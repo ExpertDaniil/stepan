@@ -20,7 +20,8 @@ KNOWLEDGE_SCHEMA = {
     'type': 'object', 'properties': {
         'query': {'type': 'string', 'maxLength': 1000,
                   'description': 'Concrete data/method question, in English when possible; empty when reading IDs.'},
-        'tags': {'type': 'array', 'items': {'type': 'string', 'maxLength': 60}, 'maxItems': 8},
+        'tags': {'type': 'array', 'items': {'type': 'string', 'maxLength': 60}, 'maxItems': 8,
+                 'description': 'Ranking hints, not an AND filter. Partial tag matches remain eligible.'},
         'ids': {'type': 'array', 'items': {'type': 'string', 'maxLength': 80}, 'maxItems': 3,
                 'description': 'Known method-/kg- IDs to read instead of searching.'},
         'offset': {'type': 'integer', 'minimum': 0, 'maximum': 100000,
@@ -90,12 +91,10 @@ class KnowledgeService:
                        eligible_documents=len(self.documents), runtime_packages=self.packages)
 
     def _rank(self, query, tags):
-        words = set(tokens(query))
+        words = sorted(set(tokens(query+' '+' '.join(tags))))
         count = len(self.documents)
         ranked = []
         for ident, doc in self.documents.items():
-            if tags and not set(tags) <= set(doc['tags']):
-                continue
             indexed = self.index[ident]
             score = sum(math.log1p((count+1)/(self.frequencies[w]+1))*indexed[w]/(indexed[w]+1)
                         for w in words if indexed[w])
@@ -103,7 +102,7 @@ class KnowledgeService:
                 score *= 1.25
             if doc['status'] == 'link_stub':
                 score *= .1
-            if score > 0 or tags:
+            if score > 0:
                 ranked.append((score, ident))
         # Stable ordering and one post per competition avoid twenty versions of
         # one competition displacing all alternative mechanisms.
@@ -169,8 +168,6 @@ class KnowledgeService:
         unknown = [ident for ident in ids if ident not in self.documents]
         if unknown:
             raise AgentError('INVALID_KNOWLEDGE_QUERY', 'IDs must come from the current task library', details={'unknown_ids': unknown})
-        if set(tags)-set(self.tags):
-            raise AgentError('INVALID_KNOWLEDGE_QUERY', 'Unknown method tags', details={'available_tags': self.tags})
         ranked = self._rank(query, tags) if not ids else []
         selected = list(dict.fromkeys(ids))[:limit] if ids else ranked[:limit]
         if seed and ranked:
@@ -183,9 +180,15 @@ class KnowledgeService:
             if cache_key in self.cache:
                 return deepcopy(self.cache[cache_key])
             results = [self._render(ident, query, offset, bool(ids), facts) for ident in selected]
+            for result in results:
+                result['match_info'] = {'matched_tags': sorted(set(tags) & set(result['tags'])),
+                    'unmatched_requested_tags': sorted(set(tags)-set(result['tags'])),
+                    'matched_query_terms': sorted(set(tokens(query)) & set(self.index[result['id']]))}
             reply = {'corpus_version': self.version, 'scope': 'offline_external_experience', 'results': results,
                      'current_pipeline_facts': {k: deepcopy(v) for k, v in (facts or {}).items() if k != 'effective_parameters'}, 'runtime_packages': dict(self.packages),
-                     'available_tags': self.tags, 'no_matches': not bool(results)}
+                     'available_tags': self.tags, 'unknown_tags': sorted(set(tags)-set(self.tags)),
+                     'ranking_policy': 'Query terms and tags are soft relevance hints; task compatibility is a hard filter.',
+                     'no_matches': not bool(results)}
             # Bound each tool response, never the model's complete input context.
             # Drop whole later results; never truncate Python into invalid examples.
             omitted = 0
@@ -200,7 +203,7 @@ class KnowledgeService:
                        query=query, knowledge_ids=[r['id'] for r in reply['results']], corpus_version=self.version)
         return deepcopy(response)
 
-    def seed(self, base=None):
+    def seed(self, base=None, *, focus=None):
         excluded = {self.spec['target_column'], *self.spec['excluded_features']}
         missing = [name for name, value in self.profile.get('train_missing_fraction', {}).items()
                    if name not in excluded and value and value > 0]
@@ -213,5 +216,9 @@ class KnowledgeService:
             query += ' categorical rare frequency encoding'
         if self.spec['task_kind'] != 'regression':
             query += ' multiclass class imbalance'
+        if focus:
+            # The question is model-authored, not a claim that a method works.
+            # Keep the current task profile as fallback context for retrieval.
+            query = (str(focus)[:700]+' '+query)[:1000]
         reply = self.search({'query': query, 'max_results': 2}, self.catalog.pipeline_facts(base), seed=True)
         return {**reply, 'usage': 'Optional hypotheses. Search independently when new evidence changes the question. Cite knowledge IDs in knowledge_ids, never as current-task evidence_ids.'}

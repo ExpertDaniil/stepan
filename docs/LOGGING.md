@@ -70,6 +70,15 @@ llm.output_truncated и llm.output_budget_increased отличают обрыв 
 llm.output_validated означает, что структурированный ответ принят; llm.call_completed лишь фиксирует
 получение API-ответа. Raw reasoning не печатается в терминал; доступный provider snapshot сохраняется.
 
+llm.tool_batch_normalized показывает raw_calls/unique_calls/new_calls/reused_calls и число
+invalid_arguments. llm.tool_no_progress означает переход к финальному решению после раунда
+полностью повторных запросов. llm.json_fence_recovered отмечает извлечение единственного блока
+JSON с последующей полной проверкой схемы. Исходный ответ остаётся в response snapshot.
+research.decision_saved содержит artifact_id, work_order_id, action и notes_supplied.
+research/decision-*.json отделяет модельные объяснения от фактической конфигурации;
+profile_summary.research_memory добавляет проверенные наблюдения из Store. Запись open_ideas
+не означает ни доказанную полезность, ни обязанность потратить на неё бюджет.
+
 Поиск: search.catalog_warmup, search.round_started, фактические параметры/гипотеза, validation.created,
 worker.constructing/fit_started/prediction_completed, job.progress, оценка и относительное улучшение
 к baseline. job.finished с failed/timed_out становится ERROR и содержит error/exit_code/stderr_log_path.

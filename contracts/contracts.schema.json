@@ -13882,6 +13882,116 @@
             "minLength": 1
           },
           "maxItems": 12
+        },
+        "research_notes": {
+          "type": "object",
+          "properties": {
+            "idea_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "mechanism": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "decision_reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "previous_result_interpretation": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "alternatives": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "idea_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "question": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "mechanism": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "next_test": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "why_deferred": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "evidence_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 12
+                  },
+                  "knowledge_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 12
+                  }
+                },
+                "required": [
+                  "idea_id",
+                  "question",
+                  "mechanism",
+                  "next_test",
+                  "why_deferred",
+                  "evidence_ids",
+                  "knowledge_ids"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 8
+            }
+          },
+          "required": [
+            "idea_id",
+            "question",
+            "mechanism",
+            "decision_reason",
+            "previous_result_interpretation",
+            "alternatives"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -13969,7 +14079,8 @@
             "type": "string",
             "maxLength": 60
           },
-          "maxItems": 8
+          "maxItems": 8,
+          "description": "Ranking hints, not an AND filter. Partial tag matches remain eligible."
         },
         "ids": {
           "type": "array",
@@ -13994,6 +14105,116 @@
       },
       "required": [
         "query"
+      ],
+      "additionalProperties": false
+    },
+    "ResearchNotes": {
+      "type": "object",
+      "properties": {
+        "idea_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "mechanism": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "decision_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "previous_result_interpretation": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "idea_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "mechanism": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "next_test": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "why_deferred": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 12
+              },
+              "knowledge_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 12
+              }
+            },
+            "required": [
+              "idea_id",
+              "question",
+              "mechanism",
+              "next_test",
+              "why_deferred",
+              "evidence_ids",
+              "knowledge_ids"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "idea_id",
+        "question",
+        "mechanism",
+        "decision_reason",
+        "previous_result_interpretation",
+        "alternatives"
       ],
       "additionalProperties": false
     }

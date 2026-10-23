@@ -15,6 +15,7 @@ from agent.tuning_space import normalize_space
 from tests.graph_helpers import GraphHarness
 from tests.test_adaptive_research import action, SOURCE
 from tests.test_research_memory import notes
+from tools.analysis import AnalysisService
 
 
 def request(space, max_trials=3):
@@ -95,6 +96,7 @@ class OptunaSearchTests(unittest.TestCase):
                 pass
         gateway = Gateway(self.g.config, self.g.budget, self.g.artifacts, self.g.bus, self.g.log,
                           output_schemas(self.g.bus), Transport())
+        gateway.analysis = AnalysisService(self.g.spec, self.g.validation, self.g.artifacts, self.g.budget, self.g.log)
         researcher = Researcher(self.g.bus, gateway, self.g.artifacts, self.g.spec, self.g.catalog, self.g.config, self.g.log)
         researcher.validation_id = self.g.validation['validation_id']
         proposal = researcher.propose(self.h.issue()['researcher_request']['payload'])

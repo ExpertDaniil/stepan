@@ -5,6 +5,12 @@
 > and computed comparison scopes are authoritative over the historical descriptions below.
 > Описания прежних defaults/отключённого byte cap ниже относятся к истории изменений.
 
+Передача входов между trusted services и worker: [DATA-TRANSPORT.md](DATA-TRANSPORT.md).
+`agent/data_transport.py` владеет ограниченным кэшем текущего run, проекцией столбцов
+и отделёнными копиями fit/predict. C00–C24 сохраняют прежние схемы; внутренний
+worker JobSpec получил optional `input_tables` с path/hash manifests. Отсутствующая
+ссылка сохраняет совместимость старых jobs и реконструкции через CSV.
+
 # Реализация и соответствие ТЗ
 
 Завершение диалогов и продвижение разрешённых серий во время API-ожидания:

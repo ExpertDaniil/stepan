@@ -1,5 +1,12 @@
 # Наблюдаемость
 
+`data.cache_prepared` показывает source artifact, строки/столбцы, размер и время
+построения `numpy-columns-v1`. `data.cache_bypassed` фиксирует причину сохранения CSV
+пути. `worker.data_prepared` сообщает фактический формат train-входа, время подготовки,
+fit/predict rows и число признаков; result.json сохраняет `input_preparation_seconds`.
+`scripts/analyze_run.py` учитывает `data-cache/` отдельной категорией `input_cache`.
+Содержимое таблиц и проверочные ответы в эти события не записываются.
+
 `knowledge.loaded` фиксирует версию/объём локальной библиотеки и доступность пакетов.
 `knowledge.seeded` и `knowledge.retrieved` связывают запрос с выданными knowledge IDs и
 артефактом `knowledge/query-*.json`. Одинаковые обращения могут переиспользовать артефакт.

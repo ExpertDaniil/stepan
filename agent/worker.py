@@ -87,26 +87,14 @@ def execute(job, trusted_thread=None):
         if file_sha256(job['code_path']) != job['code_sha256']:
             raise ValueError('Pipeline code changed between job admission and worker execution')
     task = job["task_spec"]
-    train = read_training(job["train_path"], task)
-    target_columns = targets(task)
-    features = [c for c in train if c not in task["excluded_features"] and c not in target_columns]
-    target = train[target_columns] if len(target_columns) > 1 else train[target_columns[0]]
-    if task['task_kind'] == 'regression':
-        target = target.apply(pd.to_numeric, errors='raise') if len(target_columns) > 1 else pd.to_numeric(target, errors='raise')
-    else:
-        target = target.astype(str)
-    train_rows = len(train)
-    if job['phase'] == 'train':
-        fit_indices = json.loads(Path(job['train_indices_path']).read_text(encoding='utf-8'))
-        valid_indices = json.loads(Path(job['valid_indices_path']).read_text(encoding='utf-8'))
-        fit_x, fit_y = train.iloc[fit_indices][features].copy(), target.iloc[fit_indices].copy()
-        predict_x = train.iloc[valid_indices][features].copy()
-    else:
-        test = read_table(job['test_path'])
-        fit_x, fit_y, predict_x = train[features].copy(), target.copy(), test[features].copy()
-        del test
-    # Generated code receives no frame/Series backing storage containing validation labels.
-    del train, target
+    from agent.data_transport import worker_inputs
+    data_started = time.monotonic()
+    train_rows, fit_x, fit_y, predict_x = worker_inputs(job)
+    data_seconds = time.monotonic()-data_started
+    print('AUTOML_WORKER '+json.dumps({'stage': 'data_prepared', 'phase': job['phase'],
+        'format': 'numpy-columns-v1' if job.get('input_tables', {}).get('train') else 'csv',
+        'seconds': data_seconds, 'fit_rows': len(fit_x), 'prediction_rows': len(predict_x),
+        'features': len(fit_x.columns)}), flush=True)
     params = dict(job["hyperparameters"])
     params.update(_cpu_threads=job["cpu_threads"], _seed=job["seed"])
     module_name = "generated_" + job["job_id"].replace("-", "_")
@@ -126,7 +114,9 @@ def execute(job, trusted_thread=None):
     if guard:
         guard.active = True
     try:
-        return execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits)
+        result = execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits)
+        result['input_preparation_seconds'] = data_seconds
+        return result
     finally:
         if guard:
             guard.active = False
@@ -165,8 +155,9 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
                 raise ValueError("Model changed prediction row count")
             if guard:
                 guard.active = False
-            ids = pd.read_csv(job["test_path"], dtype=str, keep_default_na=False, encoding="utf-8")
-            frame = ids[task["output"]["id_columns"]].copy()
+            id_columns = task['output']['id_columns']
+            frame = (pd.read_csv(job['test_path'], usecols=id_columns, dtype=str, keep_default_na=False,
+                                 encoding='utf-8')[id_columns] if id_columns else pd.DataFrame(index=range(len(predict_x))))
             for index, column in enumerate(task['output']['prediction_columns']):
                 frame[column] = prediction[:, index]
             frame = frame[task["output"]["columns"]]

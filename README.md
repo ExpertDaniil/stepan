@@ -1,5 +1,10 @@
 # AutoML Agent · Adaptive Research
 
+Передача данных: [DATA-TRANSPORT.md](docs/DATA-TRANSPORT.md). Внутри запуска
+используется ограниченный неизменяемый кэш NumPy-столбцов: задания передают ссылки,
+worker выбирает нужные строки без повторного CSV parsing, анализ сохраняет потоковую
+выборку и fit-only границу. Проверки и воспроизводимый benchmark приведены в отчёте.
+
 Финальная ревизия: [FINAL-DATA-RESEARCH.md](docs/FINAL-DATA-RESEARCH.md).
 Сравнены все ветки команды; объединены adaptive feature research, потоковый анализ
 и исправление приёмки финальных pipeline. Dummy оставлен ранним аварийным ответом,

@@ -1,0 +1,187 @@
+{
+  "base_remote_commit": "a2588d4c55c32e928e6933673b82d1f7799bda66",
+  "branch": "feat/final-data-research",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.8.0",
+    "joblib": "1.5.3",
+    "official_pinned_environment": false
+  },
+  "benchmark": {
+    "rows": 100000,
+    "numeric_columns": 40,
+    "string_columns": 6,
+    "workers_per_batch": 2,
+    "repeats": 3,
+    "csv_bytes": 84447890,
+    "cache_bytes": 36012967,
+    "cache_build_seconds": 0.9348772700000154,
+    "identical_model_inputs": true,
+    "records": {
+      "csv": [
+        {
+          "seconds": 0.8377053260001048,
+          "peak_rss_mb": 198.1171875,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.789338854000107,
+          "peak_rss_mb": 198.16796875,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.8368891229997644,
+          "peak_rss_mb": 198.19140625,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.7562060520003797,
+          "peak_rss_mb": 198.1171875,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.764282378000189,
+          "peak_rss_mb": 198.125,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.7742513279999912,
+          "peak_rss_mb": 198.15625,
+          "csv_reads": 1,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        }
+      ],
+      "cache": [
+        {
+          "seconds": 0.14221633999977712,
+          "peak_rss_mb": 119.74609375,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.15058270800000173,
+          "peak_rss_mb": 120.08984375,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.1335014369997225,
+          "peak_rss_mb": 120.02734375,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.11822118700001738,
+          "peak_rss_mb": 119.99609375,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.1563544619998538,
+          "peak_rss_mb": 119.89453125,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        },
+        {
+          "seconds": 0.14968386500004272,
+          "peak_rss_mb": 119.88671875,
+          "csv_reads": 0,
+          "data_sha256": "2b8efaf3a63dedba5418c33f7d402762ecb78ffd2e996b8f7fd6f497dd9eac4f"
+        }
+      ]
+    },
+    "interpretation": "Synthetic transport benchmark with warm OS cache; excludes imports/training. Includes hashes, decoding and detached fit/validation arrays.",
+    "csv": {
+      "median_seconds": 0.7817950910000491,
+      "median_peak_rss_mb": 198.140625,
+      "total_csv_reads": 6
+    },
+    "cache": {
+      "median_seconds": 0.14595010249990992,
+      "median_peak_rss_mb": 119.9453125,
+      "total_csv_reads": 0
+    },
+    "median_speedup": 5.356591585816335
+  },
+  "focused": {
+    "command": "python3 -m unittest tests.test_data_transport tests.test_prediction_contracts tests.test_analysis_access tests.test_final_data_research -q",
+    "tests": 41,
+    "passed": 41,
+    "seconds": 1.761
+  },
+  "package": {
+    "flat_root_files": 67,
+    "bytes": 549416,
+    "sha256": "aa4085b4c498c31c41246f97a549a966210936dd09a0702854f6e88c61098fa8",
+    "all_runtime_modules_byte_identical": true,
+    "official_requirements_unchanged": true,
+    "isolated_execution_tests_passed": [
+      "tests.test_end_to_end.EndToEndTests.test_flat_platform_copy_runs_research_without_repository_path",
+      "tests.test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression"
+    ]
+  },
+  "limits": [
+    "Synthetic transport benchmark measures preparation only, not full-search acceleration or competition scores",
+    "LLM demonstration decisions scripted; actual training/evaluation/output executed",
+    "Official pinned container, native CatBoost and live API not verified",
+    "Optuna absent; no dependency installation, optimizer skips or optimizer substitutes"
+  ],
+  "demonstrations": [
+    {
+      "kind": "regression",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 3,
+      "evaluated_owned_feature_programs": 1,
+      "analyses": 1,
+      "unfinished_jobs": 0,
+      "scripted_llm": true
+    },
+    {
+      "kind": "classification",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 3,
+      "evaluated_owned_feature_programs": 1,
+      "analyses": 1,
+      "unfinished_jobs": 0,
+      "scripted_llm": true
+    }
+  ],
+  "full_suite": {
+    "command": "python3 scripts/check.py --jobs 3",
+    "tests": 354,
+    "passed": 342,
+    "unique_nonpassing": 12,
+    "framework_errors": 10,
+    "framework_failed_subtests": 3,
+    "seconds": 456.467,
+    "nonpassing_ids": [
+      "tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_expired_tuning_authorization_does_not_poison_catalogue_fallback",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tuning_rebase_preserves_axes_that_were_not_authorized",
+      "tests.test_adaptive_research.AdaptiveResearchTests.test_local_tuning_requires_authorization_and_respects_axes_count_and_time",
+      "tests.test_dialogue_progress.TuningProgressTests.test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning",
+      "tests.test_optuna_search.OptunaSearchTests.test_completed_trial_reaches_optuna_and_research_memory",
+      "tests.test_optuna_search.OptunaSearchTests.test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory",
+      "tests.test_optuna_search.OptunaSearchTests.test_declared_increase_region_is_sampled_jointly_and_anchor_is_unchanged",
+      "tests.test_optuna_search.OptunaSearchTests.test_expired_authorization_proposes_no_new_work",
+      "tests.test_optuna_search.OptunaSearchTests.test_optimizer_tell_failure_preserves_the_committed_evaluation",
+      "tests.test_optuna_search.OptunaSearchTests.test_pending_duplicate_does_not_release_another_trials_claim",
+      "tests.test_optuna_search.OptunaSearchTests.test_verified_history_warms_only_the_same_fixed_pipeline_and_resumes_study"
+    ],
+    "cause": "Optuna is absent: ten direct load errors and two dependent integration scenarios. No new failure relative to the previously recorded dependency limitation."
+  },
+  "new_transport_tests": {
+    "tests": 13,
+    "passed": 13,
+    "included_in_full_and_focused": true
+  }
+}

@@ -79,6 +79,10 @@ class AnalysisService:
         self.test_path = artifacts.resolve(spec['test_artifact_id'])
         self.train_columns = list(read_table(self.train_path, nrows=0).columns)
         self.test_columns = list(read_table(self.test_path, nrows=0).columns)
+        from agent.data_transport import transport
+        tables = transport(artifacts)
+        self.input_tables = {'fit': tables.existing(spec['train_artifact_id'], spec),
+                             'test': tables.existing(spec['test_artifact_id'])}
         self.records, self.cache, self.lock = [], {}, threading.RLock()
 
     def recent(self):
@@ -108,7 +112,11 @@ class AnalysisService:
         samples, priorities = [], np.empty(0)
         offset = population = total_rows = 0
         dtype = ({self.spec['target_column']: str} if role == 'fit' and self.spec.get('task_kind') not in {None, 'regression'} and self.spec['target_column'] in selected else None)
-        with read_table(path, usecols=selected, chunksize=4096, dtype=dtype) as reader:
+        from agent.data_transport import cached_chunks
+        reference = self.input_tables[role]
+        source = (cached_chunks(reference, selected) if reference else
+                  read_table(path, usecols=selected, chunksize=4096, dtype=dtype))
+        with source as reader:
             for chunk in reader:
                 self._check_time(started)
                 total_rows += len(chunk)

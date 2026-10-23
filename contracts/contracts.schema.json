@@ -14049,7 +14049,7 @@
             "minLength": 1
           },
           "maxItems": 12,
-          "description": "Input features only; never include the target. [] chooses bounded defaults, or an empty schema/report request."
+          "description": "Existing non-target input columns, including identifiers for diagnosis. [] chooses bounded model-feature defaults, or an empty schema/report request."
         },
         "group_by": {
           "anyOf": [

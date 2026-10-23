@@ -15,7 +15,7 @@ ANALYSIS_SCHEMA = {
         "kind": {"enum": ["summary", "association", "group", "compare", "dictionary", "report", "schema"]},
         "report_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
         "columns": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 12,
-                    "description": "Input features only; never include the target. [] chooses bounded defaults, or an empty schema/report request."},
+                    "description": "Existing non-target input columns, including identifiers for diagnosis. [] chooses bounded model-feature defaults, or an empty schema/report request."},
         "group_by": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
                      "description": "For kind=group, a selected input feature from columns. Otherwise null."},
         "include_target": {"type": "boolean", "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report/schema."},
@@ -153,7 +153,7 @@ class AnalysisService:
         condition = query.get('filter')
         if condition is not None:
             if (condition['column'] not in self.train_columns
-                    or condition['column'] in set(self.spec['excluded_features']) | {self.spec['target_column']}):
+                    or condition['column'] == self.spec['target_column']):
                 raise AgentError('INVALID_ANALYSIS', 'Filter an input column, never the target')
         if query['kind'] == 'report':
             if query['columns'] or query['include_target'] or query['group_by'] is not None or condition:
@@ -186,9 +186,9 @@ class AnalysisService:
         requested = list(dict.fromkeys(query['columns']))
         if not requested:
             requested = [c for c in self.train_columns if c not in excluded][:8]
-        if any(c not in self.train_columns or c in excluded for c in requested):
-            raise AgentError("INVALID_ANALYSIS", "columns must contain existing input features only. Remove the target/excluded columns; use include_target=true for fit-only target summaries.",
-                             details={'invalid_columns': [c for c in requested if c not in self.train_columns or c in excluded],
+        if any(c not in self.train_columns or c == target for c in requested):
+            raise AgentError("INVALID_ANALYSIS", "columns must contain existing non-target input columns. Remove the target; use include_target=true for fit-only target summaries.",
+                             details={'invalid_columns': [c for c in requested if c not in self.train_columns or c == target],
                                       'target_column': target})
         columns = requested + ([target] if query['include_target'] else [])
         # Deterministic, bounded computation; row-level labels never leave this service.
@@ -207,6 +207,10 @@ class AnalysisService:
         result = {"scope": "fit_only", "validation_id": self.validation_id,
                   "fit_rows": self.fit_rows, "matched_fit_rows": population,
                   "analyzed_rows": len(data), "sampled": population > len(data), "query": query}
+        # Excluding an ID from model inputs is not a ban on diagnosing its groups.
+        # Analysis access never changes what the worker may train on.
+        diagnostic = requested + ([condition['column']] if condition else [])
+        result['diagnostic_only_columns'] = sorted(set(diagnostic).intersection(self.spec['excluded_features']))
         if query['kind'] == 'dictionary':
             result.update(scope='dictionary_only', dictionary=[])
             if self.spec.get('dictionary_artifact_id'):

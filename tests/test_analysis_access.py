@@ -64,6 +64,19 @@ class AnalysisAccessTests(unittest.TestCase):
         self.assertEqual(result['analyzed_rows'], 20000)
         self.assertTrue(result['sampled'])
 
+    def test_excluded_training_identifier_remains_available_for_fit_diagnosis(self):
+        service = self.service()
+        service.spec['excluded_features'] = ['group']
+        report = service.analyze(query('group', columns=['group', 'x'], group_by='group',
+            include_target=True, filter={'column': 'group', 'value': 'rare'}))['report']
+        self.assertEqual(report['diagnostic_only_columns'], ['group'])
+        self.assertEqual(report['matched_fit_rows'], 1)
+        self.assertEqual(report['groups'][0]['target']['quantiles']['1.0'], 7)
+        self.assertEqual(service.spec['excluded_features'], ['group'])
+        held_out = service.analyze(query(columns=['group'],
+            filter={'column': 'group', 'value': 'holdout-only'}))['report']
+        self.assertEqual(held_out['matched_fit_rows'], 0)
+
     def test_schema_pages_discover_columns_beyond_initial_preview(self):
         train = pd.DataFrame({**{'f'+str(i): [i]*3 for i in range(140)}, 'target': [1, 2, 3]})
         service = self.service(train, train.drop(columns='target'))

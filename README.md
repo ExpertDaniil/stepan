@@ -204,7 +204,7 @@ python scripts/show_run.py runs/ИМЯ_ЗАПУСКА --experiment exp-ID
 | `LLM_MAX_OUTPUT_TOKENS_LIMIT` | 32768 | Верхняя клиентская граница повышения при обрыве |
 | `LLM_MAX_TOTAL_OUTPUT_TOKENS` | 262144 | Резервируемая квота выходных токенов на запуск |
 | `LLM_PROGRESS_SECONDS` | 15 | Интервал сообщений ожидания API |
-| `CONSOLE_LOG_FORMAT` | human | Подробный терминал; json выводит полные JSONL-события |
+| `CONSOLE_LOG_FORMAT` | concise | Краткие сообщения; human — подробный терминал, json — полные JSONL-события |
 | `MAX_CONTEXT_TOKENS` | 16000 | Консервативный byte-based предел контекста, не точный tokenizer |
 | `LOG_MODEL_IO` | 1 | Сохранение raw API snapshots; структурированные планы и события сохраняются всегда |
 | `GRAPH_REFINEMENT_ENABLED` | 1 | Завершать поиск доводкой измеренного лучшего решения |

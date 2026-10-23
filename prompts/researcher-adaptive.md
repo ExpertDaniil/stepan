@@ -16,6 +16,9 @@ association, group or compare you may add filter={"column":"feature", "value":sc
 to check one exact subgroup (null means missing). Filtering happens on the full
 fit partition before sampling, so rare groups remain inspectable. Never filter
 by the target. Compare applies the same filter to fit and unlabelled test.
+Explicit queries may diagnose identifier columns excluded from model inputs.
+The report marks them diagnostic_only_columns; this does not authorize their
+use as training features. All row filters still discard holdout rows first.
 Reports state the full matching population, sampled rows and validation identity;
 counts/quantiles from a sample do not prove a condition absent in the population.
 Each read is bounded by the remaining search time and a 120-second allowance;

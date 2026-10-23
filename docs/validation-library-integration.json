@@ -1,0 +1,99 @@
+{
+  "verification_version": "library-integration-1",
+  "verified_at_utc": "2026-10-23T20:22:25.073336+00:00",
+  "runtime_commit": "f89b45f38db6d4be5aba78d3433553ad65845e49",
+  "team_commit": "75087993062e30ea7ce48242bd428c0d35b323f5",
+  "environment": {
+    "os": "Ubuntu 24.04 under WSL",
+    "python": "3.12.3",
+    "packages": {
+      "numpy": "1.26.4",
+      "scipy": "1.12.0",
+      "pandas": "2.2.3",
+      "scikit-learn": "1.5.2",
+      "catboost": "1.2.8",
+      "lightgbm": "4.6.0",
+      "xgboost": "2.1.4",
+      "optuna": "4.2.1",
+      "jsonschema": "4.23.0",
+      "joblib": "1.4.2",
+      "threadpoolctl": "3.6.0",
+      "psutil": "6.1.1"
+    }
+  },
+  "full_suite": {
+    "command": "python scripts/check.py --jobs 3",
+    "tests": 364,
+    "seconds": 480.746,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "focused_checks": {
+    "libraries_and_data_transport": 21,
+    "lifecycle_contracts_and_libraries": 14,
+    "included_in_full_suite": true
+  },
+  "source_identity": {
+    "runtime_resources": 84,
+    "tested_copy_matches_worktree": true,
+    "git_content_matches": true,
+    "git_text_line_endings_normalized": true
+  },
+  "demonstrations": {
+    "guide": {
+      "state": "completed",
+      "rows": 90,
+      "evaluated_families": [
+        "catboost",
+        "custom",
+        "dummy",
+        "extra_trees",
+        "hist_gradient",
+        "lightgbm",
+        "linear",
+        "random_forest",
+        "xgboost"
+      ],
+      "evaluated_experiments": 43,
+      "pending_experiments": 0,
+      "api": "explicit mock, no network"
+    },
+    "platform": {
+      "state": "completed",
+      "rows": 24,
+      "evaluated_families": [
+        "catboost",
+        "dummy",
+        "hist_gradient",
+        "lightgbm",
+        "linear",
+        "random_forest"
+      ],
+      "evaluated_experiments": 19,
+      "pending_experiments": 0,
+      "api": "explicit mock, no network"
+    },
+    "package": {
+      "root_files": 67,
+      "size_bytes": 550462,
+      "sha256": "6cc5b7c29b097a3311e33121ec7a1f7dbc6828d9665381dc7eccc5b1b77b0ea3",
+      "official_requirements_identical": true,
+      "owned_python_modules_identical": true
+    }
+  },
+  "documentation": {
+    "guide_diagrams": 14,
+    "review_diagrams": 1,
+    "rendered": 15,
+    "renderer": "Mermaid 11.12.2",
+    "missing_relative_links": 0,
+    "selected_images_visually_inspected": true
+  },
+  "limits": [
+    "Synthetic tasks and explicit local mock API only; live provider and competition score not tested.",
+    "Full organizers package stack not installed; listed core packages match approved pins.",
+    "XGBoost tested on CPU without NVIDIA NCCL; GPU behavior not tested.",
+    "No new original Kaggle notebooks or separate graph/console redesign delivered in this pass."
+  ]
+}

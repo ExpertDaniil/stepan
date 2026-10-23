@@ -50,6 +50,26 @@
     "schema": "ResearchAction"
   },
   {
+    "contract_id": "C04",
+    "file": "examples/C04/response-probabilities.json",
+    "schema": "C04_Response"
+  },
+  {
+    "contract_id": "C04",
+    "file": "examples/C04/response-multi-target.json",
+    "schema": "C04_Response"
+  },
+  {
+    "contract_id": "C02",
+    "file": "examples/C02/unsupported-response.json",
+    "schema": "C02_Response"
+  },
+  {
+    "contract_id": "C21",
+    "file": "examples/C21/confirmed-request.json",
+    "schema": "C21_Request"
+  },
+  {
     "contract_id": "C09",
     "file": "examples/C09/platform-request.json",
     "schema": "C09_Request"

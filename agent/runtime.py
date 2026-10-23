@@ -75,7 +75,7 @@ def bootstrap(config, started, task_path, run_id, root, log):
                                lambda p: {"task_spec": resolve_spec(bus.responses[p["interpretation_request_id"]]["data"]["draft"], profile,
                                                                    task["task_root"], artifacts, bus.schemas),
                                           "adapter_id": interpretation["data"]["draft"]["task_kind"] + "-v1",
-                                          "metric_implementation_id": "sklearn-metrics-v1"})["data"]
+                                          "metric_implementation_id": "sklearn-metrics-v2"})["data"]
         spec = spec_result["task_spec"]
         catalog = Catalog(spec["task_kind"], config)
         bus.call("C06", {"task_spec_id": spec["task_spec_id"], "adapter_id": spec_result["adapter_id"], "cpu_only": True},

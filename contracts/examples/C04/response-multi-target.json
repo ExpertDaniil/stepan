@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c04",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "task_spec": {
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "task_kind": "regression",
+      "target_column": "y_first",
+      "train_artifact_id": "art-train",
+      "test_artifact_id": "art-test",
+      "dictionary_artifact_id": "art-dictionary",
+      "sample_submission_artifact_id": "art-sample",
+      "metric": {
+        "metric_id": "rmse",
+        "direction": "minimize",
+        "prediction_kind": "values",
+        "parameters": {}
+      },
+      "allowed_labels": [],
+      "output": {
+        "path": "/task/submission.csv",
+        "columns": [
+          "id",
+          "first",
+          "second"
+        ],
+        "id_columns": [
+          "id"
+        ],
+        "prediction_columns": [
+          "first",
+          "second"
+        ],
+        "row_order": "test",
+        "encoding": "utf-8",
+        "separator": ",",
+        "write_index": false,
+        "prediction_kind": "values"
+      },
+      "excluded_features": [
+        "id",
+        "y_second"
+      ],
+      "target_columns": [
+        "y_first",
+        "y_second"
+      ]
+    },
+    "adapter_id": "regression-v1",
+    "metric_implementation_id": "sklearn-metrics-v2"
+  },
+  "error": null
+}

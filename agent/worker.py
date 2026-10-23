@@ -81,11 +81,20 @@ def execute(job):
     from threadpoolctl import threadpool_limits
     from agent.ml import enforce_threads, validate_estimator
     from tools.data import read_table
+    from agent.predictions import read_training, targets
+    if job.get('code_sha256'):
+        from agent.artifacts import file_sha256
+        if file_sha256(job['code_path']) != job['code_sha256']:
+            raise ValueError('Pipeline code changed between job admission and worker execution')
     task = job["task_spec"]
-    train = read_table(job["train_path"])
-    features = [c for c in train if c not in task["excluded_features"] and c != task["target_column"]]
-    target = train[task["target_column"]]
-    target = pd.to_numeric(target, errors="raise") if task["task_kind"] == "regression" else target.astype(str)
+    train = read_training(job["train_path"], task)
+    target_columns = targets(task)
+    features = [c for c in train if c not in task["excluded_features"] and c not in target_columns]
+    target = train[target_columns] if len(target_columns) > 1 else train[target_columns[0]]
+    if task['task_kind'] == 'regression':
+        target = target.apply(pd.to_numeric, errors='raise') if len(target_columns) > 1 else pd.to_numeric(target, errors='raise')
+    else:
+        target = target.astype(str)
     train_rows = len(train)
     if job['phase'] == 'train':
         fit_indices = json.loads(Path(job['train_indices_path']).read_text(encoding='utf-8'))
@@ -129,9 +138,13 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     import pandas as pd
     from threadpoolctl import threadpool_limits
     from agent.ml import enforce_threads, validate_estimator
+    from agent.predictions import predict, targets, validation_columns
     module_spec.loader.exec_module(module)
     print("AUTOML_WORKER "+json.dumps({"stage": "constructing", "phase": job["phase"], "rows": train_rows, "features": len(fit_x.columns)}),flush=True)
     model = validate_estimator(enforce_threads(module.make_pipeline(task, params), job["cpu_threads"]))
+    if len(targets(task)) > 1:
+        from agent.ml import SequentialTargets
+        model = SequentialTargets(model)
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
     started = time.monotonic()
@@ -141,19 +154,21 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             valid_indices = predict_x.index.tolist()
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
-            prediction = np.asarray(model.predict(predict_x)).reshape(-1)
-            frame = pd.DataFrame({"__row_index": valid_indices, "prediction": prediction})
+            prediction = predict(model, predict_x, task, 'train')
+            frame = pd.DataFrame(prediction, columns=validation_columns(task))
+            frame.insert(0, '__row_index', valid_indices)
         else:
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
-            prediction = np.asarray(model.predict(predict_x)).reshape(-1)
+            prediction = predict(model, predict_x, task, 'refit')
             if len(prediction) != len(predict_x):
                 raise ValueError("Model changed prediction row count")
             if guard:
                 guard.active = False
             ids = pd.read_csv(job["test_path"], dtype=str, keep_default_na=False, encoding="utf-8")
             frame = ids[task["output"]["id_columns"]].copy()
-            frame[task["output"]["prediction_columns"][0]] = prediction
+            for index, column in enumerate(task['output']['prediction_columns']):
+                frame[column] = prediction[:, index]
             frame = frame[task["output"]["columns"]]
     if guard:
         guard.active = False

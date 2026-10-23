@@ -5,6 +5,28 @@ import uuid
 from agent.contracts import canonical
 from agent.errors import AgentError
 from tools.data import read_table
+from agent.predictions import checked_matrix, read_training, targets, validation_columns
+
+
+def score_predictions(spec, truth, prediction):
+    import numpy as np
+    from sklearn.metrics import (accuracy_score, f1_score, log_loss, mean_absolute_error,
+                                 mean_squared_error, r2_score, roc_auc_score)
+    key = spec['metric']['metric_id']
+    if spec['task_kind'] == 'regression':
+        y = np.asarray(truth, dtype=float)
+        p = prediction.reshape(-1) if y.ndim == 1 else prediction
+        return {'rmse': lambda: math.sqrt(mean_squared_error(y, p)),
+                'mae': lambda: mean_absolute_error(y, p), 'r2': lambda: r2_score(y, p)}[key]()
+    y = np.asarray(truth, dtype=str)
+    if spec['metric']['prediction_kind'] == 'probabilities':
+        if key == 'log_loss':
+            return log_loss(y, prediction, labels=spec['allowed_labels'])
+        positive = spec['metric']['parameters']['positive_label']
+        return roc_auc_score(y == positive, prediction[:, spec['allowed_labels'].index(positive)])
+    p = prediction.reshape(-1).astype(str)
+    return (accuracy_score(y, p) if key == 'accuracy' else f1_score(y, p,
+        average='macro' if key == 'f1_macro' else 'weighted', labels=spec['allowed_labels'], zero_division=0))
 
 
 def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction):
@@ -69,7 +91,7 @@ class Evaluator:
         import numpy as np
         import pandas as pd
         from sklearn.model_selection import train_test_split, GroupShuffleSplit
-        frame = read_table(self.artifacts.resolve(self.spec["train_artifact_id"]))
+        frame = read_training(self.artifacts.resolve(self.spec["train_artifact_id"]), self.spec)
         proposal = payload["proposal"]
         params = proposal["parameters"]
         fraction = params.get("valid_fraction", 0.2)
@@ -87,12 +109,12 @@ class Evaluator:
                 a, b = train_test_split(indices, test_size=fraction, random_state=proposal["seed"])
             elif strategy == "group_holdout":
                 column = params.get("column")
-                if column not in frame or column == self.spec["target_column"]:
+                if column not in frame or column in targets(self.spec):
                     raise AgentError("INVALID_SPLIT", "Invalid group column")
                 a, b = next(GroupShuffleSplit(n_splits=1, test_size=fraction, random_state=proposal["seed"]).split(frame, groups=frame[column].fillna("__MISSING__").astype(str)))
             elif strategy == "temporal_holdout":
                 column = params.get("column")
-                if column not in frame or column == self.spec["target_column"] or frame[column].isna().any():
+                if column not in frame or column in targets(self.spec) or frame[column].isna().any():
                     raise AgentError("INVALID_SPLIT", "Temporal column must be present and complete")
                 # Whole periods stay together. Never split a timestamp boundary.
                 ordered = frame[column]
@@ -115,8 +137,14 @@ class Evaluator:
         a, b = sorted(map(int, a)), sorted(map(int, b))
         if not a or not b or set(a) & set(b) or len(a) + len(b) != len(frame):
             raise AgentError("INVALID_SPLIT", "Invalid row partition")
+        from agent.confirmation import partition
+        selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
         protocol = {"dataset_id": payload["dataset_id"], "metric": self.spec["metric"], "proposal": proposal,
-                    "train_indices": a, "valid_indices": b, "evaluator_version": "sklearn-metrics-v1"}
+                    "train_indices": a, "valid_indices": b, "evaluator_version": "sklearn-metrics-v2",
+                    'selection_indices': selection, 'confirmation_indices': confirmation,
+                    'confirmation_unavailable_reason': confirmation_reason,
+                    'prediction_contract': {'target_columns': targets(self.spec), 'allowed_labels': self.spec['allowed_labels'],
+                                            'prediction_kind': self.spec['metric']['prediction_kind']}}
         sha = hashlib.sha256(canonical(protocol).encode()).hexdigest()
         ident = "validation-" + sha[:16]
         train_art = self.artifacts.write_json(f"validation/{ident}.train.json", a, "split_train")
@@ -126,6 +154,9 @@ class Evaluator:
         self.log.event("validation.created", validation_id=ident, strategy=strategy, parameters=params,
                        metric_id=self.spec["metric"]["metric_id"], direction=self.spec["metric"]["direction"],
                        train_rows=len(a), validation_rows=len(b), protocol_sha256=sha, reason=proposal["reason"])
+        self.log.event('validation.confirmation_reserved', validation_id=ident, selection_rows=len(selection),
+                       confirmation_rows=len(confirmation), unavailable_reason=confirmation_reason,
+                       labels_visibility='evaluator_only_until_final_research_barrier')
         return {"validation_id": ident, "train_rows_artifact_id": train_art["artifact_id"],
                 "valid_rows_artifact_id": valid_art["artifact_id"], "labels_visibility": "evaluator_only",
                 "metric": self.spec["metric"], "protocol_sha256": sha}
@@ -133,33 +164,35 @@ class Evaluator:
     def evaluate(self, payload):
         import numpy as np
         import pandas as pd
-        from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, f1_score, accuracy_score
-        if payload["validation_id"] not in self.protocols or payload["dataset_id"] != self.spec["dataset_id"]:
+        from sklearn.metrics import mean_absolute_error
+        if (payload['task_spec_id'] != self.spec['task_spec_id'] or payload["validation_id"] not in self.protocols
+                or payload["dataset_id"] != self.spec["dataset_id"]):
             raise AgentError("STALE_VALIDATION", "Unknown evaluation protocol")
         protocol = self.protocols[payload["validation_id"]]
         path = self.artifacts.resolve(payload["predictions_artifact_id"])
-        frame = pd.read_csv(path, dtype={"prediction": str} if self.spec["task_kind"] != "regression" else None, keep_default_na=False)
-        if list(frame.columns) != ["__row_index", "prediction"] or frame["__row_index"].tolist() != protocol["valid_indices"]:
+        columns = validation_columns(self.spec)
+        kind = self.spec['metric']['prediction_kind']
+        frame = pd.read_csv(path, dtype={c: str for c in columns} if kind == 'labels' else None, keep_default_na=False)
+        if list(frame.columns) != ["__row_index", *columns] or frame["__row_index"].tolist() != protocol["valid_indices"]:
             raise AgentError("INVALID_PREDICTIONS", "Validation row order or columns do not match")
-        data = read_table(self.artifacts.resolve(self.spec["train_artifact_id"]))
-        y = data[self.spec["target_column"]].iloc[protocol["valid_indices"]]
-        prediction = frame["prediction"]
+        data = read_training(self.artifacts.resolve(self.spec["train_artifact_id"]), self.spec)
+        target_columns = targets(self.spec)
+        selection = protocol.get('selection_indices', protocol['valid_indices'])
+        y = data[target_columns if len(target_columns) > 1 else target_columns[0]].iloc[selection]
+        checked_matrix(frame[columns].to_numpy(), len(frame), len(columns), kind, labels=self.spec['allowed_labels'])
+        prediction = checked_matrix(frame.set_index('__row_index').loc[selection, columns].to_numpy(),
+                                    len(selection), len(columns), kind, labels=self.spec['allowed_labels'])
         key = self.spec["metric"]["metric_id"]
-        if self.spec["task_kind"] == "regression":
-            try:
-                prediction = pd.to_numeric(prediction, errors="raise").to_numpy(dtype=float)
-            except Exception as exc:
-                raise AgentError("INVALID_PREDICTIONS", "Non-numeric regression predictions") from exc
-            if not np.isfinite(prediction).all():
-                raise AgentError("INVALID_PREDICTIONS", "Non-finite predictions")
-            value = {"rmse": lambda: math.sqrt(mean_squared_error(y, prediction)),
-                     "mae": lambda: mean_absolute_error(y, prediction), "r2": lambda: r2_score(y, prediction)}[key]()
-        else:
-            prediction = prediction.astype(str)
-            if not set(prediction).issubset(self.spec["allowed_labels"]):
-                raise AgentError("INVALID_PREDICTIONS", "Unknown predicted label")
+        try:
+            value = score_predictions(self.spec, y, prediction)
+        except (ValueError, TypeError) as error:
+            raise AgentError('METRIC_FAILED', str(error)) from error
+        if self.spec['task_kind'] == 'regression' and len(target_columns) == 1:
+            prediction = prediction.reshape(-1)
+        elif self.spec['task_kind'] != 'regression':
             y = y.astype(str)
-            value = accuracy_score(y, prediction) if key == "accuracy" else f1_score(y, prediction, average="macro" if key == "f1_macro" else "weighted", labels=self.spec["allowed_labels"], zero_division=0)
+            prediction = (np.asarray(self.spec['allowed_labels'])[prediction.argmax(axis=1)]
+                          if kind == 'probabilities' else prediction.reshape(-1))
         if not math.isfinite(float(value)):
             raise AgentError("METRIC_FAILED", "Metric is not finite")
         experiment = self.store.get(payload["experiment_id"])
@@ -167,7 +200,7 @@ class Evaluator:
             self.baseline_value = float(value)
         direction = self.spec["metric"]["direction"]
         improvement = ((self.baseline_value-float(value)) if direction == "minimize" else (float(value)-self.baseline_value)) if self.baseline_value is not None else None
-        diagnostics = {"rows": len(frame), "metric_id": key, "direction": direction, "score": float(value),
+        diagnostics = {"rows": len(selection), 'prediction_rows': len(frame), "metric_id": key, "direction": direction, "score": float(value),
                        "baseline_score": self.baseline_value, "improvement_over_baseline": improvement,
                        "improvement_percent": 100*improvement/abs(self.baseline_value) if self.baseline_value and improvement is not None else None}
         if self.spec["task_kind"] == "regression":
@@ -175,7 +208,7 @@ class Evaluator:
             diagnostics.update(mae=float(mean_absolute_error(y, prediction)), target_mean=float(np.mean(y)),
                                target_std=float(np.std(y)), absolute_error_p50=float(np.quantile(errors, 0.5)),
                                absolute_error_p90=float(np.quantile(errors, 0.9)))
-        diagnostics.update(error_diagnostics(data, self.spec, protocol["train_indices"], protocol["valid_indices"], y, prediction))
+        diagnostics.update(error_diagnostics(data, self.spec, protocol["train_indices"], selection, y, prediction))
         diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json", diagnostics, "diagnostics")
         record = {"evaluation_id": "eval-" + uuid.uuid4().hex[:12], "experiment_id": payload["experiment_id"], "valid": True,
                   "primary_metric": {"metric_id": key, "direction": self.spec["metric"]["direction"], "value": float(value),

@@ -514,6 +514,7 @@ def search(controller):
 def finish(controller, stop_reason, accepted):
     graph = controller.graph
     controller.set_fallback()
+    controller.confirm_finalists()
     controller.finalize_best()
     controller.log.event("search.finished", stop_reason=stop_reason, phase='refine' if graph.refinement() else 'search', attempted_experiments=accepted,
                          fallback_seconds=controller.fallback_seconds, budget=controller.budget.snapshot(), token_budget=controller.budget.token_snapshot())

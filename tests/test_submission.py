@@ -51,6 +51,18 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(result["disposition"], "skipped_not_better")
         self.assertEqual(result["champion"], first["champion"])
 
+    def test_only_current_final_confirmation_can_replace_a_primary_winner(self):
+        first = self.submission.publish(self.payload(self.h.evaluation(.8), 'A'))
+        candidate = self.payload(self.h.evaluation(.6), 'B')
+        record = {'chosen_experiment_id': candidate['experiment_id'],
+            'expected_champion_version': first['champion']['champion_version'],
+            'prior_champion_experiment_id': first['champion']['experiment_id']}
+        art = self.h.artifacts.write_json('validation/final-test.json', record, 'final_confirmation')
+        self.submission.final_confirmation = {**record, 'artifact_id': art['artifact_id']}
+        candidate['confirmation_report_id'] = art['artifact_id']
+        self.assertEqual(self.submission.publish(candidate)['disposition'], 'published')
+        self.assertTrue(self.submission.final_confirmation['consumed'])
+
     def test_better_candidate_with_identical_test_predictions_updates_metadata(self):
         first = self.submission.publish(self.payload(self.h.evaluation(0.5), "A"))
         second = self.submission.publish(self.payload(self.h.evaluation(0.8), "A"))

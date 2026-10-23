@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
+import hashlib
 import os
 import signal
 import subprocess
@@ -13,6 +14,34 @@ import uuid
 from agent.config import ROOT
 from agent.errors import AgentError
 from agent.contracts import canonical
+from agent.artifacts import file_sha256
+
+
+def frozen_execution(artifacts, experiment, task_spec, phase):
+    """Reject source/spec/runtime drift before fitting or publishing an evaluated plan."""
+    from agent.store import Store
+    code_id = experiment['plan']['code_artifact_id']
+    actual_code_hash = file_sha256(artifacts.resolve(code_id))
+    if actual_code_hash != artifacts.meta(code_id)['sha256']:
+        raise AgentError('CANDIDATE_CHANGED', 'Pipeline source bytes changed after registration')
+    core = Store.fingerprint_core(experiment['plan'], actual_code_hash)
+    if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
+        raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
+    runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py']
+    value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
+             'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
+    path = artifacts.safe_path('experiments/'+experiment['experiment_id']+'/execution.json')
+    if path.exists():
+        if file_sha256(path) != artifacts.meta('execution-'+experiment['experiment_id'])['sha256']:
+            raise AgentError('CANDIDATE_CHANGED', 'Frozen execution snapshot bytes changed')
+        if json.loads(path.read_text(encoding='utf-8')) != value:
+            raise AgentError('CANDIDATE_CHANGED', 'Refit must reproduce the frozen evaluated source/spec/runtime')
+    elif phase == 'refit':
+        raise AgentError('MISSING_EXECUTION_SNAPSHOT', 'No trusted training execution snapshot for this candidate')
+    else:
+        artifacts.write_json(path.relative_to(artifacts.root).as_posix(), value, 'execution_snapshot',
+                             ident='execution-'+experiment['experiment_id'])
+    return value
 
 
 def _linux_group_members(pgid):
@@ -156,6 +185,7 @@ class Runner:
         held = self.budget.leases.get(lease["lease_id"])
         if not held or held["lease"]["fencing_token"] != lease["fencing_token"]:
             raise AgentError("STALE_LEASE", "Cannot start without a live lease")
+        frozen = frozen_execution(self.artifacts, experiment, task_spec, phase)
         ident = "job-" + uuid.uuid4().hex[:12]
         directory = self.artifacts.safe_path("experiments/" + experiment["experiment_id"] + "/" + ident)
         directory.mkdir(parents=True, exist_ok=False)
@@ -166,6 +196,7 @@ class Runner:
                     "train_path": str(self.artifacts.resolve(task_spec["train_artifact_id"])),
                     "test_path": str(self.artifacts.resolve(task_spec["test_artifact_id"])),
                     "code_path": str(self.artifacts.resolve(experiment["plan"]["code_artifact_id"])),
+                    'code_sha256': frozen['code_sha256'],
                     "hyperparameters": experiment["plan"]["model"]["hyperparameters"],
                     "seed": experiment["plan"]["seed"], "cpu_threads": lease["cpu_threads"],
                     "memory_limit_mb": lease["memory_limit_mb"], "timeout_seconds": lease["timeout_seconds"],

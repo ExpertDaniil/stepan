@@ -14,12 +14,14 @@ class DurationModel:
         self.config = config
         self.rows = {"train": 1, "refit": 1}
         self.features = 1
+        self.target_count = 1
         self.defaults = {}
         self.samples = defaultdict(lambda: deque(maxlen=32))
 
-    def configure(self, profile, validation_rows, recipes):
+    def configure(self, profile, validation_rows, recipes, target_count=1):
         self.rows = {"train": max(1, validation_rows), "refit": max(1, profile["train_rows"])}
         self.features = max(1, len(profile.get("test_columns", [])))
+        self.target_count = max(1, target_count)
         self.defaults = {key: {name: domain["default"] for name, domain in recipe["parameters"].items()}
                          for key, recipe in recipes.items()}
 
@@ -50,7 +52,7 @@ class DurationModel:
         else:
             size = 1
         threads = max(1, plan.get("resources", {}).get("cpu_threads", 1))
-        return max(1e-12, rows * features * size / math.sqrt(threads))
+        return max(1e-12, rows * features * size * self.target_count / math.sqrt(threads))
 
     def observe(self, plan, phase, seconds, *, fit_seconds=None, state="succeeded"):
         if not math.isfinite(seconds) or seconds < 0:
@@ -84,7 +86,7 @@ class DurationModel:
             default["model"]["hyperparameters"] = self.defaults.get(plan["recipe_id"], plan["model"]["hyperparameters"])
             # Imports and process startup remain even for a very small model.
             measured_startup = max((s['overhead'] for s in self.samples['dummy'] if not s['censored']), default=0)
-            seconds = max(2, measured_startup*1.35) + cold * max(.15, work / self.work(default, "train"))
+            seconds = max(2, measured_startup*1.35) + cold * self.target_count * max(.15, work / self.work(default, "train"))
         # A timeout is a lower bound on cost, never a fast successful measurement.
         for sample in samples:
             if sample["censored"]:

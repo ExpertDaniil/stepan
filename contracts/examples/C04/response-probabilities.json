@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "request_id": "req-c04",
+  "run_id": "run-demo-001",
+  "ok": true,
+  "data": {
+    "task_spec": {
+      "task_spec_id": "task-v1",
+      "dataset_id": "dataset-demo-v1",
+      "task_kind": "multiclass_classification",
+      "target_column": "category",
+      "train_artifact_id": "art-train",
+      "test_artifact_id": "art-test",
+      "dictionary_artifact_id": "art-dictionary",
+      "sample_submission_artifact_id": "art-sample",
+      "metric": {
+        "metric_id": "log_loss",
+        "direction": "minimize",
+        "prediction_kind": "probabilities",
+        "parameters": {}
+      },
+      "allowed_labels": [
+        "a",
+        "b",
+        "c"
+      ],
+      "output": {
+        "path": "/task/submission.csv",
+        "columns": [
+          "p_c",
+          "id",
+          "p_a",
+          "p_b"
+        ],
+        "id_columns": [
+          "id"
+        ],
+        "prediction_columns": [
+          "p_c",
+          "p_a",
+          "p_b"
+        ],
+        "row_order": "test",
+        "encoding": "utf-8",
+        "separator": ",",
+        "write_index": false,
+        "prediction_kind": "probabilities",
+        "class_labels": [
+          "c",
+          "a",
+          "b"
+        ]
+      },
+      "excluded_features": [
+        "id"
+      ],
+      "target_columns": [
+        "category"
+      ]
+    },
+    "adapter_id": "multiclass_classification-v1",
+    "metric_implementation_id": "sklearn-metrics-v2"
+  },
+  "error": null
+}

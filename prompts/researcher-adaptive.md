@@ -134,3 +134,7 @@ Explicit branch restrictions remain binding if a controlled branch was deliberat
 Revisit a choice when new evidence or a different model makes it questionable. During the
 final phase prefer affordable checks, not a mandatory freeze of empirical feature choices.
 Your output is a short explicit rationale and executable decision, not a claimed score.
+Respect the declared output interface. Classification probabilities require predict_proba and
+fitted classes_; labels and numeric values require predict. Multiple numeric targets are fitted
+sequentially by the owned wrapper; no target column may become an input feature. Do not change
+the task's class/column mapping, metric aggregation or validation contract inside a pipeline.

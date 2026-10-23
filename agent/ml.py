@@ -38,6 +38,32 @@ class CatBoostFrameModel(BaseEstimator):
     def predict(self, X):
         return np.asarray(self.model_.predict(sanitize_frame(X))).reshape(-1)
 
+    def predict_proba(self, X):
+        if self.regression:
+            raise TypeError('Regression does not produce class probabilities')
+        return self.model_.predict_proba(sanitize_frame(X))
+
+
+class SequentialTargets(BaseEstimator):
+    """Independent targets with one active estimator fit at a time per lease."""
+    def __init__(self, estimator):
+        self.estimator = estimator
+
+    def fit(self, X, y):
+        from copy import deepcopy
+        values = np.asarray(y, dtype=float)
+        if values.ndim != 2 or values.shape[1] < 2:
+            raise ValueError('SequentialTargets requires multiple numeric targets')
+        self.models_ = []
+        for index in range(values.shape[1]):
+            model = deepcopy(self.estimator)
+            model.fit(X, values[:, index])
+            self.models_.append(model)
+        return self
+
+    def predict(self, X):
+        return np.column_stack([np.asarray(model.predict(X)).reshape(-1) for model in self.models_])
+
 
 class ShiftedLogTargetModel(BaseEstimator):
     """Target transform fitted only on fit rows; predictions return original units."""

@@ -7,6 +7,7 @@ from copy import deepcopy
 from agent.contracts import canonical
 from agent.errors import AgentError
 from tools.data import read_table
+from agent.predictions import read_training, targets
 
 
 ANALYSIS_SCHEMA = {
@@ -60,11 +61,11 @@ class AnalysisService:
         self.validation_id = validation["validation_id"]
         # Trusted loader discards validation rows before exposing a frame to a query.
         indices = artifacts.read_json(validation["train_rows_artifact_id"])
-        self.fit = read_table(artifacts.resolve(spec["train_artifact_id"])).iloc[indices].copy()
+        self.fit = read_training(artifacts.resolve(spec["train_artifact_id"]), spec).iloc[indices].copy()
         self.fit_rows = len(self.fit)
         if len(self.fit) > 20000:
             self.fit = self.fit.sample(20000, random_state=42).copy()
-        self.test = read_table(artifacts.resolve(spec['test_artifact_id'])).drop(columns=[spec['target_column']], errors='ignore')
+        self.test = read_table(artifacts.resolve(spec['test_artifact_id'])).drop(columns=targets(spec), errors='ignore')
         self.test_rows = len(self.test)
         if len(self.test) > 20000:
             self.test = self.test.sample(20000, random_state=42).copy()
@@ -106,7 +107,8 @@ class AnalysisService:
             if digest in self.cache:
                 return deepcopy(self.cache[digest])
         target = self.spec['target_column']
-        excluded = set(self.spec['excluded_features']) | {target}
+        target_columns = targets(self.spec)
+        excluded = set(self.spec['excluded_features']) | set(target_columns)
         requested = list(dict.fromkeys(query['columns']))
         if not requested:
             requested = [c for c in self.fit if c not in excluded][:8]
@@ -114,7 +116,7 @@ class AnalysisService:
             raise AgentError("INVALID_ANALYSIS", "columns must contain existing input features only. Remove the target/excluded columns; use include_target=true for fit-only target summaries.",
                              details={'invalid_columns': [c for c in requested if c not in self.fit or c in excluded],
                                       'target_column': target})
-        columns = requested + ([target] if query['include_target'] else [])
+        columns = requested + (target_columns if query['include_target'] else [])
         # Deterministic, bounded computation; row-level labels never leave this service.
         data = self.fit[columns]
         sampled = self.fit_rows > len(data)
@@ -163,7 +165,8 @@ class AnalysisService:
             for label, count in counts.items():
                 record = {'group': str(label)[:100], 'rows': int(count)}
                 if query['include_target']:
-                    record['target'] = summarize(data.loc[values == label, [target]])[0]
+                    summary = summarize(data.loc[values == label, target_columns])
+                    record['target'] = summary[0] if len(summary) == 1 else summary
                 result['groups'].append(record)
         body = canonical(result)
         if len(body.encode()) > 16000:

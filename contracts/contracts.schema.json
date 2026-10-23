@@ -129,6 +129,25 @@
           "enum": [
             false
           ]
+        },
+        "prediction_kind": {
+          "enum": [
+            "values",
+            "labels",
+            "probabilities"
+          ]
+        },
+        "class_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "positive_label": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -216,6 +235,14 @@
             "minLength": 1
           },
           "minItems": 0
+        },
+        "target_columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         }
       },
       "required": [
@@ -1135,30 +1162,63 @@
               "type": "object",
               "properties": {
                 "draft": {
-                  "type": "object",
-                  "properties": {
-                    "task_kind": {
-                      "type": "string",
-                      "minLength": 1
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "task_kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "target_column": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "metric": {
+                          "$ref": "#/$defs/MetricSpec"
+                        },
+                        "output": {
+                          "$ref": "#/$defs/OutputSpec"
+                        },
+                        "target_columns": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "task_kind",
+                        "target_column",
+                        "metric",
+                        "output"
+                      ],
+                      "additionalProperties": false
                     },
-                    "target_column": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "metric": {
-                      "$ref": "#/$defs/MetricSpec"
-                    },
-                    "output": {
-                      "$ref": "#/$defs/OutputSpec"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "task_kind": {
+                          "enum": [
+                            "ranking",
+                            "unsupervised",
+                            "unsupported"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "task_kind",
+                        "reason"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "task_kind",
-                    "target_column",
-                    "metric",
-                    "output"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "evidence": {
                   "type": "array",
@@ -4706,6 +4766,10 @@
             "expected_champion_version": {
               "type": "integer",
               "minimum": 0
+            },
+            "confirmation_report_id": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [

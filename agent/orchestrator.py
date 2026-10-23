@@ -37,7 +37,9 @@ class Orchestrator:
             else:
                 self.context.knowledge = knowledge
                 self.researcher.gateway.knowledge = knowledge
-        self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes)
+        from agent.predictions import targets
+        self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes,
+                                       target_count=len(targets(spec)))
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
         self.no_fit_branches = set()
@@ -147,7 +149,7 @@ class Orchestrator:
                 latest.insert(0, incumbent)
             for result in latest[:-2]:
                 result.pop('effective_parameters')
-                result['parameter_details'] = 'Stored plan_id '+result['plan_id']
+                result['parameter_details'] = 'Frozen plan/source in execution-'+result['experiment_id']
             summaries = []
             for s in series[-4:]:
                 summaries.append({k: v for k, v in s.items() if k != 'trials'})
@@ -243,6 +245,9 @@ class Orchestrator:
 
     def final_candidate(self):
         """A validation winner that failed refit must not block other candidates."""
+        confirmed = getattr(self, 'confirmed_candidate', None)
+        if confirmed and confirmed not in self.failed_refits:
+            return confirmed
         best = self.store.best()
         if not best or best not in self.failed_refits:
             return best
@@ -490,7 +495,16 @@ class Orchestrator:
         args = {"submission_job_id": subjob, "experiment_id": ident, "task_spec_id": self.spec["task_spec_id"],
                 "code_artifact_id": experiment["plan"]["code_artifact_id"], "lease": lease_reply["lease"], "fit_scope": "all_train",
                 "predict_artifact_id": self.spec["test_artifact_id"], "output_relative_path": "submissions/" + subjob + "/candidate.csv"}
-        result = self.call("C19", args, lambda p: self.runner.start_refit(p, self.spec, experiment), key=subjob)
+        try:
+            result = self.call("C19", args, lambda p: self.runner.start_refit(p, self.spec, experiment), key=subjob)
+        except BaseException:
+            lease = lease_reply['lease']
+            if not any(j.lease['lease_id'] == lease['lease_id'] for j in self.runner.jobs.values()):
+                self.call('C13', {'operation': 'release', 'owner_id': subjob, 'phase': 'refit',
+                    'requested': self.resources(lease['timeout_seconds']), 'lease_id': lease['lease_id'],
+                    'fencing_token': lease['fencing_token']}, self.budget.lease)
+            self.submission.change_state(subjob, 'failed')
+            raise
         job = self.runner.jobs[result["job_id"]]
         job.submission_job_id = subjob
         self.submission.change_state(subjob, "refitting")
@@ -505,9 +519,13 @@ class Orchestrator:
         report = self.call("C20", {"submission_job_id": subjob, "task_spec_id": self.spec["task_spec_id"],
                                    "candidate_artifact_id": candidate, "reference_test_artifact_id": self.spec["test_artifact_id"]}, self.submission.validate_output)
         current = self.store.champion()
-        publication = self.call("C21", {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"], "candidate_artifact_id": candidate,
+        publication_payload = {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"], "candidate_artifact_id": candidate,
                            "validation_report_id": report["validation_report_id"], "candidate_sha256": report["candidate_sha256"],
-                           "expected_champion_version": current["champion_version"] if current else 0}, self.submission.publish,
+                           "expected_champion_version": current["champion_version"] if current else 0}
+        confirmation = getattr(self.submission, 'final_confirmation', None)
+        if confirmation and confirmation['chosen_experiment_id'] == ident:
+            publication_payload['confirmation_report_id'] = confirmation['artifact_id']
+        publication = self.call("C21", publication_payload, self.submission.publish,
                   key="publish/" + ident + "/" + report["candidate_sha256"])
         self.submission.change_state(subjob, "skipped_not_better" if publication["disposition"] == "skipped_not_better" else "published")
         self.update_final_reserve()
@@ -524,6 +542,12 @@ class Orchestrator:
                 "published_champion_present": self.store.champion() is not None,
                 "active_job_ids": [job.job_id for job in self.runner.active()]}
 
+    def confirm_finalists(self):
+        from agent.confirmation import finalize
+        try:
+            finalize(self)
+        except (AgentError, OSError, ValueError) as error:
+            self.log.exception('validation.confirmation_failed', error, retained_output=bool(self.store.champion()))
 
     def run(self):
         if self.graph:
@@ -630,6 +654,7 @@ class Orchestrator:
                 if not self.budget.snapshot()["search_allowed"]:
                     break
         self.set_fallback()
+        self.confirm_finalists()
         self.finalize_best()
         self.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted,
                        fallback_seconds=self.fallback_seconds, budget=self.budget.snapshot(), token_budget=self.budget.token_snapshot())

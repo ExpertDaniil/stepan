@@ -45,6 +45,10 @@ ACTION_SCHEMA = {
     'type': 'object', 'properties': {
         'action': {'enum': ['catalog', 'pipeline', 'features', 'tune', 'stop']},
         'feature_program': FEATURE_PROGRAM_SCHEMA,
+        'coordination': {'type': 'object', 'properties': {
+            'related_series_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 4},
+            'reason': {'type': 'string', 'minLength': 12, 'maxLength': 1000}},
+            'required': ['related_series_ids', 'reason'], 'additionalProperties': False},
         'recipe_id': {'type': 'string', 'minLength': 1},
         'hyperparameters': {'type': 'object'},
         'hypothesis': {'type': 'string', 'minLength': 1},

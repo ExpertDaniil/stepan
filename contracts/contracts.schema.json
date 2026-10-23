@@ -14288,6 +14288,29 @@
             "alternatives"
           ],
           "additionalProperties": false
+        },
+        "coordination": {
+          "type": "object",
+          "properties": {
+            "related_series_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "maxItems": 4
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 12,
+              "maxLength": 1000
+            }
+          },
+          "required": [
+            "related_series_ids",
+            "reason"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

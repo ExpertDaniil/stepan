@@ -116,6 +116,7 @@ def inspect_run(source):
                             "job_occupancy":job_occupancy(events),
                             "dialogues":[e for e in events if e.get('event') == 'research.dialogue_summary'],
                             "feature_seed_proposals":sum(e.get('event') == 'features.seed_proposed' for e in events),
+                            "overlap_deferrals":sum(e.get('event') == 'research.admission_reconsidered' for e in events),
                             "rolling_peer_resumptions":sum(e.get('event') == 'research.peer_resumed_while_waiting' for e in events),
                             "search_stop_reason":next((e.get('stop_reason') for e in reversed(events) if e.get('event') == 'search.finished'), None),
                             "fallback_seconds":next((e.get('fallback_seconds') for e in reversed(events) if e.get('event') == 'search.finished'), None),

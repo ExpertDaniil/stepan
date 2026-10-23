@@ -8,7 +8,7 @@ from agent.errors import AgentError
 
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     from agent.graph.controller import (advance_authorized_tuning, bind_trusted, issue,
-                                        local_for_ticket, stop_ticket, feature_seed_for_ticket)
+                                        local_for_ticket, stop_ticket, feature_seed_for_ticket, publish_activity)
     graph = controller.graph
     controller.research_round_outcomes = []
     accepted, activity = 0, False
@@ -20,7 +20,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
 
     def generation(branch):
         view = controller.researcher.gateway.feedback.latest(branch)
-        return view['revision'] if view else None
+        return view.get('measurement_generation', view['revision']) if view else None
 
     def blocked(branch, peer):
         record = controller.research_stalls.get((branch, peer))
@@ -40,6 +40,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
 
     def submit(ticket):
         work = ticket['work_order']
+        publish_activity(controller, ticket, started=True)
         future = pool.submit(controller.call, 'C09', ticket['researcher_request']['payload'], controller.researcher.propose)
         pending[future] = ticket
         controller.log.event('research.dialogue_dispatched', work_order_id=work['work_order_id'],
@@ -108,6 +109,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                 controller.researcher.gateway.cancelled.set()
                 for future, ticket in list(pending.items()):
                     future.cancel()
+                    publish_activity(controller, ticket, started=False)
                     graph.abandon(ticket['work_order']['work_order_id'], 'Finalization reserve reached; late result cannot be admitted')
                 controller.log.event('research.dialogues_cancelled', count=len(pending), reason='time_reserve')
                 break
@@ -124,6 +126,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                 continue
             for future in ready:
                 ticket = pending.pop(future)
+                publish_activity(controller, ticket, started=False)
                 work = ticket['work_order']
                 try:
                     proposal = future.result()

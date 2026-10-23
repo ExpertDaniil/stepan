@@ -44,6 +44,8 @@ class Orchestrator:
         self.local_search = LocalSearch(self)
         from agent.feature_search import FeatureSearch
         self.feature_search = FeatureSearch(self)
+        from agent.research_coordination import ResearchCoordination
+        self.coordination = ResearchCoordination(self)
         self.no_fit_branches = set()
         self.no_fit_reasons = {}
         self.research_feedback = []
@@ -155,7 +157,27 @@ class Orchestrator:
             summaries = []
             for s in series[-4:]:
                 summaries.append({k: v for k, v in s.items() if k != 'trials'})
+            activity = self.coordination.snapshot(scope)
+            terminal_states = [(eid, self.store.get(eid)['state']) for eid in ids
+                               if self.store.get(eid)['state'] in {'failed', 'invalid', 'timed_out', 'cancelled'}]
+            generation = hashlib.sha256(json.dumps([
+                [(r['experiment_id'], r['primary_metric']) for r in measured], terminal_states],
+                sort_keys=True, allow_nan=False).encode()).hexdigest()
+            pending_experiments = []
+            pending_ids = ([r[0] for r in self.store.db.execute(
+                "SELECT DISTINCT e.experiment_id FROM experiments e JOIN g_bindings b USING(run_id,experiment_id) "
+                "JOIN g_work_orders w USING(run_id,work_order_id) WHERE e.run_id=? AND w.branch_id=? "
+                "AND e.state IN ('queued','running','trained')", (self.store.run_id, scope))] if self.graph else ids)
+            for eid in pending_ids:
+                exp = self.store.get(eid)
+                if exp['state'] in {'queued', 'running', 'trained'}:
+                    pending_experiments.append({'experiment_id': eid, 'state': exp['state'],
+                        'researcher_id': exp['plan']['researcher_id'], 'recipe_id': exp['plan']['recipe_id'],
+                        'plan_id': exp['plan']['plan_id']})
             mailbox.publish(scope, {'branch_id': scope, 'validation_id': self.validation['validation_id'],
+                'measurement_generation': generation, 'activity': activity,
+                'pending_experiments': pending_experiments[-4:],
+                'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
                 'results': latest, 'omitted_result_count': len(measured)-len(latest),
                 'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
                 'instruction': 'New controller measurements available at request dispatch. Compare only compatible protocols. '
@@ -199,6 +221,7 @@ class Orchestrator:
             self.local_search.clear_series(plan['researcher_id'], branch)
         self.log.event('research.action_admitted', plan_id=plan['plan_id'], action=intent['action'],
                        branch_id=branch, tuning=intent['tuning'], effective_tuning=request, evidence_ids=intent['evidence_ids'])
+        self.publish_research_updates()
         return intent
 
     def record_research_feedback(self, peer, branch, status, message, *, code=None):
@@ -213,6 +236,15 @@ class Orchestrator:
 
     def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
         """Authorize an action before deduplicating its optional starting fit."""
+        candidate_intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        coordinator = getattr(self, 'coordination', None)
+        conflict = coordinator.review(plan, candidate_intent, branch) if coordinator is not None else None
+        if conflict is not None:
+            self.record_research_feedback(plan['researcher_id'], branch, 'overlapping_search_deferred',
+                json.dumps(conflict, ensure_ascii=False), code='RESEARCH_OVERLAP')
+            self.log.event('research.admission_reconsidered', plan_id=plan['plan_id'], branch_id=branch, **conflict)
+            self.publish_research_updates()
+            return None
         try:
             intent = self.authorize_research(plan, branch)
         except AgentError as error:

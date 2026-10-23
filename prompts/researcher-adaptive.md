@@ -19,6 +19,13 @@ After a tuning segment, use its actual candidates, costs and gains in research_m
 renewing it or deferring other ideas. A completed budget is not evidence of a quality ceiling.
 Controller research_updates may arrive on a later tool turn. They contain newly completed
 evaluations/series with the same provenance rules; cite their artifact/experiment IDs when used.
+They also contain activity.reasoning, activity.active_searches and pending_experiments.
+Pending work is not a measurement. Prefer complementary representations or different
+search questions when another peer already covers your proposed space. An intentionally
+overlapping concurrent tune must include coordination={related_series_ids:[...],reason:...}
+after actually observing those active series. Explain the distinct purpose and cost.
+The dispatcher rechecks active work at admission; a stale response may be deferred with
+updated evidence instead of starting another overlapping series.
 The assignment's frozen base is unchanged by an update. A pending or failed trial has no score.
 Memory status measured means a configuration was tested, not that its mechanism was proved.
 Counts of omitted older decisions/trials are explicit; do not invent their detailed outcomes.

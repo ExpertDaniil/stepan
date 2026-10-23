@@ -63,6 +63,13 @@ def feature_seed_for_ticket(controller, ticket):
     return bind_trusted(plan, ticket) if plan else None
 
 
+def publish_activity(controller, ticket, *, started):
+    coordinator = getattr(controller, 'coordination', None)
+    if coordinator is not None:
+        (coordinator.dispatched if started else coordinator.released)(ticket)
+        controller.publish_research_updates()
+
+
 def cancel_queued(controller, experiment_id, reason):
     with controller.store.transaction():
         controller.graph.db.execute("UPDATE experiments SET state='cancelled',error=? WHERE experiment_id=? AND state='queued'", (reason, experiment_id))
@@ -102,6 +109,8 @@ def train(controller, plans, tickets):
                 continue
             controller.degraded = True
             controller.log.exception("graph.proposal_rejected", exc, work_order_id=work["work_order_id"], branch_id=work["branch_id"])
+    if hasattr(controller, 'publish_research_updates'):
+        controller.publish_research_updates()
     pending = list(queue.items())
     width = graph.policy["max_train_workers"]
     for offset in range(0, len(pending), width):
@@ -126,6 +135,8 @@ def train(controller, plans, tickets):
                 result = controller.call("C14", args, lambda value, exp_id=eid: controller.runner.start_train(value, controller.spec, controller.store.get(exp_id)), key=eid+"/"+str(attempt))
                 job = controller.runner.jobs[result["job_id"]]
                 graph.track_job(job)
+                if hasattr(controller, 'publish_research_updates'):
+                    controller.publish_research_updates()
                 jobs.append(job)
             except Exception as exc:
                 if isinstance(exc, AgentError) and exc.code == "BUDGET_EXHAUSTED" and lease is None:
@@ -285,6 +296,8 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     streaming = graph.policy["max_train_workers"] == 1
     peers = graph.metadata("researcher_ids")
     with ThreadPoolExecutor(max_workers=len(peers), thread_name_prefix="researcher") as pool:
+        for ticket in llm_tickets:
+            publish_activity(controller, ticket, started=True)
         futures = {pool.submit(controller.call, "C09", ticket["researcher_request"]["payload"], controller.researcher.propose): ticket for ticket in llm_tickets}
         if streaming and plans:
             accepted += controller.run_training(plans, tickets)
@@ -308,6 +321,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     activity |= progressed
         for future in completed_replies():
             ticket = futures[future]
+            publish_activity(controller, ticket, started=False)
             try:
                 proposal = future.result()
             except Exception as exc:

@@ -187,6 +187,7 @@ class Gateway:
                     context_id=payload['context_artifact_id'], branch_id=delivered['branch_id'],
                     revision=delivered['revision'], feedback_artifact_id=delivered['artifact_id'],
                     experiment_ids=[v['experiment_id'] for v in delivered['results']],
+                    active_series_ids=[s['series_id'] for s in delivered.get('activity', {}).get('active_searches', [])],
                     series_ids=[s['series_id'] for s in delivered['series']])
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
@@ -222,6 +223,8 @@ class Gateway:
             if delivered:
                 response['_delivered_feedback'] = {'name': 'research_updates', 'call_no': call_no,
                     'artifact_id': delivered['artifact_id'], 'revision': delivered['revision'],
+                    'measurement_generation': delivered.get('measurement_generation'),
+                    'active_series_ids': [s['series_id'] for s in delivered.get('activity', {}).get('active_searches', [])],
                     'evidence_ids': list(dict.fromkeys(evidence_ids))}
             return response, call_no
         except AgentError:

@@ -10,7 +10,7 @@
   "official_requirements_byte_equal": true,
   "requirements_sha256": "9173b0388532fbd2a709e4f4b3029e3b9ccab685fce43a85261ffa1ba95efbe6",
   "knowledge_manifest": "all_file_hashes_equal",
-  "regression_methods_written": 377,
+  "regression_methods_written": 378,
   "runtime_source_sha256": {
     "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "agent/artifacts.py": "6a1e25701827e3e3a337be73a1d4a516d8e1db360e637c4e79aa4ac9f86eb472",
@@ -30,7 +30,7 @@
     "agent/feature_engineering.py": "334083aa2b4a99bb56fea26a88af004787e6768ef9085ca8a714db8925107d07",
     "agent/feature_memory.py": "eef3278dfa66f36c76a8b5b9de760d16d4bfb4b6a3e1292f01d2947a7da03fbd",
     "agent/feature_schema.py": "895ae6b3d70f40fe644e10ea477b510bd757f2f49ad3820ebce636a1d152f9bd",
-    "agent/feature_search.py": "cb9711aed321a3c251a02a5ab409986760c7e706f443410ee7c31e50b84e17e8",
+    "agent/feature_search.py": "62e6f93678b1d30b5d57083c328cd1c124f30042343af4f80ca77dcb302d0893",
     "agent/graph/__init__.py": "01fac84fdd6e5ab57f25e01609f85c886496d08d160ad54541df3b1456f376d1",
     "agent/graph/artifacts.py": "cab8029551b491f83a521694d14f70331bb38a84c5ca47ba220b6d5a065c869d",
     "agent/graph/constraints.py": "a8475e5a95767a086dd9f5f04558ac095e886b9dc8eaf4f256b2a9758a8b31cb",

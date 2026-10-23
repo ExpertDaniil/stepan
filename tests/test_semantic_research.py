@@ -217,6 +217,21 @@ class FrozenContextTests(unittest.TestCase):
         finally:
             budget.leases.clear()
 
+    def test_busy_analysis_defers_feature_seeds_without_stopping_search(self):
+        from agent.feature_search import FeatureSearch
+        g = self.h.g
+        self.h.result('researcher-2', {'alpha': .1}, 3)
+        def busy():
+            raise AgentError('ANALYSIS_RESOURCES_BUSY', 'Synthetic active train leases')
+        controller = self.h.controller
+        controller.graph = g
+        controller.config = replace(g.config, feature_research_enabled=True)
+        controller.context.analysis = SimpleNamespace(feature_frame=busy)
+        engine = FeatureSearch(controller)
+        self.assertIsNone(engine.next_plan('researcher-1', self.h.root))
+        self.assertNotIn(self.h.root, engine.banks)
+        self.assertFalse(g.budget.search_stopped)
+
     def test_custom_feature_manifest_is_a_declaration_after_a_valid_score(self):
         from agent.feature_memory import archive
         from agent.catalog import factory_source

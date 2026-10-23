@@ -94,7 +94,15 @@ class FeatureSearch:
         base = deepcopy(min(eligible, key=lambda item: item[0])[1])
         if branch not in self.banks:
             from agent.predictions import targets
-            fit = c.context.analysis.feature_frame()
+            from agent.errors import AgentError
+            try:
+                fit = c.context.analysis.feature_frame()
+            except AgentError as error:
+                if error.code not in {'ANALYSIS_RESOURCES_BUSY', 'SEARCH_CLOSED',
+                                      'SEARCH_PHASE_BUDGET_EXHAUSTED', 'ANALYSIS_TIMEOUT', 'ANALYSIS_MEMORY_LIMIT'}:
+                    raise
+                c.log.event('features.seed_deferred', branch_id=branch, reason=error.code)
+                return None
             columns = [name for name in fit if name not in {*targets(c.spec), *c.spec['excluded_features']}]
             self.banks[branch] = deque(seed_programs(fit[columns]))
         while self.banks[branch]:

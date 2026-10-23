@@ -157,7 +157,8 @@ partition/matched/sample counts, seed/rule, support/omissions и scope. Неог
 групп/ответов, файлов, сети, secrets или установки пакетов этот контракт не даёт.
 
 Один logical analysis slot резервирует 1 CPU/1024 MiB в том же Budget, уменьшая
-доступность train leases. Считаются elapsed и total analysis seconds. Сохраняются общий
+доступность train leases. Считаются elapsed и total analysis seconds. Занятость слота или исчерпание
+разрешения на анализ откладывает подготовку фоновых seeds, не прерывая поиск. Сохраняются общий
 deadline, phase/finalization reserve и отдельная блокировка анализов. Read allowance
 120 секунд проверяется кооперативно; sample >64 MiB или diagnostic projection >256 MiB
 отвергается. Это admission/кооперативные проверки, не OS watchdog для каждого pandas
@@ -183,7 +184,7 @@ requirements проверены без импорта agent/tools. `git diff --c
 Дополнительная независимая JSON Schema проверка примеров не выполнена: jsonschema
 отсутствует в среде; зависимости не устанавливались. Fixtures разобраны как JSON.
 
-Добавлены 23 regression-метода в test_semantic_research.py и обновлены существующие
+Добавлены 24 regression-метода в test_semantic_research.py и обновлены существующие
 fixtures: budget после tools/feedback/repair и HTTP bytes; чтение больших записей;
 scope/task/fork/sibling/pending; stale conflicts и unverified model text; named inputs;
 fit-only statistics/refit; custom declarations; SSE/F1; confirmation isolation;

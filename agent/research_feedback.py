@@ -58,6 +58,7 @@ def compact_memory(memory, *, base_experiment_id=None, question='', max_bytes=12
             'idea_id': r.get('idea_id'), 'question': r.get('question', '')[:320],
             'decision_reason': r.get('decision_reason', '')[:320],
             'model_interpretations_verified': False,
+            'investigation': deepcopy(r.get('investigation')),
             'evidence_ids': r.get('evidence_ids', [])[:12],
             'observations': deepcopy(r.get('observations', [])[-3:]),
             'tuning_series': [{k: deepcopy(v) for k, v in series.items() if k in {

@@ -11,6 +11,7 @@ from agent.errors import AgentError
 from tools.data import read_table
 from agent.predictions import targets
 from agent.tool_arguments import normalize_tool_arguments
+from agent.semantic_planning import INVESTIGATION_SCHEMA
 
 
 FILTERS_SCHEMA = {'type': 'object', 'properties': {
@@ -25,9 +26,10 @@ FILTERS_SCHEMA = {'type': 'object', 'properties': {
             'required': ['column', 'op'], 'additionalProperties': False}}},
     'required': ['mode', 'clauses'], 'additionalProperties': False}
 DERIVED_SCHEMA = {'type': 'array', 'maxItems': 8, 'items': {'type': 'object', 'properties': {
-    'op': {'enum': ['missing', 'log1p', 'signed_log1p', 'square', 'sum', 'difference', 'product', 'ratio', 'cross']},
+    'op': {'enum': ['missing', 'log1p', 'signed_log1p', 'square', 'sum', 'difference', 'product', 'ratio', 'cross', 'cyclic_sin', 'cyclic_cos']},
     'name': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-    'columns': {'type': 'array', 'minItems': 1, 'maxItems': 4, 'items': {'type': 'string', 'minLength': 1}}},
+    'columns': {'type': 'array', 'minItems': 1, 'maxItems': 4, 'items': {'type': 'string', 'minLength': 1}},
+    'period': {'type': 'number', 'exclusiveMinimum': 0}, 'origin': {'type': 'number'}},
     'required': ['op', 'name', 'columns'], 'additionalProperties': False}}
 
 
@@ -77,7 +79,12 @@ def apply_filters(frame, condition=None, filters=None):
 
 ANALYSIS_SCHEMA = {
     "type": "object", "properties": {
-        "kind": {"enum": ["summary", "association", "group", "compare", "dictionary", "report", "schema", "errors"]},
+        "kind": {"enum": ["summary", "association", "group", "compare", "dictionary", "report", "schema", "errors", "check"]},
+        "investigation": INVESTIGATION_SCHEMA,
+        "checks": {'type': 'array', 'minItems': 1, 'maxItems': 8, 'items': {
+            'type': 'object', 'properties': {'name': {'type': 'string', 'minLength': 1, 'maxLength': 80},
+                'violation': FILTERS_SCHEMA['properties']['clauses']['items']},
+            'required': ['name', 'violation'], 'additionalProperties': False}},
         "derived": DERIVED_SCHEMA,
         "filters": FILTERS_SCHEMA,
         "experiment_id": {"type": "string", "minLength": 1},
@@ -267,6 +274,8 @@ class AnalysisService:
             raise AgentError('INVALID_ANALYSIS', 'Metadata/report reads do not compute expressions or row filters')
         if query['kind'] != 'errors' and query.get('experiment_id'):
             raise AgentError('INVALID_ANALYSIS', 'experiment_id is only valid for kind=errors')
+        if query['kind'] != 'check' and 'checks' in query:
+            raise AgentError('INVALID_ANALYSIS', 'checks belongs only to kind=check')
         if query['kind'] == 'report':
             if query['columns'] or query['include_target'] or query['group_by'] is not None or condition:
                 raise AgentError('INVALID_ANALYSIS', 'Retrieve a saved report by report_id without new columns/target requests')
@@ -288,6 +297,24 @@ class AnalysisService:
             return deepcopy(known)
         if query.get('report_id') is not None:
             raise AgentError('INVALID_ANALYSIS', 'report_id is only valid for kind=report')
+        if query['kind'] not in {'schema', 'dictionary'}:
+            from agent.semantic_planning import validate_investigation, check_declared_semantics, effective_model
+            context = getattr(self, 'query_context', None)
+            evidence = set((context or {}).get('metadata', {}).get('delivered_evidence_ids', []))
+            if context:
+                user = json.loads(context['messages'][1]['content'])
+                projection = user.get('profile_summary', user)
+                evidence.update(f['source_id'] for f in user.get('facts', []))
+                evidence.update(r['artifact_id'] for r in projection.get('analysis_history', []))
+                evidence.update(r['experiment_id'] for r in projection.get('measured_search', {}).get('entries', []))
+                if user.get('base_experiment_id'):
+                    evidence.add(user['base_experiment_id'])
+            validate_investigation(query.get('investigation'), context, evidence,
+                                   self.train_columns, self.schemas, program=derived)
+            if context and context['metadata'].get('detail_artifact_id'):
+                frozen = self.artifacts.read_json(context['metadata']['detail_artifact_id'])['sections']
+                check_declared_semantics(derived, query.get('investigation'),
+                    effective_model(frozen.get('semantic_model'), frozen.get('semantics', [])))
         owner = (getattr(self, 'query_context', None) or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')
         digest = hashlib.sha256(canonical([query, owner]).encode()).hexdigest()
         with self.lock:
@@ -317,10 +344,17 @@ class AnalysisService:
                                       'target_column': target})
         selected_targets = target_columns[:4] if query['include_target'] else []
         columns = requested + selected_targets
+        if query.get('investigation'):
+            generated = {step['name'] for step in derived}
+            inputs = set(requested + filter_columns(condition, filters) + [c for step in derived for c in step['columns']])-generated
+            if not inputs <= set(query['investigation']['columns']):
+                raise AgentError('INVALID_INVESTIGATION', 'Include the selected/filter raw inputs in investigation.columns')
         if query['kind'] == 'errors':
             if query['group_by'] is not None:
                 raise AgentError('INVALID_ANALYSIS', 'For compound error groups use a derived cross column; group_by is for fit group summaries')
             return self._errors(query, requested, started)
+        if query['kind'] == 'check':
+            return self._checks(digest, query, requested, started)
         # Deterministic, bounded computation; row-level labels never leave this service.
         if query['kind'] in {'compare', 'dictionary'} and query['include_target']:
             raise AgentError('INVALID_ANALYSIS', 'Feature comparisons and dictionary queries do not expose test targets')
@@ -402,6 +436,61 @@ class AnalysisService:
         result['duration_seconds'] = time.monotonic()-started
         return self._save(digest, query, result, requested)
 
+    def _checks(self, digest, query, requested, started):
+        """Exact fit-only violation counts, streamed without a sampling loophole."""
+        import pandas as pd
+        from agent.data_transport import cached_chunks
+        from agent.feature_engineering import FeatureProgram
+        if query['include_target'] or query['group_by'] is not None or not query.get('checks'):
+            raise AgentError('INVALID_ANALYSIS', 'check needs checks, include_target=false and group_by=null')
+        derived = query.get('derived', [])
+        generated = {step['name'] for step in derived}
+        checks = query['checks']
+        if len({item['name'] for item in checks}) != len(checks):
+            raise AgentError('INVALID_ANALYSIS', 'Check names must be distinct')
+        checked = [c for item in checks for c in filter_columns(filters={'clauses': [item['violation']]})]
+        needed = [*requested, *checked, *filter_columns(query.get('filter'), query.get('filters')),
+                  *(c for step in derived for c in step['columns'])]
+        selected = list(dict.fromkeys(c for c in needed if c not in generated))
+        if not set(selected) <= set(self.train_columns)-set(targets(self.spec)):
+            raise AgentError('INVALID_ANALYSIS', 'Checks may reference input/derived columns only, never targets')
+        if query.get('investigation') and not set(selected) <= set(query['investigation']['columns']):
+            raise AgentError('INVALID_INVESTIGATION', 'Include every checked/filter input in investigation.columns')
+        counts = [{'name': item['name'], 'evaluable_rows': 0, 'violation_rows': 0, 'missing_rows': 0} for item in checks]
+        reference = self.input_tables['fit']
+        source = cached_chunks(reference, selected) if reference else read_table(self.train_path, usecols=selected, chunksize=4096)
+        offset = matched = 0
+        with source as reader:
+            for chunk in reader:
+                self._check_time(started)
+                length = len(chunk)
+                chunk = chunk.loc[[i in self.fit_indices for i in range(offset, offset+length)]]
+                offset += length
+                for step in derived:
+                    chunk[step['name']] = FeatureProgram._apply(chunk, step, {})
+                if int(chunk.memory_usage(deep=True).sum()) > 64*1024*1024:
+                    raise AgentError('ANALYSIS_MEMORY_LIMIT', 'Check chunk exceeds 64 MiB')
+                chunk = chunk.loc[apply_filters(chunk, query.get('filter'), query.get('filters'))]
+                matched += len(chunk)
+                for item, count in zip(checks, counts):
+                    clause = item['violation']
+                    valid = pd.Series(True, index=chunk.index)
+                    if clause['op'] not in {'is_missing', 'not_missing'}:
+                        for column in filter_columns(filters={'clauses': [clause]}):
+                            valid &= chunk[column].notna()
+                    violation = apply_filters(chunk, filters={'mode': 'all', 'clauses': [clause]})
+                    count['evaluable_rows'] += int(valid.sum())
+                    count['violation_rows'] += int((violation & valid).sum())
+                    count['missing_rows'] += int((~valid).sum())
+        self._check_time(started)
+        for count in counts:
+            count['violation_fraction_of_evaluable'] = count['violation_rows']/count['evaluable_rows'] if count['evaluable_rows'] else None
+        result = {'scope': 'fit_only', 'validation_id': self.validation_id, 'query': query,
+            'partition_rows': self.fit_rows, 'matched_fit_rows': matched, 'analyzed_rows': matched,
+            'sampled': False, 'checks': counts, 'duration_seconds': time.monotonic()-started,
+            'interpretation': 'Exact counts for declared violation predicates on fit rows; semantic/physical interpretation remains unverified.'}
+        return self._save(digest, query, result, selected)
+
     def _save(self, digest, query, result, requested):
         body = canonical(result)
         if len(body.encode()) > 16000:
@@ -428,8 +517,12 @@ class AnalysisService:
         response = {'artifact_id': art['artifact_id'], 'report': reply}
         with self.lock:
             self.cache[digest] = response
-            self.records.append({'artifact_id': art['artifact_id'], 'query': deepcopy(query), 'scope': result['scope'],
-                'work_order_id': (getattr(self, 'query_context', None) or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')})
+            record = {'artifact_id': art['artifact_id'], 'query': deepcopy(query), 'scope': result['scope'],
+                'work_order_id': (getattr(self, 'query_context', None) or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')}
+            if query['kind'] == 'check':
+                record['computed_observation'] = {k: deepcopy(result[k]) for k in (
+                    'partition_rows', 'matched_fit_rows', 'analyzed_rows', 'sampled', 'checks')}
+            self.records.append(record)
         self.log.event('research.analysis_completed', artifact_id=art['artifact_id'], kind=query['kind'],
                        columns=requested, rows=result.get('analyzed_rows', 0), scope=result['scope'])
         return deepcopy(response)

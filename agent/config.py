@@ -66,7 +66,7 @@ class Config:
     llm_research_tool_seconds: int = 90
     llm_research_dialogue_seconds: int = 360
     feature_research_enabled: bool = True
-    feature_seed_budget_fraction: float = .15
+    feature_seed_budget_fraction: float = 0.0
     feature_seed_timeout_seconds: int = 120
     llm_request_max_bytes: int = 196608
     llm_context_window_tokens: int = 262144
@@ -133,7 +133,7 @@ class Config:
             llm_research_tool_seconds=integer('LLM_RESEARCH_TOOL_SECONDS', 90, 0, 1800),
             llm_research_dialogue_seconds=integer('LLM_RESEARCH_DIALOGUE_SECONDS', 360, 30, 3600),
             feature_research_enabled=boolean('FEATURE_RESEARCH_ENABLED', True),
-            feature_seed_budget_fraction=real('FEATURE_SEED_BUDGET_FRACTION', .15, 0, .5),
+            feature_seed_budget_fraction=real('FEATURE_SEED_BUDGET_FRACTION', 0.0, 0, .5),
             feature_seed_timeout_seconds=integer('FEATURE_SEED_TIMEOUT_SECONDS', 120, 1, 600),
             llm_request_max_bytes=integer('LLM_REQUEST_MAX_BYTES', 196608, 16000, 2000000),
             llm_context_window_tokens=integer('LLM_CONTEXT_WINDOW_TOKENS', 262144, 4096, 1000000),

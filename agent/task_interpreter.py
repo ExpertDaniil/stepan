@@ -14,7 +14,9 @@ class TaskInterpreter:
         messages = [{"role": "system", "content": (ROOT / "prompts" / prompt_file).read_text(encoding="utf-8")},
                     {"role": "user", "content": json.dumps(content, ensure_ascii=False)}]
         context = self.artifacts.write_json("contexts/bootstrap-" + uuid.uuid4().hex[:10] + ".json",
-                    self.gateway.log.redactor.clean({"messages": messages, "metadata": {"schema_id": schema_id, "demo_spec": self.demo}}), "llm_context")
+                    self.gateway.log.redactor.clean({"messages": messages, "metadata": {
+                        "schema_id": schema_id, "demo_spec": self.demo,
+                        "bootstrap_profile_artifact_id": self.profile['profile_artifact_id']}}), "llm_context")
         return self.bus.call("C10", {"purpose": purpose, "context_artifact_id": context["artifact_id"],
                                      "response_schema_id": schema_id, "tool_schema_ids": [],
                                      "max_output_tokens": self.config.llm_bootstrap_output_tokens,
@@ -23,7 +25,8 @@ class TaskInterpreter:
     def interpret(self, payload):
         draft = self.ask("TaskDraft-v1", "task_interpretation", "task-interpreter.md",
                          {"task_markdown": self.task["task_text"], "candidate_paths": payload["candidate_paths"],
-                          "profile": self.profile["summary"], "task_root": self.task["task_root"]})
+                          "profile": self.profile["summary"], "task_root": self.task["task_root"],
+                          "semantic_source_rules": "task quotes reference this exact Markdown with record=null; dictionary quotes reference zero-based rows of profile.data_dictionary. Omitted metadata remains unknown."})
         return {"draft": draft, "evidence": ["Source task artifact: " + self.task["task_text_artifact_id"]], "unresolved_fields": []}
 
     def choose_validation(self, spec):

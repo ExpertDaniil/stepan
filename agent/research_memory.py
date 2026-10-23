@@ -56,8 +56,10 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
             semantic_decisions.append((ident, record))
         notes = record.get('research_notes')
         if notes is None:
-            notes = {'idea_id': None, 'question': record['hypothesis'], 'mechanism': record['expected_effect'],
-                     'decision_reason': 'Not supplied by the model; legacy decision retained.',
+            investigation = record.get('investigation') or {}
+            notes = {'idea_id': None, 'question': investigation.get('question', record['hypothesis']),
+                     'mechanism': investigation.get('mechanism', record['expected_effect']),
+                     'decision_reason': investigation.get('decision_rule', 'Not supplied by the model; legacy decision retained.'),
                      'previous_result_interpretation': '', 'alternatives': []}
         selected = None
         # A stop is a budget/priority decision; it must not invent a new tested idea.
@@ -127,6 +129,8 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
             'question': notes['question'], 'decision_reason': notes['decision_reason'],
             'model_interpretation': notes['previous_result_interpretation'],
             'model_interpretations_verified': False, 'model_claims': record.get('claims', []),
+            'investigation': deepcopy(record.get('investigation')),
+            'investigation_check': deepcopy(record.get('investigation_check')),
             'notes_supplied': record.get('research_notes') is not None,
             'evidence_ids': record['evidence_ids'], 'configuration': deepcopy(configuration),
             'requested_tuning': record.get('tuning'), 'tuning_series': tuning_series,
@@ -149,6 +153,17 @@ def validate_semantic_updates(updates, memory, evidence, columns, scope, known_r
     from agent.errors import AgentError
     visible = {r['record_id'] for r in memory.get('semantic_records', [])} | set(evidence)
     for item in updates:
+        props = item.get('properties', {})
+        if any(k in props for k in ('quantity_kind', 'availability_status', 'period')) and len(item['columns']) != 1:
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Typed quantity revisions name exactly one column')
+        if props.get('relation_kind') and (not 2 <= len(item['columns']) <= 6 or len(set(item['columns'])) != len(item['columns'])):
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Typed relations name two to six distinct columns')
+        if props.get('relation_kind') in {'normalized_by', 'subset_count', 'precedes'} and len(item['columns']) != 2:
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'This typed relation has exactly two ordered operands')
+        if 'period' in props and props.get('quantity_kind', 'cyclic') != 'cyclic':
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'A declared period requires a cyclic quantity')
+        if props.get('quantity_kind') in {'ordinal_code', 'identifier', 'category', 'unknown'} and props.get('units', 'unknown').casefold() != 'unknown':
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Codes/categories/unknown scales have no physical unit declaration')
         if columns is not None and not set(item['columns']) <= set(columns):
             raise AgentError('INVALID_SEMANTIC_UPDATE', 'Semantic update references absent columns')
         if not set(item['evidence_ids']) <= evidence:

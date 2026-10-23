@@ -30,7 +30,7 @@ def references(value):
                 if k == 'idea_id' and isinstance(v, str):
                     ideas.add(v)
                 if k in {'experiment_id', 'evaluation_id', 'decision_artifact_id', 'artifact_id',
-                         'diagnostics_artifact_id', 'record_id'} and isinstance(v, str):
+                         'diagnostics_artifact_id', 'record_id', 'model_id'} and isinstance(v, str):
                     ids.add(v)
                 if k == 'evidence_ids' and isinstance(v, list):
                     ids.update(v)
@@ -94,6 +94,10 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
     data = profile.get('data', user.get('profile', {}))
     memory = profile.get('research_memory', {})
     task_text = profile.get('task_text', user.get('task', ''))
+    from agent.semantic_planning import load_task_model, semantic_view
+    model = load_task_model(spec, artifacts)
+    if model is not None:
+        profile['semantic_task'] = semantic_view(model, memory, user.get('base_result'))
     scope = {**scope_for(spec, artifacts), 'validation_id': validation_id,
              'validation_sha256': validation_sha256,
              'task_text_sha256': hashlib.sha256(task_text.encode('utf-8')).hexdigest(),
@@ -109,6 +113,8 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'knowledge': profile.get('knowledge', {}),
         'representations': profile.get('feature_memory', {}), 'comparisons': profile.get('comparison_evidence', {}),
         'analyses': profile.get('analysis_history', user.get('analysis_history', []))}
+    if model is not None:
+        sections.update(semantic_model=model, quantities=model['quantities'], relations=model['relations'])
     sections['analyses'] = [{**r, 'report': artifacts.read_json(r['artifact_id'])}
                             for r in sections['analyses']]
     documents = {}
@@ -132,8 +138,8 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
                 if execution:
                     meta = execution['meta']
                     documents['execution/'+eid] = {'artifact_id': meta['artifact_id'], 'sha256': meta['sha256'], 'format': 'json'}
-    for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses'):
-        for index, item in enumerate(sections[name]):
+    for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses', 'quantities', 'relations'):
+        for index, item in enumerate(sections.get(name, [])):
             sections[name+'/'+str(index)] = item
     art = artifacts.write_json('research/context-details-'+uuid.uuid4().hex[:16]+'.json',
                                {'scope': scope, 'sections': sections, 'documents': documents}, 'research_context_details')
@@ -199,4 +205,10 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
     log.event('research.memory_selected', reference_id=art['artifact_id'],
         retained_decisions=[d['decision_artifact_id'] for d in profile['research_memory'].get('decisions', [])],
         selection_reason='base_dependency_then_question_overlap_then_recency', scope=scope)
-    return {'detail_artifact_id': art['artifact_id'], 'detail_scope': scope}
+    if model is not None:
+        view = profile['semantic_task']
+        log.event('research.semantic_context_selected', model_id=model['model_id'],
+            quantity_ids=[q['record_id'] for q in view['quantities']], relation_ids=[r['record_id'] for r in view['relations']],
+            bytes=len(canonical(view).encode()), selection_reason='previous_question_columns_and_named_program_dependencies', scope=scope)
+    return {'detail_artifact_id': art['artifact_id'], 'detail_scope': scope,
+            **({'semantic_contract': 'semantic-planning-1'} if model is not None else {})}

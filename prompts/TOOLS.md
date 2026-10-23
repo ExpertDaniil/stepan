@@ -77,3 +77,20 @@ Optional legacy parameters=[names] uses entire catalogue domains; if both are gi
 names must agree. max_trials counts new proposals including cache hits/rejections,
 not warm-start trials. Admission may shorten wall time. No pruning is currently enabled.
 No API calls, package installation or fitting occur in these read tools.
+
+# Semantic planning and exact logical checks
+
+Computing analyze_data calls in semantic-planning-1 contexts include investigation
+before observing the result. It contains question, basis_ids, columns,
+interpretation, mechanism, assumptions, expected_observation,
+alternative_explanation and decision_rule. Metadata/report reads are exempt.
+Example: after a sourced subset_count relation [minor,major], a check query uses
+kind="check", columns=["minor","major"], group_by=null, include_target=false,
+checks=[{name:"nesting_violation",violation:{column:"minor",op:"gt",other_column:"major"}}].
+Attach the actual relation ID and explicit same-window assumptions in investigation.
+This streams ALL fit rows: violation_rows/evaluable_rows/missing_rows are exact for
+the declared predicate. No validation/confirmation labels or raw target inputs.
+Filters apply before counting. Derived expressions are stateless and named.
+cyclic_sin/cyclic_cos take period>0 and optional origin; the period uses input units.
+read_memory additionally exposes semantic_model, quantities/index and relations/index.
+Source quotations are checked for occurrence; semantic interpretations remain unverified.

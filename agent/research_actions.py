@@ -1,6 +1,7 @@
 """Explicit research decisions, persisted separately from the frozen ExperimentPlan."""
 from agent.errors import AgentError
 from agent.feature_schema import FEATURE_PROGRAM_SCHEMA
+from agent.semantic_planning import INVESTIGATION_SCHEMA
 
 CUSTOM_RECIPE = 'python-pipeline-v1'
 IDEA_SCHEMA = {
@@ -41,6 +42,10 @@ SEMANTIC_UPDATE_SCHEMA = {'type': 'array', 'maxItems': 6, 'items': {
             'availability': {'type': 'string', 'maxLength': 200},
             'normalization': {'type': 'string', 'maxLength': 200},
             'relationships': {'type': 'string', 'maxLength': 400},
+            'quantity_kind': {'enum': ['quantity', 'count', 'ratio', 'rate', 'category', 'ordinal_code', 'identifier', 'calendar', 'cyclic', 'unknown']},
+            'availability_status': {'enum': ['available', 'unavailable', 'unknown']},
+            'period': {'type': 'number', 'exclusiveMinimum': 0},
+            'relation_kind': {'enum': ['normalized_by', 'subset_count', 'part_of', 'rate_exposure', 'same_window', 'precedes', 'conditional_response', 'proxy', 'other']},
             'unknowns': {'type': 'string', 'maxLength': 400},
             'operation_id': {'type': 'string', 'maxLength': 100}}, 'additionalProperties': False}},
     'required': ['topic', 'kind', 'statement', 'columns', 'evidence_ids'], 'additionalProperties': False}}
@@ -85,7 +90,8 @@ ACTION_SCHEMA = {
         'tuning': {'anyOf': [TUNING_SCHEMA, {'type': 'null'}]},
         'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
         'knowledge_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
-        'research_notes': RESEARCH_NOTES_SCHEMA, 'semantic_updates': SEMANTIC_UPDATE_SCHEMA},
+        'research_notes': RESEARCH_NOTES_SCHEMA, 'semantic_updates': SEMANTIC_UPDATE_SCHEMA,
+        'investigation': INVESTIGATION_SCHEMA},
     'required': ['action', 'recipe_id', 'hyperparameters', 'hypothesis', 'expected_effect',
                  'feature_steps', 'code', 'tuning', 'evidence_ids'], 'additionalProperties': False}
 

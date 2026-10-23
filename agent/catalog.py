@@ -29,7 +29,7 @@ class Catalog:
                           "timeout_seconds": timeout, "side_effect": side_effect})
         if self.config.research_mode == 'adaptive':
             from tools.analysis import ANALYSIS_SCHEMA
-            tools.append({'name': 'analyze_data', 'description': 'Bounded fit-only statistics, feature comparisons and metadata.',
+            tools.append({'name': 'analyze_data', 'description': 'Question-bound fit-only statistics, exact check counts, feature comparisons and metadata. Computing queries attach investigation before observations.',
                           'input_schema': ANALYSIS_SCHEMA, 'timeout_seconds': 120, 'side_effect': 'artifact_write'})
             from tools.knowledge import KNOWLEDGE_SCHEMA
             tools.append({'name': 'search_knowledge', 'description': 'Search local Kaggle methods and complete project-authored pipeline examples; read by knowledge ID. No network.',

@@ -73,7 +73,7 @@ def bootstrap(config, started, task_path, run_id, root, log):
         spec_result = bus.call("C04", {"interpretation_request_id": interpretation["request_id"],
                                         "profile_artifact_id": profile["profile_artifact_id"], "dataset_id": profile["dataset_id"]},
                                lambda p: {"task_spec": resolve_spec(bus.responses[p["interpretation_request_id"]]["data"]["draft"], profile,
-                                                                   task["task_root"], artifacts, bus.schemas),
+                                                                   task["task_root"], artifacts, bus.schemas, task_text=task['task_text']),
                                           "adapter_id": interpretation["data"]["draft"]["task_kind"] + "-v1",
                                           "metric_implementation_id": "sklearn-metrics-v2"})["data"]
         spec = spec_result["task_spec"]

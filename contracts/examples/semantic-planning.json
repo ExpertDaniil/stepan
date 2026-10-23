@@ -1,0 +1,230 @@
+{
+  "task_text": "One row is a device-session. response is work per session duration. minor counts a subset of major in the same session. period_tag is an anonymous ordered code, not a calendar date. calendar_stamp is a calendar year. bearing is a direction in degrees with period 360.",
+  "profile": {
+    "train_columns": [
+      "minor",
+      "major",
+      "period_tag",
+      "calendar_stamp",
+      "bearing",
+      "duration",
+      "response"
+    ],
+    "test_columns": [
+      "minor",
+      "major",
+      "period_tag",
+      "calendar_stamp",
+      "bearing",
+      "duration"
+    ],
+    "data_dictionary": []
+  },
+  "valid": {
+    "TaskModel": {
+      "context": {
+        "entity": "device",
+        "observation_grain": "one device-session",
+        "prediction_time": "unknown",
+        "target_meaning": "work per session duration",
+        "target_normalization": "divided by session duration"
+      },
+      "context_sources": [
+        {
+          "source": "task",
+          "record": null,
+          "quote": "One row is a device-session. response is work per session duration."
+        }
+      ],
+      "quantities": [
+        {
+          "column": "response",
+          "meaning": "work per session duration",
+          "kind": "rate",
+          "unit": "work/time",
+          "period": null,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "response is work per session duration."
+          }
+        },
+        {
+          "column": "minor",
+          "meaning": "subset event count",
+          "kind": "count",
+          "unit": "events",
+          "period": null,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "minor counts a subset of major in the same session."
+          }
+        },
+        {
+          "column": "major",
+          "meaning": "superset event count",
+          "kind": "count",
+          "unit": "events",
+          "period": null,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "minor counts a subset of major in the same session."
+          }
+        },
+        {
+          "column": "period_tag",
+          "meaning": "anonymous ordered period",
+          "kind": "ordinal_code",
+          "unit": null,
+          "period": null,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "period_tag is an anonymous ordered code, not a calendar date."
+          }
+        },
+        {
+          "column": "calendar_stamp",
+          "meaning": "calendar year",
+          "kind": "calendar",
+          "unit": "year",
+          "period": null,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "calendar_stamp is a calendar year."
+          }
+        },
+        {
+          "column": "bearing",
+          "meaning": "circular direction",
+          "kind": "cyclic",
+          "unit": "degrees",
+          "period": 360,
+          "availability": "available",
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "bearing is a direction in degrees with period 360."
+          }
+        }
+      ],
+      "relations": [
+        {
+          "kind": "subset_count",
+          "columns": [
+            "minor",
+            "major"
+          ],
+          "statement": "minor is a subset count of major within the same session",
+          "assumptions": [
+            "Same observed events and session window."
+          ],
+          "source": {
+            "source": "task",
+            "record": null,
+            "quote": "minor counts a subset of major in the same session."
+          }
+        }
+      ],
+      "unknowns": [
+        "Geometry, device identity across sessions and the mapping of period_tag are unknown."
+      ]
+    },
+    "Investigation": {
+      "question": "Do nested event counts agree with their stated relation?",
+      "basis_ids": [],
+      "columns": [
+        "minor",
+        "major"
+      ],
+      "interpretation": "mathematical",
+      "mechanism": "A subset count cannot exceed its superset for the same events and window.",
+      "assumptions": [
+        "Both counts refer to the same session and event definitions."
+      ],
+      "expected_observation": "Zero violations among rows where both counts are observed.",
+      "alternative_explanation": "Violations may reflect different windows or definitions rather than corrupted values.",
+      "decision_rule": "With violations, revisit definitions before constructing an interval count; otherwise consider the difference without assuming predictive gain."
+    },
+    "ResearchAction": {
+      "action": "features",
+      "recipe_id": "linear-regressor-v1",
+      "hyperparameters": {},
+      "hypothesis": "Represent the events outside the nested subset.",
+      "expected_effect": "Measure the full configuration; predictive benefit is unknown.",
+      "feature_steps": [],
+      "code": null,
+      "tuning": null,
+      "evidence_ids": [],
+      "investigation": {
+        "question": "Do nested event counts agree with their stated relation?",
+        "basis_ids": [],
+        "columns": [
+          "minor",
+          "major"
+        ],
+        "interpretation": "mathematical",
+        "mechanism": "A subset count cannot exceed its superset for the same events and window.",
+        "assumptions": [
+          "Both counts refer to the same session and event definitions."
+        ],
+        "expected_observation": "Zero violations among rows where both counts are observed.",
+        "alternative_explanation": "Violations may reflect different windows or definitions rather than corrupted values.",
+        "decision_rule": "With violations, revisit definitions before constructing an interval count; otherwise consider the difference without assuming predictive gain."
+      },
+      "feature_program": [
+        {
+          "op": "difference",
+          "name": "outside_subset",
+          "columns": [
+            "major",
+            "minor"
+          ]
+        }
+      ]
+    },
+    "AnalysisQuery": {
+      "kind": "check",
+      "columns": [
+        "minor",
+        "major"
+      ],
+      "group_by": null,
+      "include_target": false,
+      "investigation": {
+        "question": "Do nested event counts agree with their stated relation?",
+        "basis_ids": [],
+        "columns": [
+          "minor",
+          "major"
+        ],
+        "interpretation": "mathematical",
+        "mechanism": "A subset count cannot exceed its superset for the same events and window.",
+        "assumptions": [
+          "Both counts refer to the same session and event definitions."
+        ],
+        "expected_observation": "Zero violations among rows where both counts are observed.",
+        "alternative_explanation": "Violations may reflect different windows or definitions rather than corrupted values.",
+        "decision_rule": "With violations, revisit definitions before constructing an interval count; otherwise consider the difference without assuming predictive gain."
+      },
+      "checks": [
+        {
+          "name": "subset_exceeds_superset",
+          "violation": {
+            "column": "minor",
+            "op": "gt",
+            "other_column": "major"
+          }
+        }
+      ]
+    }
+  }
+}

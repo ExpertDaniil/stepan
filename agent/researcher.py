@@ -23,6 +23,7 @@ class Researcher:
         adaptive = self.config.research_mode == 'adaptive'
         catalog_mode = self.config.research_mode == "catalog"
         context = self.artifacts.read_json(payload["context_id"])
+        investigation_check = None
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
                                         "tool_schema_ids": (['analyze_data', 'read_memory'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
@@ -50,6 +51,11 @@ class Researcher:
                 if delivery.get('name') == 'research_updates':
                     evidence.update(delivery['evidence_ids'])
             projection = user.get('profile_summary', user)
+            semantic_task = projection.get('semantic_task', {})
+            if semantic_task.get('model_id'):
+                evidence.add(semantic_task['model_id'])
+            evidence.update(item['record_id'] for field in ('quantities', 'relations') for item in semantic_task.get(field, []))
+            evidence.update(item['record_id'] for item in memory.get('semantic_records', []))
             landscape = projection.get('research_landscape', {})
             for result in [*landscape.get('best_per_family', []), *projection.get('feature_memory', {}).get('representations', [])]:
                 evidence.add(result['experiment_id'])
@@ -73,6 +79,17 @@ class Researcher:
             from agent.research_memory import validate_semantic_updates
             detail_id = context['metadata'].get('detail_artifact_id')
             semantic_records = self.artifacts.read_json(detail_id)['sections']['semantics'] if detail_id else []
+            from agent.semantic_planning import validate_investigation, check_declared_semantics, effective_model
+            investigation_check = validate_investigation(proposed.get('investigation'), context, evidence,
+                self.feature_columns, self.bus.schemas, program=proposed.get('feature_program', []))
+            if (proposed.get('investigation', {}).get('interpretation') in {'physical', 'mathematical'}
+                    and (proposed['hyperparameters'].get('numeric_interactions') is True
+                         or 'numeric_interactions' in (proposed.get('tuning') or {}).get('search_space', {})
+                         or 'numeric_interactions' in (proposed.get('tuning') or {}).get('parameters', []))):
+                raise AgentError('INVALID_INVESTIGATION', 'Automatic numeric_interactions cannot substantiate named physical/mathematical interactions; use an explicit feature_program or an exploratory interpretation')
+            frozen_model = self.artifacts.read_json(detail_id)['sections'].get('semantic_model') if detail_id else None
+            investigation_check['warnings'] = check_declared_semantics(proposed.get('feature_program', []),
+                proposed.get('investigation'), effective_model(frozen_model, semantic_records))
             validate_semantic_updates(proposed.get('semantic_updates', []), memory, evidence,
                                       (self.feature_columns + [step['name'] for step in proposed.get('feature_program', [])]
                                        if self.feature_columns is not None else None),
@@ -89,7 +106,7 @@ class Researcher:
                                  '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
             validate_research_notes(proposed.get('research_notes'), memory, evidence, visible_knowledge)
             if proposed['action'] == 'stop':
-                self.save_decision(proposed, None, payload, context, answer)
+                self.save_decision(proposed, None, payload, context, answer, investigation_check=investigation_check)
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
                         'plan': None, 'decision': 'stop', 'stop_reason': proposed['hypothesis']}
@@ -121,6 +138,9 @@ class Researcher:
                                branch_id=branch_user["branch_id"], work_order_id=branch_user["work_order_id"], changes=constraint_changes)
             params = effective
         plan_recipe = proposed['recipe_id']
+        if (adaptive and proposed.get('investigation', {}).get('interpretation') in {'physical', 'mathematical'}
+                and params.get('numeric_interactions') is True):
+            raise AgentError('INVALID_INVESTIGATION', 'The effective inherited parameters still enable automatic numeric_interactions; use explicit named operations or an exploratory interpretation')
         feature_manifest = None
         if adaptive and proposed['action'] == 'features':
             from agent.feature_schema import FACTORY_SOURCE, validate_program, operation_facts
@@ -169,6 +189,8 @@ class Researcher:
                 {**{k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
                  'knowledge_ids': proposed.get('knowledge_ids', []),
                  'research_notes': proposed.get('research_notes'),
+                 'investigation': proposed.get('investigation'),
+                 'investigation_check': investigation_check,
                  'coordination': proposed.get('coordination', {}),
                  'claims': proposed.get('claims', []), 'visible_evidence_ids': sorted(evidence),
                  'delivered_feedback': [c for c in answer.get('tool_calls', []) if c.get('name') == 'research_updates'],
@@ -176,7 +198,7 @@ class Researcher:
                     ([knowledge['artifact_id']] if knowledge.get('artifact_id') else [])+
                     [call['artifact_id'] for call in answer['tool_calls'] if call.get('name') == 'search_knowledge' and call.get('artifact_id')]))},
                 'research_intent', ident='intent-'+plan['plan_id'])
-            self.save_decision(proposed, plan, payload, context, answer)
+            self.save_decision(proposed, plan, payload, context, answer, investigation_check=investigation_check)
             self.log.event('research.action_proposed', plan_id=plan['plan_id'], researcher_id=payload['researcher_id'],
                            action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'],
                            knowledge_ids=proposed.get('knowledge_ids', []))
@@ -187,7 +209,7 @@ class Researcher:
         return {"proposal_id": "proposal-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                 "plan": plan, "decision": "propose", "stop_reason": None}
 
-    def save_decision(self, proposed, plan, payload, context, answer):
+    def save_decision(self, proposed, plan, payload, context, answer, *, investigation_check=None):
         """Immutable artifact only; SQLite/measurement updates stay in the dispatcher."""
         binding = context['metadata'].get('graph_binding', {})
         configuration = None
@@ -206,6 +228,8 @@ class Researcher:
         record['claims'] = proposed.get('claims', [])
         record['model_interpretations_verified'] = False
         record['semantic_updates'] = proposed.get('semantic_updates', [])
+        record['investigation'] = proposed.get('investigation')
+        record['investigation_check'] = investigation_check
         record['semantic_scope'] = context['metadata'].get('detail_scope')
         if record['semantic_updates']:
             self.log.event('research.semantic_update_saved', context_id=payload['context_id'],
@@ -215,3 +239,8 @@ class Researcher:
         self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
             action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,
             work_order_id=binding.get('work_order_id'))
+        if record['investigation']:
+            self.log.event('research.investigation_saved', artifact_id=art['artifact_id'],
+                question=record['investigation']['question'], basis_ids=record['investigation']['basis_ids'],
+                columns=record['investigation']['columns'], interpretation=record['investigation']['interpretation'],
+                check=record['investigation_check'], plan_id=plan['plan_id'] if plan else None)

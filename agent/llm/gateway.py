@@ -71,7 +71,8 @@ class MockTransport:
         if not demo:
             raise AgentError("INVALID_CONFIG", "Mock mode requires a task created by scripts/make_demo.py")
         if purpose == "TaskDraft-v1":
-            payload = demo["draft"]
+            from agent.semantic_planning import unknown_model
+            payload = {**demo['draft'], 'task_model': unknown_model()}
         elif purpose == "ValidationProposal-v1":
             payload = demo.get("validation") or {"strategy": "random_holdout" if demo["draft"]["task_kind"] == "regression" else "stratified_holdout",
                                                   "parameters": {"valid_fraction": 0.2}, "seed": 42,
@@ -107,6 +108,13 @@ class MockTransport:
                     column = next(c for c in data['train_columns'] if c in data['test_columns'] and c != 'id')
                     payload.update(action='features', feature_program=[
                         {'op': 'missing', 'name': '__mock_missing_'+str(round_no), 'columns': [column]}])
+                payload['investigation'] = {
+                    'question': 'Does this complete synthetic configuration improve the measured base?',
+                    'basis_ids': [], 'columns': [column] if payload['action'] == 'features' else [],
+                    'interpretation': 'exploratory', 'mechanism': 'Synthetic demo reference, not a physical interpretation.',
+                    'assumptions': ['Synthetic demo only.'], 'expected_observation': 'A valid independent configuration score.',
+                    'alternative_explanation': 'Differences may reflect the joint estimator and representation.',
+                    'decision_rule': 'Retain the better valid configuration without asserting a component mechanism.'}
         return {"id": "mock-" + uuid.uuid4().hex[:12],
                 "choices": [{"message": {"role": "assistant", "content": json.dumps(payload, ensure_ascii=False)}, "finish_reason": "stop"}]}
 
@@ -318,7 +326,13 @@ class Gateway:
         dialogue_started = time.monotonic()
         context = self.artifacts.read_json(payload["context_artifact_id"])
         messages = deepcopy(context["messages"])
-        expected = self.output_schemas[payload["response_schema_id"]]
+        expected = deepcopy(self.output_schemas[payload["response_schema_id"]])
+        if payload['response_schema_id'] == 'TaskDraft-v1':
+            for variant in expected['oneOf']:
+                if 'target_column' in variant.get('properties', {}):
+                    variant['required'] = [*variant['required'], 'task_model']
+        elif payload['response_schema_id'] == 'ResearchAction-v1' and context['metadata'].get('semantic_contract'):
+            expected['required'] = [*expected['required'], 'investigation']
         def expanded(value):
             if isinstance(value, dict):
                 if "$ref" in value:
@@ -356,7 +370,7 @@ class Gateway:
             if self.analysis is None:
                 raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
-                'description': 'Read-only fit summary/association/group, stateless derived expressions and composite filters, errors for a visible experiment_id, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. columns contains input features only, never the target: use include_target=true for target summaries. For group, group_by names one to three selected columns. errors returns selection-only aggregates; include_target=false. At most 12 columns; [] selects defaults.',
+                'description': 'Read-only fit summary/association/group, exact streamed check violation counts, stateless derived expressions/filters, errors for a visible experiment_id, unlabelled test comparison, dictionary or report. Computing queries attach investigation before observations. No holdout labels. columns contains inputs, never targets; include_target=true adds fit-only summaries. check requires checks, group_by=null, include_target=false. errors returns selection-only aggregates. At most 12 columns.',
                 'parameters': ANALYSIS_SCHEMA}})
         if 'read_memory' in payload['tool_schema_ids']:
             from agent.context_details import READ_SCHEMA
@@ -555,6 +569,11 @@ class Gateway:
                             trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
                                      'knowledge_ids': [r['id'] for r in result.get('results', [])]}
                         calls.append(trace)
+                        if not result.get('error'):
+                            delivered_ids = set(result.get('evidence_ids', []))
+                            if result.get('artifact_id'):
+                                delivered_ids.add(result['artifact_id'])
+                            context['metadata'].setdefault('delivered_evidence_ids', []).extend(sorted(delivered_ids))
                         tool_cache[key] = (deepcopy(result), call['id'])
                         if name == 'analyze_data' and result.get('artifact_id') and not result.get('error'):
                             from agent.tool_arguments import report_read
@@ -584,6 +603,19 @@ class Gateway:
                         raise IncompleteOutput(str(exc)) from exc
                     raise
                 self.bus.schemas._check(parsed, expected, "$")
+                if (payload['response_schema_id'] == 'TaskDraft-v1' and 'target_column' in parsed
+                        and context['metadata'].get('bootstrap_profile_artifact_id')):
+                    # Repair source/column mistakes within the existing bounded
+                    # bootstrap dialogue, before they can abort TaskSpec resolution.
+                    from agent.semantic_planning import build_task_model
+                    source = json.loads(context['messages'][1]['content'])
+                    full_profile = self.artifacts.read_json(context['metadata']['bootstrap_profile_artifact_id'])
+                    try:
+                        build_task_model(parsed['task_model'], source['task_markdown'], full_profile, self.bus.schemas,
+                            {'task_spec_id': 'bootstrap-source-check', 'dataset_id': 'bootstrap-source-check',
+                             'target_column': parsed['target_column']})
+                    except AgentError as error:
+                        raise ValueError(str(error)) from error
                 if recovered:
                     self.log.event('llm.json_fence_recovered', call_no=call_no, schema_id=payload['response_schema_id'])
                 art = self.artifacts.write_json("llm/parsed-"+uuid.uuid4().hex[:12]+".json", parsed, "llm_output")

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from agent.feature_schema import GROUP_OPS, validate_program, operation_facts
+from agent.feature_schema import GROUP_OPS, PROGRAM_VERSION, validate_program, operation_facts
 
 def _keys(values):
     def key(value):
@@ -61,7 +61,7 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
             values = frame[name]
             self.report_.append({'name': name, 'op': op, 'inputs': cols,
                 'program_id': self.execution_spec_['program_id'], 'verification': 'owned_operation_executed',
-                'implementation': 'feature-program-2', 'units': 'not_inferred',
+                'implementation': PROGRAM_VERSION, 'units': 'not_inferred',
                 'group_by': step.get('group_by'), 'fit_rows': len(frame),
                 'missing_fraction': float(values.isna().mean()), 'unique': int(values.nunique()),
                 'statistics_scope': 'fit_rows_without_target'})
@@ -125,6 +125,9 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
                     result = result*other
             elif op == 'difference':
                 result = value-values[1]
+            elif op in {'cyclic_sin', 'cyclic_cos'}:
+                phase = 2*np.pi*((value-step.get('origin', 0)) % step['period'])/step['period']
+                result = np.sin(phase) if op == 'cyclic_sin' else np.cos(phase)
             else:
                 result = value/values[1].replace(0, np.nan)
         return result.replace([np.inf, -np.inf], np.nan)

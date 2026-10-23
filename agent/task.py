@@ -14,7 +14,7 @@ METRICS = {
 }
 
 
-def resolve_spec(draft, profile, task_root, artifacts, schemas):
+def resolve_spec(draft, profile, task_root, artifacts, schemas, *, task_text=''):
     import pandas as pd
     import numpy as np
     kind = draft["task_kind"]
@@ -115,6 +115,15 @@ def resolve_spec(draft, profile, task_root, artifacts, schemas):
             'target_columns': target_columns,
             **{k: profile[k] for k in ("train_artifact_id", "test_artifact_id", "dictionary_artifact_id", "sample_submission_artifact_id")},
             "metric": metric, "allowed_labels": labels, "output": output, "excluded_features": excluded}
+    from agent.semantic_planning import build_task_model
+    semantic_profile = artifacts.read_json(profile['profile_artifact_id']) if profile.get('profile_artifact_id') else profile['summary']
+    if task_text or draft.get('task_model') is not None:
+        model = build_task_model(draft.get('task_model'), task_text, semantic_profile, schemas, spec)
+        semantic_art = artifacts.write_json('task/semantic-model.json', model, 'task_semantic_model')
+        spec.update(semantic_model_artifact_id=semantic_art['artifact_id'], semantic_model_id=model['model_id'])
+        artifacts.log.event('research.task_model_built', model_id=model['model_id'], artifact_id=semantic_art['artifact_id'],
+            quantities=len(model['quantities']), relations=len(model['relations']),
+            verification=model['verification'], source='existing_task_interpretation_call')
     schemas.validate(spec, "TaskSpec")
     artifacts.write_json("task/task-spec.json", spec, "task_spec")
     return spec

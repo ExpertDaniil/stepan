@@ -95,6 +95,8 @@ class LocalSearch:
         locked = self.feature_parameters() if numeric_only else set()
         domains = list(self.c.catalog.recipes[recipe]['parameters'].items())
         domains = [(name, domain) for name, domain in domains if name not in locked]
+        if self.c.config.research_mode == 'adaptive' and parameter_names is None:
+            domains = [(name, domain) for name, domain in domains if name != 'numeric_interactions']
         if parameter_names is not None:
             domains = [(name, domain) for name, domain in domains if name in parameter_names]
         if domains:
@@ -260,6 +262,8 @@ class LocalSearch:
             params = self.c.catalog.normalize(recipe, base['model']['hyperparameters'] if final else {})
             domains = self.c.catalog.recipes[recipe]["parameters"]
             names = [name for name in domains if not final or name not in feature_parameters]
+            if adaptive:
+                names = [name for name in names if name != 'numeric_interactions']
             if not names:
                 return None
             name = rng.choice(names)

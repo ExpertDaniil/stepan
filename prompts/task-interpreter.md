@@ -21,3 +21,34 @@ For ranking, unsupervised tasks, multi-target classification, unknown metrics or
 return {"task_kind":"unsupported", "reason":"the precise unsupported requirement from the task"}
 (ranking/unsupervised may use those task_kind values). Never silently replace the task or metric.
 No internet, extra data, pretrained models, package installation or external APIs are allowed.
+
+Also return task_model in this SAME response. This is a compact model of the problem,
+not a list of transformations. Use the output schema, selecting the target and the
+most informative quantities/relations rather than filling every allowed slot.
+
+context records entity, observation_grain, prediction_time, target_meaning and
+target_normalization. Explain what one row represents, which information exists at
+prediction, and any denominators already built into the target. Use "unknown" when
+the sources do not say. context_sources contains exact short quotations supporting
+these interpretations. A source has {source:task|dictionary|hypothesis, record, quote}.
+task uses record=null and a verbatim substring of task_markdown. dictionary uses a
+zero-based row of profile.data_dictionary and a verbatim substring of that row.
+hypothesis uses record=null, quote="". Quotations will be checked; their interpretation
+is still unverified. Missing dictionary rows are not permission to invent definitions.
+
+quantities names actual columns with meaning, kind, unit, period, availability and
+source. Kinds: quantity/count/ratio/rate/category/ordinal_code/identifier/calendar/
+cyclic/unknown. unit=null means unknown; codes/categories/identifiers have no physical
+unit. period is a positive number only for sourced cyclic quantities, otherwise null.
+availability is available/unavailable/unknown. Names and numeric dtype alone do not
+identify physical units, elapsed time, entity identity or temporal availability.
+Hypothetical interpretations keep unit/period=null. Target definitions matter as
+much as input definitions; account for all numeric targets when applicable.
+
+relations links named columns with kind, ordered columns, statement, assumptions and
+source. normalized_by=[normalized quantity, denominator]; subset_count=[subset,
+superset]; precedes=[earlier,later]. Other kinds: part_of, rate_exposure, same_window,
+conditional_response, proxy, other. These express logical structure or a proposed
+mechanism; they do not assert causality or predictive gain. Keep unknown observation
+windows, anonymous code mappings and unavailable geometry explicit in unknowns.
+Source-grounded claims and hypotheses must remain distinguishable.

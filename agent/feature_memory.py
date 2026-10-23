@@ -70,15 +70,13 @@ def interface():
             'categorical': ['frequency', 'cross'],
             'grouped': ['group_mean', 'group_std', 'group_rank', 'relative_to_group'],
             'datetime': ['month', 'dayofweek', 'hour']},
+        'geometry': 'cyclic_sin/cyclic_cos require an explicit positive period and optional origin, in the input scale.',
         'semantics': 'Named operations execute in order, may consume earlier generated columns, and preserve originals. '
             'Group statistics/frequencies/rank reference distributions fit on fit rows only, never on prediction batches. '
             'Unknown groups yield missing, unseen frequencies zero, division by zero yields missing. '
-            'Choose actual named inputs using the dictionary and analysis; column order is not relevance.',
+            'Choose a question/mechanism from semantic_task before choosing an operator. '
+            'Use named inputs; column order is not relevance. Each features action supplies an investigation covering its raw dependencies.',
         'output': 'action=features; recipe_id is an owned learned base; hyperparameters are that base parameters; '
             'feature_program=[{op,name,columns, optional group_by}]; code/tuning=null; feature_steps=[]. '
             'Use action=pipeline for transformations outside this language; custom tuning remains available.',
-        'example_program': [
-            {'op': 'cross', 'name': 'joint_category', 'columns': ['category_a', 'category_b']},
-            {'op': 'frequency', 'name': 'joint_frequency', 'columns': ['joint_category']},
-            {'op': 'relative_to_group', 'name': 'relative_size', 'columns': ['numeric_a'], 'group_by': 'joint_category'}],
-        'example_note': 'Example names are placeholders, not columns to assume exist.'}
+        'detail_hint': 'Use read_memory section=tool_guide for examples. Select actual inputs from semantic_task and analysis, not from a default example program.'}

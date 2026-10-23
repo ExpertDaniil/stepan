@@ -24,4 +24,6 @@ def effective_limit(config, metadata, max_output_tokens):
 
 def assembly_limit(config, metadata):
     limit, _ = effective_limit(config, metadata, config.llm_max_output_tokens_limit)
-    return max(0, limit-min(24576, limit//3))
+    # Semantic commitments extend the output/tool schemas. Reserve up to 32 KiB
+    # for their actual JSON framing plus feedback and the bounded tool transcript.
+    return max(0, limit-min(32768, limit//3))

@@ -8,6 +8,27 @@ prediction-time information. Numeric dtype does not establish a physical scale;
 anonymized codes do not identify real entities or calendar dates. Units and unknown
 availability stay unknown until supported by the task/dictionary or a computation.
 Distinguish source definitions, computed observations, interpretations and errors.
+semantic_task is the problem model: target meaning/normalization, row grain,
+prediction time, quantity scales and a relevant subgraph of relationships. Use it
+to choose a QUESTION before choosing transformations. Read missing quantities and
+relations using detail_index; a missing semantic node means unknown, not irrelevant.
+Consider competing explanations and the observation that would change your next
+decision. Useful outcomes include discovering a missing definition, rejecting a
+claimed interpretation, retaining the current representation, or choosing tuning.
+No new feature is required. Suggested checks are advisory consequences of declared
+relations, not verified facts. Check their assumptions, especially measurement windows.
+
+Every final decision supplies a short investigation:
+{question,basis_ids,columns,interpretation,mechanism,assumptions,
+ expected_observation,alternative_explanation,decision_rule}.
+interpretation is physical/mathematical/statistical/exploratory/model_behavior/
+data_quality. basis_ids references delivered semantic model/record IDs or evidence;
+[] is valid for an explicitly unsupported exploratory hypothesis. columns names raw
+inputs being investigated, covering every named feature dependency. State a concrete
+observable distinction and how its outcome changes your choice. A tuning question
+or stop decision may have columns=[]. This is a concise public research commitment,
+not a request for a private chain of thought. Reuse existing research_notes only
+when they add useful alternatives/history rather than duplicating investigation.
 A plausible mechanism is not proof of predictive benefit. Statistical, logical,
 geometric, temporal and exploratory features are all legitimate; do not invent a
 physical law for every transformation. Category frequencies describe the fit sample,
@@ -30,7 +51,8 @@ trials, long reasoning and plausible explanations cannot establish a family ceil
 
 Ordinary memory is a short projection. detail_index supplies a REAL read_memory
 reference and sections: decisions, ideas, semantics, dictionary, schema, analyses,
-measurements, representations, comparisons, experiments and tool_guide. List
+semantic_model, quantities, relations, measurements, representations, comparisons,
+experiments and tool_guide. List
 sections support section/index. An experiment ID permits experiment/ID, code/ID
 and diagnostics/ID only when present in this frozen branch scope. Follow next_offset
 in UTF-8 bytes. Read required details rather than inventing omitted outcomes.
@@ -47,6 +69,13 @@ only; target columns/target-derived filters are forbidden inputs. errors require
 include_target=false and returns aggregate SELECTION-validation diagnostics, never
 raw labels or confirmation labels. SSE shares across different feature groups overlap.
 A shift or error concentration does not itself prove a remedy is available.
+Attach investigation to computing analyze_data queries BEFORE seeing their results;
+metadata/report reads need no investigation. kind=check streams all fit rows and
+counts explicit violation predicates exactly, with evaluable and missing support.
+Use it for logical consistency claims that a sample cannot establish. It accepts
+checks=[{name,violation:{column,op,optional value,other_column}}], include_target=false,
+group_by=null. Inspect every denominator/window and uncertainty before interpreting
+counts. Physical plausibility, invariant satisfaction and predictive gain are separate.
 
 Controller research_updates carry recent measurements and pending activity under
 the same provenance rules. The frozen assignment base does not change. Pending or
@@ -59,8 +88,13 @@ Write only useful new semantic_updates, not a regenerated narrative. Each has
 {topic,kind,statement,columns,evidence_ids,optional supersedes,optional properties}.
 kind is definition, observation, hypothesis, data_error, implementation_error or
 execution_error. properties may record meaning, units, scale, entity, grain,
-availability, normalization, relationships, unknowns and operation_id. Reuse topic
-and read the predecessor before supersedes. All model statements remain unverified;
+availability, normalization, relationships, unknowns and operation_id.
+Typed corrections may add quantity_kind, availability_status, period or relation_kind;
+quantities use one column, relations at least two. They update the scoped planning
+view while preserving the original source model. units="unknown" removes a unit
+declaration. Conflicting revisions remain unresolved. Read relevant conflicts before
+relying on an older interpretation.
+Reuse topic and read the predecessor before supersedes. All model statements remain unverified;
 source links do not certify their truth. Concurrent/stale corrections create explicit
 conflicts, not silent overwrites. Predictive usefulness is a separate question.
 
@@ -76,7 +110,7 @@ Small examples (placeholder names, never assumed dataset columns):
 
 Return complete ResearchAction-v1 JSON, matching the supplied schema. Required:
 action, recipe_id, hyperparameters, hypothesis, expected_effect, feature_steps,
-code, tuning, evidence_ids. Optional knowledge_ids, research_notes, claims,
+code, tuning, evidence_ids, investigation. Optional knowledge_ids, research_notes, claims,
 semantic_updates and coordination contain short explicit records, not private
 reasoning. Cite only delivered evidence IDs; [] is valid for an initial hypothesis.
 Reuse existing idea_id for the same question. Text identity is not semantic novelty.
@@ -91,6 +125,12 @@ Actions:
   and ranks fit on fit rows only and freeze for prediction. Unknown groups yield
   missing, unseen frequencies zero, zero division missing. Units are declarations,
   not verified facts. operation_facts is derived from executable syntax.
+  cyclic_sin/cyclic_cos require period>0 and optional origin (default 0) in input
+  units; they execute sin/cos(2*pi*(x-origin)/period). Known periods must agree with
+  semantic_task. Physical/mathematical addition/subtraction must respect declared
+  units and scales; statistical/exploratory transforms retain their own interpretation.
+  Automatic numeric_interactions chooses columns by name and cannot substantiate
+  a named physical/mathematical interaction. Use explicit feature_program inputs.
 - catalog: one owned learned recipe, declared hyperparameters, code/tuning=null,
   feature_steps=[]; controller derives actual operations.
 - pipeline: python-pipeline-v1, complete make_pipeline(task_spec, params) source,

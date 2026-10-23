@@ -1,9 +1,10 @@
 """Feature program syntax shared by controller and worker; no ML imports."""
 from copy import deepcopy
+import math
 
 OPS = ('missing', 'log1p', 'signed_log1p', 'square', 'sum', 'difference', 'product',
        'ratio', 'frequency', 'cross', 'group_mean', 'group_std', 'group_rank',
-       'relative_to_group', 'month', 'dayofweek', 'hour')
+       'relative_to_group', 'month', 'dayofweek', 'hour', 'cyclic_sin', 'cyclic_cos')
 
 GROUP_OPS = ('group_mean', 'group_std', 'group_rank', 'relative_to_group')
 
@@ -13,6 +14,8 @@ FEATURE_PROGRAM_SCHEMA = {
         'op': {'enum': list(OPS)}, 'name': {'type': 'string', 'minLength': 1, 'maxLength': 100},
         'columns': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'minItems': 1, 'maxItems': 4},
         'group_by': {'type': 'string', 'minLength': 1},
+        'period': {'type': 'number', 'exclusiveMinimum': 0},
+        'origin': {'type': 'number'},
         'input_units': {'type': 'object', 'additionalProperties': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
         'output_unit': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
         'required': ['op', 'name', 'columns'], 'additionalProperties': False}}
@@ -27,7 +30,7 @@ def validate_program(program, columns=None, excluded=()):
     available = set(columns) if columns is not None else None
     generated = set()
     for step in program:
-        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit'}:
+        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit', 'period', 'origin'}:
             raise ValueError('Unknown feature operation fields')
         op, name, inputs = step.get('op'), step.get('name'), step.get('columns')
         if op not in OPS or not isinstance(name, str) or not 1 <= len(name) <= 100:
@@ -41,6 +44,13 @@ def validate_program(program, columns=None, excluded=()):
             raise ValueError(op+' needs exactly two inputs')
         if op not in {'sum', 'product', 'difference', 'ratio', 'cross'} and len(inputs) != 1:
             raise ValueError(op+' needs exactly one input')
+        if op in {'cyclic_sin', 'cyclic_cos'}:
+            period, origin = step.get('period'), step.get('origin', 0)
+            if (isinstance(period, bool) or not isinstance(period, (int, float)) or not math.isfinite(period) or period <= 0
+                    or isinstance(origin, bool) or not isinstance(origin, (int, float)) or not math.isfinite(origin)):
+                raise ValueError('Cyclic operators need a finite positive period and finite origin')
+        elif 'period' in step or 'origin' in step:
+            raise ValueError('period/origin belong only to cyclic operators')
         group = step.get('group_by')
         if ((op in GROUP_OPS and not (isinstance(group, str) and group))
                 or (op not in GROUP_OPS and 'group_by' in step)):
@@ -60,7 +70,7 @@ def validate_program(program, columns=None, excluded=()):
     return deepcopy(program)
 
 
-PROGRAM_VERSION = 'feature-program-2'
+PROGRAM_VERSION = 'feature-program-3'
 
 
 def operation_facts(program):
@@ -82,7 +92,9 @@ def operation_facts(program):
                 'frequency': 'fit_count(key)/fit_rows', 'group_mean': 'fit_group_mean(x)',
                 'group_std': 'fit_group_std(x,ddof=1)', 'group_rank': 'fit_group_ECDF(x), right inclusive',
                 'relative_to_group': 'x/fit_group_mean(x)', 'month': 'UTC month',
-                'dayofweek': 'UTC weekday 0..6', 'hour': 'UTC hour'}[step['op']],
+                'dayofweek': 'UTC weekday 0..6', 'hour': 'UTC hour',
+                'cyclic_sin': 'sin(2*pi*(x-origin)/period)', 'cyclic_cos': 'cos(2*pi*(x-origin)/period)'}[step['op']],
+            **({'period': step['period'], 'origin': step.get('origin', 0)} if step['op'] in {'cyclic_sin', 'cyclic_cos'} else {}),
             'missing': ('typed missing key participates in counts/cross/group lookup'
                 if step['op'] in {'cross', 'frequency', 'group_mean', 'group_std'} else
                 'indicator 1 for missing' if step['op'] == 'missing' else 'missing value propagates'),

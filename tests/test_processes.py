@@ -160,6 +160,7 @@ class ProcessTests(unittest.TestCase):
 
     def test_failed_spawn_releases_unstarted_lease(self):
         controller = Orchestrator.__new__(Orchestrator)
+        controller.local_search = None
         train = self.h.artifacts.write_json("validation/train.json", [0, 1])
         valid = self.h.artifacts.write_json("validation/valid.json", [2])
         for key, value in {"config": self.h.config, "bus": self.h.bus, "budget": self.budget,

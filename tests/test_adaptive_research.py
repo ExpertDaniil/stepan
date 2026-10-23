@@ -235,11 +235,14 @@ class AdaptiveIntegrationTests(unittest.TestCase):
 
     def test_io_guard_denies_dataset_access_but_allows_installed_imports(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp);source = root/'candidate.py';source.write_text('')
+            root = Path(temp);source = root/'candidate.py'
+            source.write_text('import sklearn.preprocessing\ndef make_pipeline(task_spec, params):\n    return None\n')
             secret = root/'train.csv';secret.write_text('private validation labels')
-            code = '''from tools.runtime_guard import PipelineGuard
+            code = '''from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
 from pathlib import Path
 import sys
+# Match Worker: declared libraries initialize before generated execution is sealed.
+prepare_pipeline_imports(sys.argv[1])
 guard=PipelineGuard(sys.argv[1]);guard.active=True
 try:
     import sklearn.preprocessing

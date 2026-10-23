@@ -99,6 +99,8 @@ class ResearchMemoryTests(unittest.TestCase):
         children = self.g.invoke('G02', fork)
         reject = children['reject_branch']['branch_id']
         accept = children['accept_branch']['branch_id']
+        self.g.invoke('G08', {'branch_id': reject, 'expected_branch_revision': 0,
+                             'action': 'resume', 'reason': 'Inspect sibling decision visibility'})
         ticket = self.h.issue(branch=reject)
         payload = self.h.proposal(ticket, {'alpha': .123})
         self.save(ticket, payload['proposal']['plan'], notes())

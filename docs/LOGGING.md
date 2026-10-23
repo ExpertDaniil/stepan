@@ -1,3 +1,5 @@
+> Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
+
 # Наблюдаемость
 
 `data.cache_prepared` показывает source artifact, строки/столбцы, размер и время
@@ -199,3 +201,13 @@ records active work actually shown to the provider. `research.admission_reconsid
 `research.overlap_acknowledged` distinguish stale/unjustified overlap from deliberate work.
 `llm.tool_result_reused` links semantic reads to their original reply. `research.evidence_assessed`
 links model claims to controller-computed scope without declaring model prose verified.
+
+
+`llm.wire_request_budget_checked` проверяет фактические сериализованные HTTP bytes
+перед отправкой, без headers/секретов. `llm.request_budget_checked` включает effective
+limits и размеры messages/tools/прочих полей. `research.memory_selected/read` показывает
+причину выбора, IDs, раздел/byte offsets и scope. `research.semantic_update_saved`
+не означает verified: это сохранённый модельный текст с проверенными ссылками.
+`analysis.resource_acquired/released` связывает анализ с общими CPU/RAM и временем.
+`feature_execution`/`features.json` относятся к тому же worker job, что evaluated predictions;
+`feature_execution/ID` и `execution/ID` в read_memory раскрывают операции и runtime hashes.

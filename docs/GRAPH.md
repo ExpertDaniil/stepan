@@ -147,7 +147,7 @@ GEnvironmentManifest дополнен optional owned_runtime_artifact_id/owned_r
 | GRAPH_PLATEAU_WINDOW / GRAPH_PLATEAU_SECONDS | 4 / 900 |
 | GRAPH_REFINEMENT_ENABLED / GRAPH_SEARCH_FRACTION | 1 / 0.85 |
 | GRAPH_MIN_EFFECT | 0.001 |
-| GRAPH_CONTEXT_BYTES | 48000 для полного API request |
+| GRAPH_CONTEXT_BYTES | 98304 bytes полного API request во всех research modes; issued policy/client cap также ограничивают запрос |
 | GRAPH_MAX_ARTIFACT_BYTES / GRAPH_MIN_FREE_DISK_BYTES | 8000000000 / 2000000000 для новых graph blobs |
 
 Рецептный/LLM бюджет v0.3 сохранён. Параметры ветвления/плато — инженерные defaults, не математически оптимальные.

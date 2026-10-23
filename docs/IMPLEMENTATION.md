@@ -1,3 +1,5 @@
+> Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
+
 > Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).
 > Feature-research update: [FEATURE-RESEARCH.md](FEATURE-RESEARCH.md),
 > [VALIDATION-FEATURE-RESEARCH.md](VALIDATION-FEATURE-RESEARCH.md). The adaptive action set

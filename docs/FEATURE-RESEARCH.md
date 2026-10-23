@@ -13,9 +13,9 @@ To tune a compiled feature pipeline, keep its complete program/model_parameters 
 add scalar `model__<parameter>` overrides in a custom `tune` space. They override only
 the named base-model values; features and fit statistics remain fixed by the source.
 
-Feature-focused assignments rotate between existing peers/rounds. They admit `features`,
-a changed declared custom input-feature pipeline, or `stop`; model-only tuning does not
-consume that assignment. This guarantees attention, not useful features. A stop is respected.
+Feature-focused attention rotates between existing peers/rounds as an advisory hint.
+Analysis, tuning, catalogue and coordinated pipeline actions remain available. There is
+no feature quota or forced stop. See [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
 `FEATURE_RESEARCH_ENABLED=0` disables rotation and controller seeds for comparison.
 
 The dispatcher can run up to eight generic seed programs per visible branch while a different
@@ -41,7 +41,7 @@ actual fitted operator report. Feature modules and the runtime guard are include
 the frozen execution hashes checked before refit.
 
 `feature_memory` is built by the dispatcher from visible, trusted evaluations. It includes
-diverse program identities, complete parameters, scores and immutable source references,
+program identities, scores and immutable source references; complete parameters are readable through scoped read_memory,
 with explicit omission counts. A custom source's feature manifest is a declaration;
 it is not independent evidence that every declared operation ran or caused improvement.
 

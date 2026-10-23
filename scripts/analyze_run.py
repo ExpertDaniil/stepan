@@ -5,6 +5,32 @@ import json
 import math
 import statistics
 import zipfile
+from datetime import datetime
+
+
+def job_occupancy(events):
+    """Wall intervals with a train/refit job; this is not measured CPU utilization."""
+    if not events:
+        return {}
+    start, end = (datetime.fromisoformat(events[i]['timestamp']).timestamp() for i in (0, -1))
+    opened, intervals = {}, []
+    for event in events:
+        stamp = datetime.fromisoformat(event['timestamp']).timestamp()
+        if event['event'] == 'job.started':
+            opened[event['job_id']] = stamp
+        elif event['event'] == 'job.finished' and event['job_id'] in opened:
+            intervals.append((opened.pop(event['job_id']), stamp))
+    intervals.extend((stamp, end) for stamp in opened.values())
+    merged = []
+    for left, right in sorted(intervals):
+        if merged and left <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], right)
+        else:
+            merged.append([left, right])
+    busy = sum(right-left for left, right in merged)
+    return {'elapsed_seconds': round(end-start, 3), 'job_present_seconds': round(busy, 3),
+            'no_train_or_refit_seconds': round(max(0, end-start-busy), 3),
+            'unfinished_jobs': len(opened), 'interpretation': 'Job presence from saved events, not CPU utilization.'}
 
 
 def inspect_run(source):
@@ -65,7 +91,8 @@ def inspect_run(source):
             initial = max(16384, 2**math.ceil(math.log2(maximum+1))) if censored else max(16384,maximum)
             initial = min(initial,131072)
             valid_outputs = [r["output_tokens"] for r in rows if not r["truncated"] and isinstance(r["output_tokens"],int)]
-            state = next((e.get("state") for e in reversed(events) if e.get("event")=="run.finished"),"failed_or_incomplete")
+            state = next((e.get("state") for e in reversed(events) if e.get("event")=="run.finished"),
+                         'failed' if any(e.get('event') == 'run.failed' for e in events) else 'incomplete')
             categories = {}
             for name, size in sizes.items():
                 if not name.startswith(prefix):
@@ -86,6 +113,9 @@ def inspect_run(source):
                             "budget_note":"Client-side starting estimate, not a verified provider maximum or a RUB conversion. Truncated samples are censored; exact token need is unknown.",
                             "research_decisions":sum(e.get('event') == 'research.decision_saved' for e in events),
                             "feedback_deliveries":sum(e.get('event') == 'research.feedback_delivered' for e in events),
+                            "job_occupancy":job_occupancy(events),
+                            "dialogues":[e for e in events if e.get('event') == 'research.dialogue_summary'],
+                            "feature_seed_proposals":sum(e.get('event') == 'features.seed_proposed' for e in events),
                             "rolling_peer_resumptions":sum(e.get('event') == 'research.peer_resumed_while_waiting' for e in events),
                             "search_stop_reason":next((e.get('stop_reason') for e in reversed(events) if e.get('event') == 'search.finished'), None),
                             "fallback_seconds":next((e.get('fallback_seconds') for e in reversed(events) if e.get('event') == 'search.finished'), None),

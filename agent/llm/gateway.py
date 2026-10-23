@@ -275,6 +275,7 @@ class Gateway:
                            protocol=self.config.llm_reasoning_protocol)
 
     def complete(self, payload):
+        dialogue_started = time.monotonic()
         context = self.artifacts.read_json(payload["context_artifact_id"])
         messages = deepcopy(context["messages"])
         expected = self.output_schemas[payload["response_schema_id"]]
@@ -287,6 +288,8 @@ class Gateway:
         messages.insert(1, {"role": "system", "content": "Final output JSON schema:\n" + json.dumps(expanded(expected), ensure_ascii=False)})
         reserve = self.budget.reserve_seconds() + 1 if payload["purpose"] == "research_proposal" else .5
         deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
+        if payload['response_schema_id'] == 'ResearchAction-v1':
+            deadline = min(deadline, dialogue_started+self.config.llm_research_dialogue_seconds)
         phase_limited = False
         if payload['purpose'] == 'research_proposal' and self.budget.phase_deadline:
             # This is a response deadline only. A received proposal can wait in
@@ -330,9 +333,22 @@ class Gateway:
                            final_request_reserved=True, repair_request_reserved=slots > 1,
                            max_output_tokens=token_limit)
         try:
-            return self._complete_dialogue(payload, context, messages, expected, tools, deadline, phase_limited,
+            answer = self._complete_dialogue(payload, context, messages, expected, tools, deadline, phase_limited,
                                            token_limit, dialogue_id, slots)
+            if payload['response_schema_id'] == 'ResearchAction-v1':
+                self.log.event('research.dialogue_summary', context_id=payload['context_artifact_id'],
+                    duration_seconds=round(time.monotonic()-dialogue_started, 3),
+                    tool_results=sum(c.get('name') != 'research_updates' for c in answer['tool_calls']),
+                    decision_received=True, tool_seconds_limit=self.config.llm_research_tool_seconds,
+                    dialogue_seconds_limit=self.config.llm_research_dialogue_seconds)
+            return answer
         except AgentError as error:
+            if payload['response_schema_id'] == 'ResearchAction-v1':
+                self.log.event('research.dialogue_summary', context_id=payload['context_artifact_id'],
+                    duration_seconds=round(time.monotonic()-dialogue_started, 3),
+                    decision_received=False, error_code=error.code,
+                    tool_seconds_limit=self.config.llm_research_tool_seconds,
+                    dialogue_seconds_limit=self.config.llm_research_dialogue_seconds)
             if error.code in {'LLM_UNAVAILABLE', 'LLM_RATE_LIMIT'}:
                 until = min(self.budget.deadline, time.monotonic()+60) if error.retryable else self.budget.deadline
                 with self.availability_lock:
@@ -347,6 +363,7 @@ class Gateway:
 
     def _complete_dialogue(self, payload, context, messages, expected, tools, deadline, phase_limited,
                            token_limit, dialogue_id, reserved_slots):
+        tool_deadline = time.monotonic()+self.config.llm_research_tool_seconds
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
         tool_cache, force_decision = {}, False
@@ -361,6 +378,11 @@ class Gateway:
             if not self.semaphore.acquire(timeout=left):
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
+                if tools and dialogue_id is not None and not force_decision and time.monotonic() >= tool_deadline:
+                    force_decision = True
+                    self.log.event('llm.tool_phase_closed', context_id=payload['context_artifact_id'],
+                        reason='tool_wall_budget', tool_seconds_limit=self.config.llm_research_tool_seconds,
+                        attempt=attempt, final_capacity_retained=True)
                 request = {"model": request_model(self.config.llm_mode), "messages": deepcopy(messages), "max_tokens": token_limit}
                 terminal = bool(tools and (force_decision or attempt == payload['attempt_limit']))
                 if dialogue_id is not None:
@@ -389,7 +411,7 @@ class Gateway:
                     request['messages'].append({'role': 'user', 'content': instruction})
                     self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'], dialogue_id=dialogue_id)
                 elif tools:
-                    request.update(tools=tools, parallel_tool_calls=False)
+                    request.update(tools=tools, parallel_tool_calls=dialogue_id is not None)
                 response, call_no = self._request(request, context, payload, attempt, deadline, dialogue_id)
             except AgentError as exc:
                 if phase_limited and time.monotonic() >= deadline:

@@ -63,6 +63,8 @@ class Config:
     llm_max_output_tokens_limit: int = 32768
     llm_max_total_output_tokens: int | None = 262144
     llm_research_tool_turns: int = 8
+    llm_research_tool_seconds: int = 90
+    llm_research_dialogue_seconds: int = 360
     feature_research_enabled: bool = True
     feature_seed_budget_fraction: float = .15
     feature_seed_timeout_seconds: int = 120
@@ -128,6 +130,8 @@ class Config:
             llm_max_output_tokens_limit=integer("LLM_MAX_OUTPUT_TOKENS_LIMIT", 32768, 128, 131072),
             llm_max_total_output_tokens=optional_limit("LLM_MAX_TOTAL_OUTPUT_TOKENS", None if platform else 262144, 1024, 1000000000),
             llm_research_tool_turns=integer('LLM_RESEARCH_TOOL_TURNS', 8, 0, 32),
+            llm_research_tool_seconds=integer('LLM_RESEARCH_TOOL_SECONDS', 90, 0, 1800),
+            llm_research_dialogue_seconds=integer('LLM_RESEARCH_DIALOGUE_SECONDS', 360, 30, 3600),
             feature_research_enabled=boolean('FEATURE_RESEARCH_ENABLED', True),
             feature_seed_budget_fraction=real('FEATURE_SEED_BUDGET_FRACTION', .15, 0, .5),
             feature_seed_timeout_seconds=integer('FEATURE_SEED_TIMEOUT_SECONDS', 120, 1, 600),
@@ -166,6 +170,8 @@ class Config:
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
+        if cfg.llm_research_tool_seconds >= cfg.llm_research_dialogue_seconds:
+            raise AgentError('INVALID_CONFIG', 'Tool phase must leave time for a final research decision')
         if cfg.llm_reasoning_protocol not in {'compatible', 'qwen_chat_template'}:
             raise AgentError('INVALID_CONFIG', 'LLM_REASONING_PROTOCOL must be compatible or qwen_chat_template')
         if cfg.llm_reasoning_effort not in {None, 'low', 'medium', 'xhigh'}:

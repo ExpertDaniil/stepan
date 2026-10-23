@@ -12,6 +12,7 @@ import threading
 from agent.config import ROOT
 from agent.contracts import canonical
 from agent.errors import AgentError
+from agent.tool_arguments import normalize_tool_arguments
 
 RESOURCE_NAMES = ('manifest.json', 'cards.json', 'competitions.json', 'sources.jsonl',
                   'selection.json', 'UPSTREAM_LICENSE.txt')
@@ -27,7 +28,7 @@ KNOWLEDGE_SCHEMA = {
         'offset': {'type': 'integer', 'minimum': 0, 'maximum': 100000,
                    'description': 'Character offset for reading long source write-ups by ID.'},
         'max_results': {'type': 'integer', 'minimum': 1, 'maximum': 3}},
-    'required': ['query'], 'additionalProperties': False}
+    'required': [], 'additionalProperties': False}
 STOP = set('the a an to of in for and or on with is are it this that from by as be at into we our model data features using'.split())
 
 
@@ -157,6 +158,7 @@ class KnowledgeService:
         return result
 
     def search(self, args, facts=None, *, seed=False):
+        args = normalize_tool_arguments('search_knowledge', args)
         query, ids = args.get('query', ''), args.get('ids', [])
         tags, offset = args.get('tags', []), args.get('offset', 0)
         limit = args.get('max_results', 3)

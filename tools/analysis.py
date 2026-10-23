@@ -8,6 +8,7 @@ from agent.contracts import canonical
 from agent.errors import AgentError
 from tools.data import read_table
 from agent.predictions import read_training, targets
+from agent.tool_arguments import normalize_tool_arguments
 
 
 ANALYSIS_SCHEMA = {
@@ -80,6 +81,7 @@ class AnalysisService:
     def analyze(self, query):
         import numpy as np
         import pandas as pd
+        query = normalize_tool_arguments('analyze_data', query)
         if not self.budget.snapshot()["search_allowed"]:
             raise AgentError("SEARCH_CLOSED", "Analysis cannot consume the final publication reserve")
         if self.budget.phase_remaining() < 1:
@@ -98,7 +100,8 @@ class AnalysisService:
             with self.lock:
                 known = next((r for r in self.cache.values() if r['artifact_id'] == query.get('report_id')), None)
             if known is None:
-                raise AgentError('INVALID_ANALYSIS', 'report_id must refer to an analysis from this run and validation')
+                raise AgentError('INVALID_ANALYSIS', 'report_id must refer to an analysis from this run and validation',
+                    details={'available_report_ids': [r['artifact_id'] for r in self.recent()]})
             return deepcopy(known)
         if query.get('report_id') is not None:
             raise AgentError('INVALID_ANALYSIS', 'report_id is only valid for kind=report')

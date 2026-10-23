@@ -14422,9 +14422,7 @@
           "maximum": 3
         }
       },
-      "required": [
-        "query"
-      ],
+      "required": [],
       "additionalProperties": false
     },
     "ResearchNotes": {

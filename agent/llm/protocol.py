@@ -5,6 +5,7 @@ import re
 import uuid
 
 from agent.contracts import canonical
+from agent.tool_arguments import normalize_tool_arguments
 
 
 class IncompleteOutput(ValueError):
@@ -75,7 +76,7 @@ def prepare_tool_calls(raw_calls, schema_by_name, validate, researcher_id, *, at
             raise ValueError('Unexpected tool or non-string tool arguments')
         args, error, syntax_error = None, None, None
         try:
-            args = parse_json(arguments)
+            args = normalize_tool_arguments(name, parse_json(arguments))
         except ValueError as exc:
             syntax_error = exc
             error = str(exc)

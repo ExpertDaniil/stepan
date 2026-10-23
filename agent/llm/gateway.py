@@ -466,6 +466,8 @@ class Gateway:
                                     result[field] = previous[field]
                             messages.append({'role': 'tool', 'tool_call_id': call['id'],
                                              'content': json.dumps(result, ensure_ascii=False)})
+                            self.log.event('llm.tool_result_reused', call_no=call_no, tool=name,
+                                original_tool_call_id=original_id, operation_key=self._digest(key))
                             continue
                         new_calls += 1
                         if item['error'] is not None:
@@ -492,6 +494,11 @@ class Gateway:
                                      'knowledge_ids': [r['id'] for r in result.get('results', [])]}
                         calls.append(trace)
                         tool_cache[key] = (deepcopy(result), call['id'])
+                        if name == 'analyze_data' and result.get('artifact_id') and not result.get('error'):
+                            from agent.tool_arguments import report_read
+                            report_key = ('analyze_data', json.dumps(report_read(result['artifact_id']),
+                                sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False))
+                            tool_cache[report_key] = (deepcopy(result), call['id'])
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
                     self.log.event('llm.tool_batch_normalized', call_no=call_no, raw_calls=len(message['tool_calls']),
                         unique_calls=len(prepared), new_calls=new_calls, reused_calls=len(prepared)-new_calls,

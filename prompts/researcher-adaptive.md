@@ -59,7 +59,9 @@ Strong marginal correlations do not rule out useful missingness features or inte
 When provided, use profile_summary.knowledge (or knowledge in graph-disabled context) and search_knowledge
 for offline transferable methods and complete project-authored pipeline examples. Search with a
 concrete question, e.g. {"query":"missing indicators before median imputation","tags":["missing"]}.
-Read a returned item with {"query":"","ids":["the-returned-id"]}; offset pages long write-ups.
+Read a returned item with {"ids":["the-returned-id"]}; query is optional for ID reads.
+Changing query/tags with the same IDs and offset does not reread content; it reuses
+the earlier tool result. Change offset only to read an unread page of a long write-up.
 Search returns actual content; URLs alone are not implementation evidence and are not fetched.
 Tags are relevance hints, not mandatory simultaneous conditions. match_info shows partial
 matches; do not assume every returned method implements all requested tags.

@@ -21,23 +21,22 @@ def read_table(path, **kwargs):
 def profile_data(payload, artifacts):
     import pandas as pd
     registered = {}
-    tables = {}
     summary = {}
     for role, path in payload["candidate_paths"].items():
         art = artifacts.register(path, "input_" + role, "text/csv", external=True)
         registered[role] = art
         if role in {"train", "test"}:
             try:
-                tables[role] = read_table(path)
+                frame = read_table(path)
             except Exception as exc:
                 raise AgentError("INVALID_TABLE", f"Cannot read {role}: {exc}") from exc
-            frame = tables[role]
             if frame.empty or not frame.columns.is_unique:
                 raise AgentError("INVALID_TABLE", f"{role} must have rows and unique columns")
             summary[role + "_rows"] = len(frame)
             summary[role + "_columns"] = list(frame.columns)
             summary[role + "_dtypes"] = {c: str(t) for c, t in frame.dtypes.items()}
             summary[role + "_missing_fraction"] = {c: round(float(v), 5) for c, v in frame.isna().mean().items()}
+            del frame
     ident = "dataset-" + hashlib.sha256((registered["train"]["sha256"] + registered["test"]["sha256"]).encode()).hexdigest()[:20]
     if "dictionary" in payload["candidate_paths"]:
         dictionary = read_table(payload["candidate_paths"]["dictionary"])

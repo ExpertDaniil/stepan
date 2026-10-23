@@ -6,6 +6,7 @@ from agent.contracts import canonical
 from agent.errors import AgentError
 from tools.data import read_table
 from agent.predictions import checked_matrix, read_training, targets, validation_columns
+from agent.data_transport import transport
 
 
 def score_predictions(spec, truth, prediction):
@@ -91,7 +92,7 @@ class Evaluator:
         import numpy as np
         import pandas as pd
         from sklearn.model_selection import train_test_split, GroupShuffleSplit
-        frame = read_training(self.artifacts.resolve(self.spec["train_artifact_id"]), self.spec)
+        frame = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec)
         proposal = payload["proposal"]
         params = proposal["parameters"]
         fraction = params.get("valid_fraction", 0.2)
@@ -175,7 +176,7 @@ class Evaluator:
         frame = pd.read_csv(path, dtype={c: str for c in columns} if kind == 'labels' else None, keep_default_na=False)
         if list(frame.columns) != ["__row_index", *columns] or frame["__row_index"].tolist() != protocol["valid_indices"]:
             raise AgentError("INVALID_PREDICTIONS", "Validation row order or columns do not match")
-        data = read_training(self.artifacts.resolve(self.spec["train_artifact_id"]), self.spec)
+        data = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec)
         target_columns = targets(self.spec)
         selection = protocol.get('selection_indices', protocol['valid_indices'])
         y = data[target_columns if len(target_columns) > 1 else target_columns[0]].iloc[selection]

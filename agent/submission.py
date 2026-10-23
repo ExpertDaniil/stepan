@@ -45,7 +45,13 @@ class Submission:
         if payload["task_spec_id"] != self.spec["task_spec_id"] or payload["reference_test_artifact_id"] != self.spec["test_artifact_id"]:
             raise AgentError("TASK_SPEC_CONFLICT", "Output validation uses another task or test file")
         path = self.artifacts.resolve(payload["candidate_artifact_id"])
-        test = pd.read_csv(self.artifacts.resolve(self.spec["test_artifact_id"]), dtype=str, keep_default_na=False, encoding="utf-8")
+        ids = self.spec['output']['id_columns']
+        from agent.data_transport import transport
+        # Count from the typed cache; ID comparison must use original literal text.
+        row_count = len(transport(self.artifacts).read(self.spec['test_artifact_id'], columns=[]))
+        test = (pd.read_csv(self.artifacts.resolve(self.spec['test_artifact_id']), usecols=ids,
+                            dtype=str, keep_default_na=False, encoding='utf-8')[ids]
+                if ids else pd.DataFrame(index=range(row_count)))
         candidate = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
         output = self.spec["output"]
         if list(candidate.columns) != output["columns"] or len(candidate) != len(test):

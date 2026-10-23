@@ -5,6 +5,7 @@ from agent.contracts import canonical
 from agent.errors import AgentError
 from tools.data import read_table
 from agent.predictions import read_training, targets
+from agent.data_transport import transport
 
 METRICS = {
     "rmse": ("minimize", "values"), "mae": ("minimize", "values"), "r2": ("maximize", "values"),
@@ -25,8 +26,8 @@ def resolve_spec(draft, profile, task_root, artifacts, schemas):
         raise AgentError('TASK_SPEC_CONFLICT', 'target_columns must be unique, nonempty and start with target_column')
     if kind != 'regression' and len(target_columns) > 1:
         raise AgentError('UNSUPPORTED_OUTPUT_SCHEMA', 'Multi-target classification requires a separate explicit adapter')
-    train = read_training(artifacts.resolve(profile["train_artifact_id"]), draft)
-    test = read_table(artifacts.resolve(profile["test_artifact_id"]))
+    train = transport(artifacts).read(profile['train_artifact_id'], draft)
+    test = transport(artifacts).read(profile['test_artifact_id'])
     if any(c not in train for c in target_columns) or train[target_columns].isna().any().any():
         raise AgentError("TASK_SPEC_CONFLICT", "Target must exist and have no missing training values")
     metric = dict(draft["metric"])

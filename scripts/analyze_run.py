@@ -132,7 +132,7 @@ def inspect_run(source):
                 if not name.startswith(prefix):
                     continue
                 relative = name[len(prefix):]
-                category = "model_snapshots" if relative.endswith(".joblib") else "worker_logs" if relative.endswith(".log") else "predictions_csv" if relative.endswith(".csv") else "other_metadata"
+                category = "input_cache" if relative.startswith('data-cache/') else "model_snapshots" if relative.endswith(".joblib") else "worker_logs" if relative.endswith(".log") else "predictions_csv" if relative.endswith(".csv") else "other_metadata"
                 categories[category] = categories.get(category, 0)+size
             storage = {"total_bytes": sum(categories.values()), "by_category": categories,
                        "largest_files": [{"path": n[len(prefix):], "size_bytes": size} for n, size in sorted(sizes.items(), key=lambda p: p[1], reverse=True) if n.startswith(prefix)][:10]}

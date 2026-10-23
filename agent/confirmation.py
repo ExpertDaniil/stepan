@@ -83,9 +83,11 @@ def finalize(controller):
     from agent.evaluation import score_predictions
     import pandas as pd
     import numpy as np
-    data = read_training(controller.artifacts.resolve(controller.spec['train_artifact_id']), controller.spec)
+    from agent.data_transport import transport
+    data = transport(controller.artifacts).read(controller.spec['train_artifact_id'], controller.spec,
+                                              columns=targets(controller.spec), rows=indices)
     names = targets(controller.spec)
-    truth = data.loc[indices, names if len(names) > 1 else names[0]]
+    truth = data[names if len(names) > 1 else names[0]]
     columns = validation_columns(controller.spec)
     kind = controller.spec['metric']['prediction_kind']
     scores = []

@@ -46,6 +46,10 @@ class ContextBuilder:
             user['optimizer_facts'] = optimizer_facts()
             from agent.feature_memory import archive, interface
             user['feature_engineering'] = interface()
+            from agent.feature_search import focus_for_round
+            user['feature_focus'] = bool(getattr(self.catalog.config, 'feature_research_enabled', False)
+                and focus_for_round(self.round_no, int(payload['researcher_id'].rsplit('-', 1)[-1])-1,
+                                    self.catalog.config.max_workers))
             if getattr(self, 'store', None):
                 from agent.research_memory import build_research_memory
                 ids = [row[0] for row in self.store.db.execute('SELECT experiment_id FROM experiments WHERE run_id=?', (self.store.run_id,))]
@@ -151,6 +155,16 @@ class ContextBuilder:
             user['profile_summary']['optimizer_facts'] = optimizer_facts()
             from agent.feature_memory import archive, interface
             user['profile_summary']['feature_engineering'] = interface()
+            from agent.feature_search import focus_for_round
+            user['profile_summary']['feature_focus'] = bool(
+                getattr(self.catalog.config, 'feature_research_enabled', False) and user['research_phase'] != 'refine'
+                and 'python-pipeline-v1' in allowed
+                and focus_for_round(self.round_no, int(payload['researcher_id'].rsplit('-', 1)[-1])-1,
+                                    self.catalog.config.graph_peers))
+            if user['profile_summary']['feature_focus']:
+                user['assignment'] += (' This rotating assignment funds feature representation discovery. '
+                    'Return features or a new custom pipeline with input feature operations; '
+                    'parameter-only tuning/catalog actions will be rejected. Stop with a reason if none is useful.')
             if getattr(self, 'store', None):
                 user['profile_summary']['feature_memory'] = archive(self.store, self.artifacts,
                     graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))

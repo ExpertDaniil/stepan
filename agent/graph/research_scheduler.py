@@ -8,7 +8,7 @@ from agent.errors import AgentError
 
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     from agent.graph.controller import (advance_authorized_tuning, bind_trusted, issue,
-                                        local_for_ticket, stop_ticket)
+                                        local_for_ticket, stop_ticket, feature_seed_for_ticket)
     graph = controller.graph
     controller.research_round_outcomes = []
     accepted, activity = 0, False
@@ -53,6 +53,8 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
             return
         if any(t['work_order']['researcher_id'] == peer for t in pending.values()):
             return
+        if any(f.done() for f in pending):
+            return
         try:
             ticket = issue(controller, branch, peer, work['action'], work['allowed_donor_experiment_ids'])
         except AgentError as error:
@@ -69,6 +71,11 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                 accepted += controller.run_training([plan], [ticket])
                 activity = True
                 return
+        seed = feature_seed_for_ticket(controller, ticket) if pending else None
+        if seed is not None:
+            accepted += controller.run_training([seed], [ticket])
+            activity = True
+            return
         if controller.llm_available():
             controller.set_fallback()
             submit(ticket)

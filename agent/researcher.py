@@ -32,6 +32,8 @@ class Researcher:
         if adaptive:
             validate_action(proposed, self.catalog)
             user = json.loads(context['messages'][1]['content'])
+            from agent.feature_search import validate_focus
+            validate_focus(proposed, user)
             memory = user.get('profile_summary', user).get('research_memory', {})
             evidence = {f['source_id'] for f in user.get('facts', [])}
             for fact in user.get('facts', []):

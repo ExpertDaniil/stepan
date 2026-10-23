@@ -172,6 +172,15 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             frame = frame[task["output"]["columns"]]
     if guard:
         guard.active = False
+    from agent.feature_engineering import FeatureProgram
+    from sklearn.pipeline import Pipeline
+    fitted = model.models_ if hasattr(model, 'models_') else [model]
+    for target_index, fitted_model in enumerate(fitted):
+        if isinstance(fitted_model, Pipeline):
+            transformer = fitted_model.named_steps.get('features')
+            if isinstance(transformer, FeatureProgram):
+                print('AUTOML_WORKER '+json.dumps({'stage': 'features_fitted', 'target_index': target_index,
+                    'report': transformer.report_}, allow_nan=False), flush=True)
     output = Path(job["prediction_path"])
     print("AUTOML_WORKER "+json.dumps({"stage": "prediction_completed", "phase": job["phase"], "fit_seconds": fit_seconds, "prediction_rows": len(frame)}),flush=True)
     output.parent.mkdir(parents=True, exist_ok=True)

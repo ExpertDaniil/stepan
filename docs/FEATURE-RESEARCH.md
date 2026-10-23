@@ -10,6 +10,22 @@ feature columns and compiles a frozen `python-pipeline-v1` plan. Original inputs
 operations can consume earlier generated columns. Multiple changes are permitted.
 Custom Python `pipeline` and explicit custom tuning remain available.
 
+Feature-focused assignments rotate between existing peers/rounds. They admit `features`,
+a changed declared custom input-feature pipeline, or `stop`; model-only tuning does not
+consume that assignment. This guarantees attention, not useful features. A stop is respected.
+`FEATURE_RESEARCH_ENABLED=0` disables rotation and controller seeds for comparison.
+
+The dispatcher can run up to eight generic seed programs per visible branch while a different
+peer reasons. They use fit-only missingness, numeric spread and categorical cardinality;
+they do not encode public-task column names. Seeds are explicit controller-authorized
+hypotheses, not LLM decisions, and are logged as such. All use ordinary graph work orders,
+leases, frozen split, output checks and finalization. There is no third peer or SQL writer.
+`FEATURE_SEED_BUDGET_FRACTION=.15` caps observed seed wall time relative to the task budget;
+the currently admitted seed can overshoot the soft share by one fit. Its hard lease remains
+bounded by `FEATURE_SEED_TIMEOUT_SECONDS=120` and the existing finalization reserve.
+Once the small seed bank is exhausted, LLM research continues. No automatic Optuna series
+is invented while waiting. A seed's measured source and parameters appear in feature_memory.
+
 The owned transformer includes arithmetic, missing indicators, safe logs, categorical
 crosses/frequencies, grouped mean/std/rank/relative value, and datetime components.
 Frequencies and grouped reference distributions fit without targets on fit rows only.

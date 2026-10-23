@@ -63,6 +63,9 @@ class Config:
     llm_max_output_tokens_limit: int = 32768
     llm_max_total_output_tokens: int | None = 262144
     llm_research_tool_turns: int = 8
+    feature_research_enabled: bool = True
+    feature_seed_budget_fraction: float = .15
+    feature_seed_timeout_seconds: int = 120
     llm_request_max_bytes: int = 196608
     llm_context_window_tokens: int = 262144
     llm_reasoning_protocol: str = 'compatible'
@@ -125,6 +128,9 @@ class Config:
             llm_max_output_tokens_limit=integer("LLM_MAX_OUTPUT_TOKENS_LIMIT", 32768, 128, 131072),
             llm_max_total_output_tokens=optional_limit("LLM_MAX_TOTAL_OUTPUT_TOKENS", None if platform else 262144, 1024, 1000000000),
             llm_research_tool_turns=integer('LLM_RESEARCH_TOOL_TURNS', 8, 0, 32),
+            feature_research_enabled=boolean('FEATURE_RESEARCH_ENABLED', True),
+            feature_seed_budget_fraction=real('FEATURE_SEED_BUDGET_FRACTION', .15, 0, .5),
+            feature_seed_timeout_seconds=integer('FEATURE_SEED_TIMEOUT_SECONDS', 120, 1, 600),
             llm_request_max_bytes=integer('LLM_REQUEST_MAX_BYTES', 196608, 16000, 2000000),
             llm_context_window_tokens=integer('LLM_CONTEXT_WINDOW_TOKENS', 262144, 4096, 1000000),
             llm_reasoning_protocol=os.environ.get('LLM_REASONING_PROTOCOL', 'compatible'),

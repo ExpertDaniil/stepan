@@ -73,6 +73,13 @@ class MockTransport:
                 payload.pop("code")
             elif purpose == 'ResearchAction-v1':
                 payload.update(action='catalog', code=None, tuning=None, evidence_ids=[])
+                user = json.loads(context['messages'][1]['content'])
+                from agent.feature_search import feature_focus
+                if feature_focus(user):
+                    data = user.get('profile_summary', {}).get('data', user.get('profile', {}))
+                    column = next(c for c in data['train_columns'] if c in data['test_columns'] and c != 'id')
+                    payload.update(action='features', feature_program=[
+                        {'op': 'missing', 'name': '__mock_missing_'+str(round_no), 'columns': [column]}])
         return {"id": "mock-" + uuid.uuid4().hex[:12],
                 "choices": [{"message": {"role": "assistant", "content": json.dumps(payload, ensure_ascii=False)}, "finish_reason": "stop"}]}
 

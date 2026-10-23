@@ -53,6 +53,16 @@ def local_for_ticket(controller, ticket):
     return bind_trusted(plan, ticket) if plan else None
 
 
+def feature_seed_for_ticket(controller, ticket):
+    engine = getattr(controller, 'feature_search', None)
+    if engine is None:
+        return None
+    work = ticket['work_order']
+    plan = engine.next_plan(work['researcher_id'], work['branch_id'], work['constraints'])
+    ticket.pop('_proposal', None)
+    return bind_trusted(plan, ticket) if plan else None
+
+
 def cancel_queued(controller, experiment_id, reason):
     with controller.store.transaction():
         controller.graph.db.execute("UPDATE experiments SET state='cancelled',error=? WHERE experiment_id=? AND state='queued'", (reason, experiment_id))
@@ -484,7 +494,11 @@ def search(controller):
                         stop_ticket(controller, ticket, "No affordable untried catalogue candidate")
                 else:
                     controller.set_fallback()
-                    llm_tickets.append(ticket)
+                    seed = feature_seed_for_ticket(controller, ticket) if llm_tickets else None
+                    if seed is not None:
+                        trusted_plans.append(seed);trusted_tickets.append(ticket)
+                    else:
+                        llm_tickets.append(ticket)
             else:
                 break
         attempted, had_plans = research_batch(controller, trusted_plans, trusted_tickets, llm_tickets)

@@ -42,6 +42,8 @@ class Orchestrator:
                                        target_count=len(targets(spec)))
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
+        from agent.feature_search import FeatureSearch
+        self.feature_search = FeatureSearch(self)
         self.no_fit_branches = set()
         self.no_fit_reasons = {}
         self.research_feedback = []
@@ -342,9 +344,12 @@ class Orchestrator:
         return results
 
     def run_training(self, plans, tickets=None):
+        started = time.monotonic()
         try:
             return self._run_training(plans, tickets)
         finally:
+            if any(p['plan_id'] in self.feature_search.plan_ids for p in plans):
+                self.feature_search.spent_seconds += time.monotonic()-started
             optimizer = getattr(getattr(self, 'local_search', None), 'optuna', None)
             if optimizer is not None:
                 optimizer.sync()

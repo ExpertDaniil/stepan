@@ -1,7 +1,7 @@
 {
   "catalog_version": "components-v1",
   "constructor_version": "constructor-1.0",
-  "implementation_resources": ["agent/ml.py", "recipes/catalog.json", "recipes/components.json"],
+  "implementation_resources": ["agent/ml.py", "agent/preprocessing.py", "recipes/catalog.json", "recipes/components.json"],
   "features": {
     "feature.class_weight": {"parameter": "class_weight", "enabled_value": "balanced", "disabled_value": null},
     "feature.target_transform": {"parameter": "target_transform", "enabled_value": "shifted_log1p", "disabled_value": "identity"},

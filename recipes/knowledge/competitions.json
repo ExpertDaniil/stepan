@@ -1,0 +1,781 @@
+[
+  {
+    "source_record": 2,
+    "title": "Categorical Feature Encoding Challenge: Binary classification, with every feature a categorical",
+    "accepted": true,
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "scope": "general_method_transfer",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/cat-in-the-dat",
+    "description": "\n== Description ===\nIs there a cat in your dat?\nA common task in machine learning pipelines is encoding categorical variables for a given algorithm in a format that allows as much useful signal as possible to be captured.\nBecause this is such a common task and important skill to master, we've put together a dataset that contains\nonly\ncategorical features, and includes:\nbinary features\nlow- and high-cardinality nominal features\nlow- and high-cardinality  ordinal features\n(potentially) cyclical features\nThis Playground competition will give you the opportunity to try different encoding schemes for different algorithms to compare how they perform. We encourage you to share what you find with the community.\nIf you're not sure how to get started, you can check out the\nCategorical Variables\nsection of Kaggle's\nIntermediate Machine Learning course.\nHave Fun!\n\n== Evaluation ===\nSubmissions are evaluated on\narea under the ROC curve\nbetween the predicted probability and the observed target.\nSubmission File\nFor each\nid\nin the test set, you must predict a probability for the\ntarget\nvariable. The file should contain a header and have the following format:\nid,target\n300000,0\n.\n5\n300001,0\n.\n5\n300002,0\n.\n5\n...\ncontent_copy",
+    "source_metric": "binary_auc"
+  },
+  {
+    "source_record": 5,
+    "title": "ASHRAE - Great Energy Predictor III: How much energy will a building consume?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/ashrae-energy-prediction",
+    "description": "\n== Description ===\nQ: How much does it cost to cool a skyscraper in the summer?\nA: A lot! And not just in dollars, but in environmental impact.\nThankfully, significant investments are being made to improve building efficiencies to reduce costs and emissions. The question is, are the improvements working? That’s where you come in. Under pay-for-performance financing, the building owner makes payments based on the difference between their real energy consumption and what they would have used without any retrofits. The latter values have to come from a model. Current methods of estimation are fragmented and do not scale well. Some assume a specific meter type or don’t work with different building types.\nIn this competition, you’ll develop accurate models of metered building energy usage in the following areas: chilled water, electric, hot water, and steam meters. The data comes from over 1,000 buildings over a three-year timeframe. With better estimates of these energy-saving investments, large scale investors and financial institutions will be more inclined to invest in this area to enable progress in building efficiencies.\nAbout the Host\nFounded in 1894,\nASHRAE\nserves to advance the arts and sciences of heating, ventilation, air conditioning refrigeration and their allied fields. ASHRAE members represent building system design and industrial process professionals around the world. With over 54,000 members serving in 132 countries,\nASHRAE\nsupports research, standards writing, publishing and continuing education - shaping tomorrow’s built environment today.\nBanner photo by Federico Beccari on Unsplash\n\n== Evaluation ===\nEvaluation Metric\nThe evaluation metric for this competition is Root Mean Squared Logarithmic Error.\nThe RMSLE is calculated as\nϵ\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\nlog\n(\np\ni\n+\n1\n)\n−\nlog\n(\na\ni\n+\n1\n)\n)\n2\nWhere:\n\\\\(\\epsilon\\\\) is the RMSLE value (score)\n\\\\(n\\\\) is the total number of observations in the (public/private) data set,\n\\\\(p_i\\\\) is your prediction of target, and\n\\\\(a_i\\\\) is the actual target for \\\\(i\\\\).\n\\\\(\\log(x)\\\\) is the natural logarithm of \\\\(x\\\\)\nNote that not all rows will necessarily be scored.\nNotebook Submissions\nYou can make submissions directly from Kaggle Notebooks. By adding your teammates as collaborators on a notebook, you can share and edit code privately with them.\nSubmission File\nFor each id in the test set, you must predict the target variable. The file should contain a header and have the following format:\nid,\nmeter_reading\n0,\n0\n1,\n0\n2,\n0\netc.\ncontent_copy",
+    "source_metric": "rmsle"
+  },
+  {
+    "source_record": 54,
+    "title": "Tabular Playground Series - Jan 2021: Practice your ML regression skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-jan-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions, and thus more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching a month-long tabular Playground competition on the 1st of every month, and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, but less challenging, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nGood luck and have fun!\nGetting Started\nCheck out this\nStarter Notebook\nwhich walks you through how to make your very first submission!\nFor more ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are scored on the\nroot mean squared error\n. RMSE is defined as:\nRMSE\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\nis the predicted value,\ny\nis the original value, and\nn\nis the number of rows in the test data.\nSubmission File\nFor each row in the test set, you must predict the value of the target as described on the data tab, each on a separate row in the submission file. The file should contain a header and have the following format:\nid\n,target\n0\n,\n0\n.\n5\n2\n,\n10\n.\n2\n6\n,\n2\n.\n2\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 59,
+    "title": "Tabular Playground Series - Feb 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-feb-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching month-long tabular Playground competitions on the 1st of every month and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, and approachable for anyone, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nThe dataset is used for this competition is synthetic, but based on a real dataset and generated using a CTGAN. The original dataset deals with predicting the amount of an insurance claim. Although the features are anonymized, they have properties relating to real-world features.\nGood luck and have fun!\nGetting Started\nCheck out this\nStarter Notebook\nwhich walks you through how to make your very first submission!\nFor more ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are scored on the\nroot mean squared error\n. RMSE is defined as:\nRMSE\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\nis the predicted value,\ny\nis the original value, and\nn\nis the number of rows in the test data.\nSubmission File\nFor each row in the test set, you must predict the value of the target as described on the data tab, each on a separate row in the submission file. The file should contain a header and have the following format:\nid\n,target\n0\n,\n0\n.\n5\n5\n,\n10\n.\n2\n15\n,\n2\n.\n2\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 75,
+    "title": "Tabular Playground Series - May 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-may-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching month-long tabular Playground competitions on the 1st of every month and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, and approachable for anyone, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams, to inspire broad participation we are limiting winner's of swag to once per person for this series. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nThe dataset is used for this competition is synthetic, but based on a real dataset and generated using a\nCTGAN\n. The original dataset deals with predicting the category on an eCommerce product given various attributes about the listing. Although the features are anonymized, they have properties relating to real-world features.\nGood luck and have fun!\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are evaluated using multi-class logarithmic loss. Each row in the dataset has been labeled with one true\nClass\n. For each row, you must submit the predicted probabilities that the product belongs to each class label. The formula is:\nlog loss\n=\n−\n1\nN\nN\n∑\ni\n=\n1\nM\n∑\nj\n=\n1\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nwhere\nN\nis the number of rows in the test set,\nM\nis the number of class labels,\nlog\nis the natural logarithm,\ny\ni\nj\nis 1 if observation\ni\nis in class\nj\nand 0 otherwise, and\np\ni\nj\nis the predicted probability that observation\ni\nbelongs to class\nj\n.\nThe submitted probabilities for a given product are not required to sum to one; they are rescaled prior to being scored, each row is divided by the row sum. In order to avoid the extremes of the\nlog\nfunction, predicted probabilities are replaced with\nm\na\nx\n(\nm\ni\nn\n(\np\n,\n1\n−\n10\n−\n15\n)\n,\n10\n−\n15\n)\n.\nSubmission File\nYou must submit a csv file with the product\nid\nand the predicted probability that the product belongs to each of the classes seen in the dataset. The order of the rows does not matter. The file must have a header and should look like the following:\nid\n,Class_1,Class_2,Class_3,Class_4\n100000\n,\n0\n.\n1\n,\n0\n.\n3\n,\n0\n.\n2\n,\n0\n.\n4\n100001\n,\n0\n.\n5\n,\n0\n.\n1\n,\n0\n.\n1\n,\n0\n.\n3\n100002\n,\n0\n.\n4\n,\n0\n.\n4\n,\n0\n.\n1\n,\n0\n.\n1\netc\n.\ncontent_copy",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 78,
+    "title": "Tabular Playground Series - Jun 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-jun-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching month-long tabular Playground competitions on the 1st of every month and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, and approachable for anyone, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nThe dataset is used for this competition is synthetic, but based on a real dataset and generated using a\nCTGAN\n. The original dataset deals with predicting the category on an eCommerce product given various attributes about the listing. Although the features are anonymized, they have properties relating to real-world features.\nGood luck and have fun!\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are evaluated using multi-class logarithmic loss. Each row in the dataset has been labeled with one true\nClass\n. For each row, you must submit the predicted probabilities that the product belongs to each class label. The formula is:\nlog loss\n=\n−\n1\nN\nN\n∑\ni\n=\n1\nM\n∑\nj\n=\n1\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nwhere\nN\nis the number of rows in the test set,\nM\nis the number of class labels,\nlog\nis the natural logarithm,\ny\ni\nj\nis 1 if observation\ni\nis in class\nj\nand 0 otherwise, and\np\ni\nj\nis the predicted probability that observation\ni\nbelongs to class\nj\n.\nThe submitted probabilities for a given product are not required to sum to one; they are rescaled prior to being scored, each row is divided by the row sum. In order to avoid the extremes of the\nlog\nfunction, predicted probabilities are replaced with\nm\na\nx\n(\nm\ni\nn\n(\np\n,\n1\n−\n10\n−\n15\n)\n,\n10\n−\n15\n)\n.\nSubmission File\nYou must submit a csv file with the product\nid\nand the predicted probability that the product belongs to each of the classes seen in the dataset. The order of the rows does not matter. The file must have a header and should look like the following:\nid\n,Class_1,Class_2,Class_3,Class_4,Class_5,Class_6,Class_7,Class_8,Class_9\n200000\n,\n0\n.\n05\n,\n0\n.\n14\n,\n0\n.\n21\n,\n0\n.\n05\n,\n0\n.\n20\n,\n0\n.\n04\n,\n0\n.\n00\n,\n0\n.\n20\n,\n0\n.\n11\n200001\n,\n0\n.\n21\n,\n0\n.\n06\n,\n0\n.\n10\n,\n0\n.\n20\n,\n0\n.\n13\n,\n0\n.\n01\n,\n0\n.\n04\n,\n0\n.\n10\n,\n0\n.\n15\n200002\n,\n0\n.\n15\n,\n0\n.\n12\n,\n0\n.\n18\n,\n0\n.\n10\n,\n0\n.\n16\n,\n0\n.\n16\n,\n0\n.\n03\n,\n0\n.\n01\n,\n0\n.\n09\netc\n.\ncontent_copy",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 86,
+    "title": "Tabular Playground Series - Aug 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-aug-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching month-long tabular Playground competitions on the 1st of every month and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, and approachable for anyone, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nThe dataset is used for this competition is synthetic, but based on a real dataset and generated using a\nCTGAN\n. The original dataset deals with calculating the loss associated with a loan defaults. Although the features are anonymized, they have properties relating to real-world features.\nGood luck and have fun!\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are scored on the\nroot mean squared error\n. RMSE is defined as:\nRMSE\n=\n1\nn\n∑\ni\n=\n1\nn\n(\ny\ni\n−\ny\n^\ni\n)\n2\n−\n−\n−\n−\n−\n−\n−\n−\n−\n−\n−\n−\n√\nRMSE\n=\n1\nn\n∑\ni\n=\n1\nn\n(\ny\ni\n−\ny\n^\ni\n)\n2\nwhere\ny\n^\ny\n^\nis the predicted value,\ny\ny\nis the ground truth value, and\nn\nn\nis the number of rows in the test data.\nSubmission File\nFor each row\nid\nin the test set, you must predict the value of the target\nloss\nas described on the data tab, each on a separate row in the submission file. The file should contain a header and have the following format:\nid\n,loss\n250000\n,\n0\n.\n0\n250001\n,\n10\n.\n3\n250002\n,\n42\n.\n42\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 100,
+    "title": "Tabular Playground Series - Dec 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-dec-2021",
+    "description": "\n== Description ===\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nIn order to have a more consistent offering of these competitions for our community, we're trying a new experiment in 2021. We'll be launching month-long tabular Playground competitions on the 1st of every month and continue the experiment as long as there's sufficient interest and participation.\nThe goal of these competitions is to provide a fun, and approachable for anyone, tabular dataset. These competitions will be great for people looking for something in between the Titanic Getting Started competition and a Featured competition. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you. We encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nThe dataset is used for this competition is synthetic, but based on a real dataset and generated using a\nCTGAN\n. This dataset is based off of the original\nForest Cover Type Prediction\ncompetition.\nGood luck and have fun!\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\n\n== Evaluation ===\nSubmissions are evaluated on multi-class classification accuracy.\nSubmission File\nFor each\nId\nin the test set, you must predict the\nCover_Type\nclass. The file should contain a header and have the following format:\nId\n,Cover_Type\n4000000\n,\n2\n4000001\n,\n1\n4000001\n,\n3\netc\n.\ncontent_copy",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 104,
+    "title": "Tabular Playground Series - Jan 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-jan-2022",
+    "description": "\n== Description ===\nWe've heard your feedback from the 2021 Tabular Playground Series, and now Kaggle needs your help going forward in 2022!\nThere are two (fictitious) independent store chains selling Kaggle merchandise that want to become\nthe\nofficial outlet for all things Kaggle. We've decided to see if the Kaggle community could help us figure out which of the store chains would have the best sales going forward. So, we've collected some data and are asking you to build forecasting models to help us decide.\nHelp us figure out whether KaggleMart or KaggleRama should become the official Kaggle outlet!\nAbout the Tabular Playground Series\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nThe goal of these competitions is to provide a fun and approachable-for-anyone tabular dataset to model. These competitions are a great choice for people looking for something in between the Titanic Getting Started competition and the Featured competitions. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you; thus, we encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\n\n== Evaluation ===\nSubmissions are evaluated on\nSMAPE\nbetween forecasts and actual values. We define SMAPE = 0 when the actual and predicted values are both 0.\nSubmission File\nFor each\nrow_id\nin the test set, you must predict the corresponding\nnum_sold\n. The file should contain a header and have the following format:\nrow_id\n,num_sold\n26298\n,\n100\n26299\n,\n100\n26300\n,\n100\netc\n.\ncontent_copy",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 107,
+    "title": "Tabular Playground Series - Feb 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-feb-2022",
+    "description": "\n== Description ===\nFor the February 2022 Tabular Playground Series competition, your task is to classify 10 different bacteria species using data from a genomic analysis technique that has some data compression and data loss. In this technique, 10-mer snippets of DNA are sampled and analyzed to give the\nhistogram\nof base count. In other words, the DNA segment\nATATGGCCTT\nbecomes\nA\n2\nT\n4\nG\n2\nC\n2\n. Can you use this lossy information to accurately predict bacteria species?\nAbout the Tabular Playground Series\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nThe goal of these competitions is to provide a fun and approachable-for-anyone tabular dataset to model. These competitions are a great choice for people looking for something in between the Titanic Getting Started competition and the Featured competitions. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you; thus, we encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nGetting Started\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\nGood luck and have fun!\nAcknowledgements\nThe idea for this competition came from the following\npaper\n:\n@ARTICLE{10.3389/fmicb.2020.00257,\nAUTHOR\n={Wood, Ryan L.\nand\nJensen, Tanner\nand\nWadsworth, Cindi\nand\nClement, Mark\nand\nNagpal, Prashant\nand\nPitt, William G.},\nTITLE\n={Analysis of Identification Method for Bacterial Species\nand\nAntibiotic Resistance Genes Using Optical\nData\nFrom DNA Oligomers},\nJOURNAL\n={Frontiers in Microbiology},\nVOLUME\n={\n11\n},\nYEAR\n={\n2020\n},\nURL\n={https:\n//www.frontiersin.org/article/10.3389/fmicb.2020.00257},\nDOI\n={\n10\n.\n3389\n/fmicb.\n2020\n.\n00257\n},\nISSN\n={\n1664\n-\n302\nX}}\ncontent_copy\n\n== Evaluation ===\nEvaluation\nSubmissions will be evaluated based on their\ncategorization accuracy\n.\nSubmission Format\nThe submission format for the competition is a csv file with the following format:\nrow\n_id,target\n200000,Streptococcus_pneumoniae\n200001,Enterococcus_\nhirae\netc.\ncontent_copy",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 138,
+    "title": "Tabular Playground Series - Sep 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/tabular-playground-series-sep-2022",
+    "description": "\n== Description ===\nThe competing Kaggle merchandise stores we saw in\nJanuary's Tabular Playground\nare at it again. This time, they're selling books!\nThe task for this month's competitions is a bit more complicated. Not only are there\nsix\ncountries and\nfour\nbooks to forecast, but you're being asked to forecast sales during the tumultuous year 2021. Can you use your data science skills to predict book sales when conditions are far from the ordinary?\nAbout the Tabular Playground Series\nKaggle competitions are incredibly fun and rewarding, but they can also be intimidating for people who are relatively new in their data science journey. In the past, we've launched many Playground competitions that are more approachable than our Featured competitions and thus, more beginner-friendly.\nThe goal of these competitions is to provide a fun and approachable-for-anyone tabular dataset to model. These competitions are a great choice for people looking for something in between the Titanic Getting Started competition and the Featured competitions. If you're an established competitions master or grandmaster, these probably won't be much of a challenge for you; thus, we encourage you to avoid saturating the leaderboard.\nFor each monthly competition, we'll be offering Kaggle Merchandise for the top three teams. And finally, because we want these competitions to be more about learning, we're limiting team sizes to 3 individuals.\nGetting Started\nFor ideas on how to improve your score, check out the\nIntro to Machine Learning\nand\nIntermediate Machine Learning\ncourses on Kaggle Learn.\nGood luck and have fun!\nPhoto above by\nAron Visuals\non\nUnsplash\n\n== Evaluation ===\nSubmissions are evaluated on\nSMAPE\nbetween forecasts and actual values. We define SMAPE = 0 when the actual and predicted values are both 0.\nSubmission File\nFor each\nrow_id\nin the test set, you must predict the corresponding\nnum_sold\n. The file should contain a header and have the following format:\nrow_id\n,num_sold\n70128\n,\n100\n70129\n,\n100\n70130\n,\n100\netc\n.\ncontent_copy",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 151,
+    "title": "Playground Series Season 3, Episode 1: Tabular Regression with the California Housing Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e1",
+    "description": "\n== Description ===\nNOTE:\nYou can now create your own synthetic versions of this dataset by forking and running\nthis notebook\n.\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to last year's Tabular Playground Series. And many thanks to all those who took the time to provide constructive feedback! We're thrilled that there continues to be interest in these types of challenges, and we're continuing the series this year but with a few changes.\nFirst, the series is getting upgraded branding. We've dropped \"Tabular\" from the name because, while we anticipate this series will still have plenty of tabular competitions, we'll also be having some other formats as well. You'll also notice freshly-upgraded (better looking and more fun!) banner and thumbnail images.\nSecond, rather than naming the challenges by month and year, we're moving to a Season-Edition format. This year is Season 3, and each challenge will be a new Edition. We're doing this to have more flexibility. Competitions going forward won't necessarily align with each month like they did in previous years (although some might!), we'll have competitions with different time durations, and we may have multiple competitions running at the same time on occasion.\nRegardless of these changes, the goals of the Playground Series remain the same—to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science. We hope we continue to meet this objective!\nTo start the year with some fun, January will be the month of Tabular Tuesday. We're launching four week-long tabular competitions, with each starting Tuesday 00:00 UTC. These will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\nSynthetically-Generated Datasets\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data (with named features) and ensuring test labels are not publicly available. This allows us to host competitions with more interesting datasets than in the past. While there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts. Please feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the value for the target\nMedHouseVal\n. The file should contain a header and have the following format:\nid\n,MedHouseVal\n37137\n,\n2\n.\n01\n37138\n,\n0\n.\n92\n37139\n,\n1\n.\n11\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 158,
+    "title": "Playground Series - Season 3, Episode 6: Tabular Regression with a Paris Housing Price Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e6",
+    "description": "\n== Description ===\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to last year's Tabular Playground Series. And many thanks to all those who took the time to provide constructive feedback! We're thrilled that there continues to be interest in these types of challenges, and we're continuing the series this year but with a few changes.\nFirst, the series is getting upgraded branding. We've dropped \"Tabular\" from the name because, while we anticipate this series will still have plenty of tabular competitions, we'll also be having some other formats as well. You'll also notice freshly-upgraded (better looking and more fun!) banner and thumbnail images.\nSecond, rather than naming the challenges by month and year, we're moving to a Season-Edition format. This year is Season 3, and each challenge will be a new Edition. We're doing this to have more flexibility. Competitions going forward won't necessarily align with each month like they did in previous years (although some might!), we'll have competitions with different time durations, and we may have multiple competitions running at the same time on occasion.\nRegardless of these changes, the goals of the Playground Series remain the same—to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science. We hope we continue to meet this objective!\nWith the great start and participation in January, we will continue launching the Tabular Tuesday in February every Tuesday 00:00 UTC, with each competition running for 2 weeks instead. Again, these will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\nSynthetically-Generated Datasets\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data (with named features) and ensuring test labels are not publicly available. This allows us to host competitions with more interesting datasets than in the past. While there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts. Please feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the value for the target\nprice\n. The file should contain a header and have the following format:\nid\n,price\n22709\n,\n200689\n.\n01\n22710\n,\n398870\n.\n92\n22711\n,\n1111145\n.\n11\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 162,
+    "title": "Playground Series - Season 3, Episode 8: Tabular Regression with a Gemstone Price Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e8",
+    "description": "\n== Description ===\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to last year's Tabular Playground Series. And many thanks to all those who took the time to provide constructive feedback! We're thrilled that there continues to be interest in these types of challenges, and we're continuing the series this year but with a few changes.\nFirst, the series is getting upgraded branding. We've dropped \"Tabular\" from the name because, while we anticipate this series will still have plenty of tabular competitions, we'll also be having some other formats as well. You'll also notice freshly-upgraded (better looking and more fun!) banner and thumbnail images.\nSecond, rather than naming the challenges by month and year, we're moving to a Season-Edition format. This year is Season 3, and each challenge will be a new Edition. We're doing this to have more flexibility. Competitions going forward won't necessarily align with each month like they did in previous years (although some might!), we'll have competitions with different time durations, and we may have multiple competitions running at the same time on occasion.\nRegardless of these changes, the goals of the Playground Series remain the same—to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science. We hope we continue to meet this objective!\nWith the great start and participation in January, we will continue launching the Tabular Tuesday in February every Tuesday 00:00 UTC, with each competition running for 2 weeks instead. Again, these will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\nSynthetically-Generated Datasets\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data (with named features) and ensuring test labels are not publicly available. This allows us to host competitions with more interesting datasets than in the past. While there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts. Please feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the value for the target\nprice\n. The file should contain a header and have the following format:\nid\n,price\n193573\n,\n3969\n.\n155\n193574\n,\n8512\n.\n67\n193575\n,\n1122\n.\n34\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 163,
+    "title": "Playground Series - Season 3, Episode 9: Tabular Regression with a Concrete Strength Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e9",
+    "description": "\n== Description ===\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to last year's Tabular Playground Series. And many thanks to all those who took the time to provide constructive feedback! We're thrilled that there continues to be interest in these types of challenges, and we're continuing the series this year but with a few changes.\nFirst, the series is getting upgraded branding. We've dropped \"Tabular\" from the name because, while we anticipate this series will still have plenty of tabular competitions, we'll also be having some other formats as well. You'll also notice freshly-upgraded (better looking and more fun!) banner and thumbnail images.\nSecond, rather than naming the challenges by month and year, we're moving to a Season-Edition format. This year is Season 3, and each challenge will be a new Edition. We're doing this to have more flexibility. Competitions going forward won't necessarily align with each month like they did in previous years (although some might!), we'll have competitions with different time durations, and we may have multiple competitions running at the same time on occasion.\nRegardless of these changes, the goals of the Playground Series remain the same—to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science. We hope we continue to meet this objective!\nWith the great start and participation in January, we will continue launching the Tabular Tuesday in February every Tuesday 00:00 UTC, with each competition running for 2 weeks instead. Again, these will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\nSynthetically-Generated Datasets\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data (with named features) and ensuring test labels are not publicly available. This allows us to host competitions with more interesting datasets than in the past. While there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts. Please feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the value for the target\nStrength\n. The file should contain a header and have the following format:\nid\n,Strength\n5439\n,\n55\n.\n2\n5440\n,\n12\n.\n3\n5441\n,\n83\n.\n4\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 166,
+    "title": "Playground Series - Season 3, Episode 11: Regression with a Tabular Media Campaign Cost Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e11",
+    "description": "\n== Description ===\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to Season 3 Playground Series so far!\nWith the same goal to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science, we will continue launching the Tabular Tuesday in March every Tuesday 00:00 UTC, with each competition running for 2 weeks. Again, these will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc..\nSynthetically-Generated Datasets\nUsing synthetic data for Playground competitions allows us to strike a balance between having real-world data (with named features) and ensuring test labels are not publicly available. This allows us to host competitions with more interesting datasets than in the past. While there are still challenges with synthetic data generation, the state-of-the-art is much better now than when we started the Tabular Playground Series two years ago, and that goal is to produce datasets that have far fewer artifacts. Please feel free to give us feedback on the datasets for the different competitions so that we can continue to improve!\n\n== Evaluation ===\nRoot Mean Squared Log Error (RMLSE)\nSubmissions are scored on the\nroot mean squared log error (RMSLE)\n(the sklearn\nmean_squared_log_error\nwith\nsquared=False\n).\nSubmission File\nFor each\nid\nin the test set, you must predict the value for the target\ncost\n. The file should contain a header and have the following format:\nid\n,cost\n360336\n,\n99\n.\n615\n360337\n,\n87\n.\n203\n360338\n,\n101\n.\n111\netc\n.\ncontent_copy",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 174,
+    "title": "Playground Series - Season 3, Episode 14: Prediction of Wild Blueberry Yield",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e14",
+    "description": "\n== Evaluation ===\nEvaluation\nSubmissions will be evaluated using\nMean Absolute Error (MAE)\n,\nwhere each\nx_i\nrepresents the predicted target,\ny_i\nrepresents the ground truth, and\nn\nis the number of rows in the test set.\nSubmission File\nFor each\nid\nin the test set, you must predict the target\nyield\n. The file should contain a header and have the following format:\nid\n,yield\n15289\n,\n6025\n.\n194\n15290\n,\n1256\n.\n223\n15291\n,\n357\n.\n44\netc\n.\ncontent_copy",
+    "source_metric": "mae"
+  },
+  {
+    "source_record": 180,
+    "title": "Playground Series - Season 3, Episode 16: Regression with a Crab Age Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e16",
+    "description": "\n== Evaluation ===\nEvaluation\nSubmissions will be evaluated using\nMean Absolute Error (MAE)\n,\nwhere each\nx_i\nrepresents the predicted target,\ny_i\nrepresents the ground truth, and\nn\nis the number of rows in the test set.\nSubmission File\nFor each\nid\nin the test set, you must predict the target\nAge\n. The file should contain a header and have the following format:\nid\n,yield\n74051\n,\n10\n.\n2\n74051\n,\n3\n.\n6\n74051\n,\n11\n.\n9\netc\n.\ncontent_copy",
+    "source_metric": "mae"
+  },
+  {
+    "source_record": 190,
+    "title": "Playground Series - Season 3, Episode 20: Predict CO2 Emissions in Rwanda",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e20",
+    "description": "\n== Description ===\nWelcome to the 2023 edition of Kaggle's Playground Series!\nThank you to everyone who participated in and contributed to Season 3 Playground Series so far!\nWith the same goal to give the Kaggle community a variety of fairly light-weight challenges that can be used to learn and sharpen skills in different aspects of machine learning and data science, we will continue launching the Tabular Tuesday in July every Tuesday 00:00 UTC, with each competition running for 3 weeks. Again, these will be fairly light-weight datasets that are synthetically generated from real-world data, and will provide an opportunity to quickly iterate through various model and feature engineering ideas, create visualizations, etc.\nThis Episode is a similar to the Kaggle/Zindi Hackathon that was held at the\nKaggle@ICLR 2023: ML Solutions in Africa\nworkshop in Rwanda, and builds on an ongoing partnership between Kaggle and Zindi to build community-driven impact across Africa. Zindi is a professional network for data scientists to learn, grow their careers, and get jobs. If you haven't done so recently, stop by\nZindi\nand see what they're up to!\nPredicting CO2 Emissions\nThe ability to accurately monitor carbon emissions is a critical step in the fight against climate change. Precise carbon readings allow researchers and governments to understand the sources and patterns of carbon mass output. While Europe and North America have extensive systems in place to monitor carbon emissions on the ground, there are few available in Africa.\nThe objective of this challenge is to create a machine learning models using open-source CO2 emissions data from\nSentinel-5P\nsatellite observations to predict future carbon emissions.\nThese solutions may help enable governments, and other actors to estimate carbon emission levels across Africa, even in places where on-the-ground monitoring is not possible.\nAcknowledgements\nWe acknowledge Carbon Monitor for the use of the GRACED dataset, and special thanks Darius Moruri from Zindi for his work in preparing the dataset and starter notebooks.\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nID_LAT_LON_YEAR_WEEK\nrow in the test set, you must predict the value for the target\nemission\n. The file should contain a header and have the following format:\nID_LAT_LON_YEAR_WEEK\n,emission\nID_\n-\n0\n.\n510\n_29.\n290\n_2022_00,\n81\n.\n94\nID_\n-\n0\n.\n510\n_29.\n290\n_2022_01,\n81\n.\n94\nID_\n-\n0\n.\n510\n_29.\n290\n_2022_02,\n81\n.\n94\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 207,
+    "title": "Playground Series - Season 3, Episode 26: Multi-Class Prediction of Cirrhosis Outcomes",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s3e26",
+    "description": "\n== Evaluation ===\nSubmissions are evaluated using the multi-class logarithmic loss. Each\nid\nin the test set had a single true class label,\nStatus\n. For each\nid\n, you must submit a set of predicted probabilities for each of the three possible outcomes, e.g.,\nStatus_C\n,\nStatus_CL\n, and\nStatus_D\n.\nThe metric is calculated\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\nN\n∑\ni\n=\n1\nM\n∑\nj\n=\n1\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nwhere\nN\nis the number of rows in the test set,\nM\nis the number of outcomes (i.e., 3),\nl\no\ng\nis the natural logarithm,\ny\ni\nj\nis 1 if row\ni\nhas the ground truth label\nj\nand 0 otherwise, and\np\ni\nj\nis the predicted probability that observation\ni\nbelongs to class\nj\n.\nThe submitted probabilities for a given row are not required to sum to one because they are rescaled prior to being scored (each row is divided by the row sum). In order to avoid the extremes of the log function, predicted probabilities are replaced with\nm\na\nx\n(\nm\ni\nn\n(\np\n,\n1\n−\n10\n−\n15\n)\n,\n10\n−\n15\n)\n.\nSubmission File\nFor each\nid\nrow in the test set, you must predict probabilities of the three outcomes\nStatus_C\n,\nStatus_CL\n, and\nStatus_D\n. The file should contain a header and have the following format:\nid\n,Status_C,Status_CL,Status_D\n7905\n,\n0\n.\n628084\n,\n0\n.\n034788\n,\n0\n.\n337128\n7906\n,\n0\n.\n628084\n,\n0\n.\n034788\n,\n0\n.\n337128\n7907\n,\n0\n.\n628084\n,\n0\n.\n034788\n,\n0\n.\n337128\netc\n.\ncontent_copy",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 214,
+    "title": "Playground Series - Season 4, Episode 2: Multi-Class Prediction of Obesity Risk",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e2",
+    "description": "\n== Evaluation ===\nSubmissions are evaluated using the\naccuracy\nscore.\nSubmission File\nFor each\nid\nrow in the test set, you must predict the class value of the target,\nNObeyesdad\n. The file should contain a header and have the following format:\nid,NObeyesdad\n20758\n,\nNormal_Weight\n20759\n,\nNormal_Weight\n20760\n,\nNormal_Weight\netc.\ncontent_copy",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 222,
+    "title": "Playground Series - Season 4, Episode 4: Regression with an Abalone Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e4",
+    "description": "\n== Evaluation ===\nThe evaluation metric for this competition is\nRoot Mean Squared Logarithmic Error\n.\nThe\nRMSLE\nis calculated as:\n√\n1\nn\nn\n∑\ni\n=\n1\n(\nlog\n(\n1\n+\nˆ\ny\ni\n)\n−\nlog\n(\n1\n+\ny\ni\n)\n)\n2\nwhere:\nn\nis the total number of observations in the test set,\nˆ\ny\ni\nis the predicted value of the target for instance (i),\ny\ni\nis the actual value of the target for instance (i), and,\nlog\nis the natural logarithm.\nSubmission File\nFor each\nid\nrow in the test set, you must predict the target,\nRings\n. The file should contain a header and have the following format:\nid\n,Rings\n90615\n,\n10\n90616\n,\n10\n90617\n,\n10\netc\n.\ncontent_copy",
+    "source_metric": "rmsle"
+  },
+  {
+    "source_record": 224,
+    "title": "Playground Series - Season 4, Episode 5: Regression with a Flood Prediction Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e5",
+    "description": "\n== Evaluation ===\nSubmissions are evaluated using the\nR2 score\n.\nSubmission File\nFor each\nid\nrow in the test set, you must predict the value of the target,\nFloodProbability\n. The file should contain a header and have the following format:\nid\n,FloodProbability\n1117957\n,\n0\n.\n5\n1117958\n,\n0\n.\n5\n1117959\n,\n0\n.\n5\netc\n.\ncontent_copy",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 229,
+    "title": "Playground Series - Season 4, Episode 6: Classification with an Academic Success Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e6",
+    "description": "\n== Evaluation ===\nSubmissions are evaluated using the\naccuracy\nscore.\nSubmission File\nFor each\nid\nrow in the test set, you must predict the class value of the\nTarget\n, which is a categorical academic risk assessment. The file should contain a header and have the following format:\nid\n,Target\n76518\n,Graduate\n76519\n,Graduate\n76520\n,Graduate\netc.\ncontent_copy",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 239,
+    "title": "Playground Series - Season 4, Episode 9: Regression of Used Car Prices",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e9",
+    "description": "\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n(\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\n)\n1\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the\nprice\nof the car. The file should contain a header and have the following format:\nid\n,price\n188533\n,\n43878\n.\n016\n188534\n,\n43878\n.\n016\n188535\n,\n43878\n.\n016\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 245,
+    "title": "UM - Game-Playing Strength of MCTS Variants: Predict which variants of Monte-Carlo Tree Search will perform well or poorly against each other in hundreds of board games",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/um-game-playing-strength-of-mcts-variants",
+    "description": "\n== Description ===\nMCTS is a widely used search algorithm for developing agents that can play board games intelligently. Over the past two decades, researchers have proposed dozens, if not hundreds, of MCTS variants. Despite this, it's been challenging to determine which variants are best suited for specific types of games.\nIn most studies, researchers demonstrate that a new MCTS variant outperforms one or a few other variants in a limited set of games. However, it’s uncommon for a new variant to consistently outperform others across a broad range of games, making it unclear which types of games certain MCTS variants are best at. Answering this question would greatly improve our understanding of MCTS algorithms, and help us make better decisions about which variants to apply to new games or other decision-making problems.\nThis competition challenges you to develop a model that can predict the performance of one MCTS variant against another in a given game, based on the features of the game.\nYour work could help pave the way for identifying the strengths and weaknesses of different MCTS variants, advancing our understanding of where they work best in various scenarios.\n\n== Evaluation ===\nSubmissions are evaluated based on the\nRoot-mean-square-error (RMSE)\nbetween predicted and ground-truth performance levels of the first agent against the second agent.\nSubmitting\nYou must submit to this competition using the provided Python evaluation API, which serves test set instances in random order in batches of 100. To use the API, follow the template in\nthis notebook\n.",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 248,
+    "title": "Playground Series - Season 4, Episode 12: Regression with an Insurance Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s4e12",
+    "description": "\n== Evaluation ===\nSubmissions are evaluated using the\nRoot Mean Squared Logarithmic Error (RMSLE)\n.\nSubmission File\nFor each\nid\nrow in the test set, you must predict the continuous target\nPremium Amount\n. The file should contain a header and have the following format:\nid\n,Premium Amount\n1200000\n,\n1102\n.\n545\n1200001\n,\n1102\n.\n545\n1200002\n,\n1102\n.\n545\netc\n.\ncontent_copy",
+    "source_metric": "rmsle"
+  },
+  {
+    "source_record": 252,
+    "title": "Playground Series - Season 5, Episode 2: Backpack Prediction Challenge",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/playground-series-s5e2",
+    "description": "\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n(\n1\nN\nN\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\n)\n1\n2\nwhere\nˆ\ny\ni\nis the predicted value and\ny\ni\nis the original value for each instance\ni\n.\nSubmission File\nFor each\nid\nin the test set, you must predict the\nPrice\nof the backpack. The file should contain a header and have the following format:\nid\n,Price\n300000\n,\n81\n.\n411\n300001\n,\n81\n.\n411\n300002\n,\n81\n.\n411\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 297,
+    "title": "Google Analytics Customer Revenue Prediction: Predict how much GStore customers will spend",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/ga-customer-revenue-prediction",
+    "description": "\n== Description ===\nThe 80/20 rule has proven true for many businesses–only a small percentage of customers produce most of the revenue. As such, marketing teams are challenged to make appropriate investments in promotional strategies.\nRStudio, the developer of free and open tools for R and enterprise-ready products for teams to scale and share work, has partnered with Google Cloud and Kaggle to demonstrate the business impact that thorough data analysis can have.\nIn this competition, you’re challenged to analyze a Google Merchandise Store (also known as GStore, where Google swag is sold) customer dataset to predict revenue per customer. Hopefully, the outcome will be more actionable operational changes and a better use of marketing budgets for those companies who choose to use data analysis on top of GA data.\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is defined as:\nRMSE\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\n,\nwhere y hat is the natural log of the predicted revenue for a customer and y is the natural log of the actual summed revenue value plus one.\nSubmission File\nFor each\nfullVisitorId\nin the test set, you must predict the\nnatural log\nof their total revenue in\nPredictedLogRevenue\n. The submission file should contain a header and have the following format:\nfullVisitorId\n,PredictedLogRevenue\n0000000259678714014\n,\n0\n0000049363351866189\n,\n0\n0000053049821714864\n,\n0\netc\n.\ncontent_copy",
+    "source_metric": "rmse"
+  },
+  {
+    "source_record": 300,
+    "title": "PUBG Finish Placement Prediction (Kernels Only): Can you predict the battle royale finish of PUBG Players?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/pubg-finish-placement-prediction",
+    "description": "\n== Description ===\nSo, where we droppin' boys and girls?\nBattle Royale-style video games have taken the world by storm. 100 players are dropped onto an island empty-handed and must explore, scavenge, and eliminate other players until only one is left standing, all while the play zone continues to shrink.\nPlayerUnknown's BattleGrounds (PUBG) has enjoyed massive popularity. With over 50 million copies sold, it's the fifth best selling game of all time, and has millions of active monthly players.\nThe team at\nPUBG\nhas made official game data available for the public to explore and scavenge outside of \"The Blue Circle.\" This competition is not an official or affiliated PUBG site - Kaggle collected data made possible through the\nPUBG Developer API\n.\nYou are given over 65,000 games' worth of anonymized player data, split into training and testing sets, and asked to predict final placement from final in-game stats and initial player ratings.\nWhat's the best strategy to win in PUBG? Should you sit in one spot and hide your way into victory, or do you need to be the top shot? Let's let the data do the talking!\n\n== Evaluation ===\nSubmissions are evaluated on\nMean Absolute Error\nbetween your predicted winPlacePerc and the observed winPlacePerc.\nSubmission File\nFor each Id in the test set, you must predict their placement as a percentage (0 for last, 1 for first place) for the winPlacePerc variable. The file should contain a header and have the following format:\nId\n,winPlacePerc\n47734\n,\n0\n47735\n,\n0\n.\n5\n47736\n,\n0\n47737\n,\n1\netc\n.\ncontent_copy\nSee sample_submission.csv on the data page for a full sample submission.",
+    "source_metric": "mae"
+  },
+  {
+    "source_record": 309,
+    "title": "Forest Cover Type (Kernels Only): Use cartographic variables to classify forest categories",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/forest-cover-type-kernels-only",
+    "description": "\n== Description ===\nRandom forests?\nCover trees?\nNot so fast, computer nerds. We're talking about the real thing.\nIn this competition you are asked to predict the forest cover type (the predominant kind of tree cover) from cartographic variables. The actual forest cover type for a given 30 x 30 meter cell was determined from US Forest Service (USFS) Region 2 Resource Information System data. Independent variables were then derived from data obtained from the US Geological Survey and USFS. The data is in raw form and contains binary columns of data for qualitative independent variables such as wilderness areas and soil type.\nThis study area includes four wilderness areas located in the Roosevelt National Forest of northern Colorado. These areas represent forests with minimal human-caused disturbances, so that existing forest cover types are more a result of ecological processes rather than forest management practices.\nThis competition originally ran in 2015. We are relaunching it as a kernels-only version here.\nAcknowledgements\nKaggle is hosting this competition for the machine learning community to use for fun and practice. This dataset was provided by Jock A. Blackard and Colorado State University. We also thank the UCI machine learning repository for\nhosting the dataset\n. If you use the problem in publication, please cite:\nBache, K. & Lichman, M. (2013).\nUCI Machine Learning Repository\n. Irvine, CA: University of California, School of Information and Computer Science\n\n== Evaluation ===\nSubmissions are evaluated on multi-class classification accuracy.\nSubmission File\nYour submission file should have the observation Id and a predicted cover type (an integer between 1 and 7, inclusive). The file should contain a header and have the following format:\nId,Cover_Type\n15121,1\n15122,1\n15123,1\n...",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 313,
+    "title": "Santander Value Prediction Challenge: Predict the value of transactions for potential customers.",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/santander-value-prediction-challenge",
+    "description": "\n== Description ===\nAccording to Epsilon research, 80% of customers are more likely to do business with you if you provide personalized service. Banking is no exception.\nThe digitalization of everyday lives means that customers expect services to be delivered in a personalized and timely manner… and often before they´ve even realized they need the service. \nIn their 3rd Kaggle competition,\nSantander Group\naims to go a step beyond recognizing that there is a need to provide a customer a financial service and intends to determine the amount or value of the customer's transaction.  This means anticipating customer needs in a more concrete, but also simple and personal way.  With so many choices for financial services, this need is greater now than ever before.\nIn this competition, Santander Group is asking Kagglers to help them identify the value of transactions for each potential customer. This is a first step that Santander needs to nail in order to personalize their services at scale.\n\n== Evaluation ===\nThe evaluation metric for this competition is Root Mean Squared Logarithmic Error.\nThe RMSLE is calculated as\nϵ\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\nlog\n(\np\ni\n+\n1\n)\n−\nlog\n(\na\ni\n+\n1\n)\n)\n2\nWhere:\n\\\\(\\epsilon\\\\) is the RMSLE value (score)\n\\\\(n\\\\) is the total number of observations in the (public/private) data set,\n\\\\(p_i\\\\) is your prediction of target, and\n\\\\(a_i\\\\) is the actual target for \\\\(i\\\\).\n\\\\(\\log(x)\\\\) is the natural logarithm of \\\\(x\\\\)\nSubmission File\nFor every row in the test.csv\n, submission files should contain two columns: ID and target.  The ID corresponds to the column of that ID in the test.tsv. The file should contain a header and have the following format:\nID,target\n000137c73,5944923.322036332\n00021489f,5944923.322036332\n0004d7953,5944923.322036332\netc.",
+    "source_metric": "rmsle"
+  },
+  {
+    "source_record": 335,
+    "title": "Zillow Prize; Zillow’s Home Value Prediction (Zestimate): Can you improve the algorithm that changed the world of real estate?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/zillow-prize-1",
+    "description": "\n== Description ===\nZillow’s Zestimate home valuation has shaken up the U.S. real estate industry since first released 11 years ago.\nA home is often the largest and most expensive purchase a person makes in his or her lifetime. Ensuring homeowners have a trusted way to monitor this asset is incredibly important. The Zestimate was created to give consumers as much information as possible about homes and the housing market, marking the first time consumers had access to this type of home value information at no cost.\n“Zestimates” are estimated home values based on 7.5 million statistical and machine learning models that analyze hundreds of data points on each property.   And, by continually improving the median margin of error (from 14% at the onset to 5% today), Zillow has since become established as one of the largest, most trusted marketplaces for real estate information in the U.S. and a leading example of impactful machine learning.\nZillow Prize, a competition with a one million dollar grand prize, is challenging the data science community to help push the accuracy of the Zestimate even further. Winning algorithms stand to impact the home values of  110M homes across the U.S.\nIn this million-dollar competition, participants will develop an algorithm that makes predictions about the future sale prices of homes. The contest is structured into two rounds, the qualifying round which opens May 24, 2017 and the private round for the 100 top qualifying teams that opens  on Feb 1st, 2018. In the qualifying round, you’ll be building a model to improve the Zestimate residual error. In the final round, you’ll build a home valuation algorithm from the ground up, using external data sources to help engineer new features that give your model an edge over the competition.\nBecause real estate transaction data is public information, there will be a three-month sales tracking period after each competition round closes where your predictions will be evaluated against the actual sale prices of the homes. The final leaderboard won’t be revealed until the close of the sales tracking period.\n\n== Evaluation ===\nSubmissions are evaluated on\nMean Absolute Error\nbetween the predicted log error and the actual log error. The log error is defined as\nl\no\ng\ne\nr\nr\no\nr\n=\nl\no\ng\n(\nZ\ne\ns\nt\ni\nm\na\nt\ne\n)\n−\nl\no\ng\n(\nS\na\nl\ne\nP\nr\ni\nc\ne\n)\nand it is recorded in the transactions training data. If a transaction didn't happen for a property during that period of time, that row is ignored and not counted in the calculation of MAE.\nSubmission File\nFor each property (unique parcelid), you must predict a log error for each time point. You should be predicting 6 timepoints:\nOctober 2016 (201610), November 2016 (201611), December 2016 (201612), October 2017 (201710), November 2017 (201711), and December 2017 (201712)\n.  The file should contain a header and have the following format:\nParcelId,201610,201611,201612,201710,201711,201712\n10754147,0.1234,1.2234,-1.3012,1.4012,0.8642-3.1412\n10759547,0,0,0,0,0,0\netc.\nNote that the actual log errors are accurate the 4th decimal places, so you can adjust your decimal formats to limit the size of your submission file.",
+    "source_metric": "accuracy"
+  },
+  {
+    "source_record": 346,
+    "title": "New York City Taxi Trip Duration: Share code and data to improve ride time predictions",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/nyc-taxi-trip-duration",
+    "description": "\n== Description ===\nIn this competition, Kaggle is challenging you to build a model that predicts the total ride duration of taxi trips in New York City. Your primary dataset is one released by the NYC Taxi and Limousine Commission, which includes pickup time, geo-coordinates, number of passengers, and several other variables.\nLongtime Kagglers will recognize that this competition objective is similar to the\nECML/PKDD trip time challenge\nwe hosted in 2015. But, this challenge comes with a twist. Instead of awarding prizes to the top finishers on the leaderboard, this playground competition was created to reward collaboration and collective learning.\nWe are encouraging you (\nwith cash prizes!\n) to publish additional training data that other participants can use for their predictions. We also have designated bi-weekly and final prizes to reward authors of\nkernels\nthat are particularly insightful or valuable to the community.\n\n== Evaluation ===\nThe evaluation metric for this competition is\nRoot Mean Squared Logarithmic Error\n.\nThe RMSLE is calculated as\n$$\n\\epsilon = \\sqrt{\\frac{1}{n} \\sum_{i=1}^n (\\log(p_i + 1) - \\log(a_i+1))^2 }\n$$\nWhere:\n\\\\(\\epsilon\\\\) is the RMSLE value (score)\n\\\\(n\\\\) is the total number of observations in the (public/private) data set,\n\\\\(p_i\\\\) is your prediction of trip duration, and\n\\\\(a_i\\\\) is the actual trip duration for \\\\(i\\\\).\n\\\\(\\log(x)\\\\) is the natural logarithm of \\\\(x\\\\)\nSubmission File\nFor every row in the dataset\n, submission files should contain two columns: id and trip_duration.  The id corresponds to the column of that id in the test.csv. The file should contain a header and have the following format:\nid,trip_duration\nid00001,978\nid00002,978\nid00003,978\nid00004,978\netc.",
+    "source_metric": "rmsle"
+  },
+  {
+    "source_record": 348,
+    "title": "Mercedes-Benz Greener Manufacturing: Can you cut the time a Mercedes-Benz spends on the test bench?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/mercedes-benz-greener-manufacturing",
+    "description": "\n== Description ===\nSince the first automobile, the Benz Patent Motor Car in 1886, Mercedes-Benz has stood for important automotive innovations. These include, for example, the passenger safety cell with crumple zone, the airbag and intelligent assistance systems. Mercedes-Benz applies for nearly 2000 patents per year, making the brand the European leader among premium car makers.\nDaimler’s\nMercedes-Benz cars are leaders in the premium car industry. With a huge selection of features and options, customers can choose the customized Mercedes-Benz of their dreams. .\nTo ensure the safety and reliability of each and every unique car configuration before they hit the road, Daimler’s engineers have developed a robust testing system. But, optimizing the speed of their testing system for so many possible feature combinations is complex and time-consuming without a powerful algorithmic approach. As one of the world’s biggest manufacturers of premium cars, safety and efficiency are paramount on Daimler’s production lines.\nIn this competition, Daimler is challenging Kagglers to tackle the curse of dimensionality and reduce the time that cars spend on the test bench. Competitors will work with a dataset representing different permutations of Mercedes-Benz car features to predict the time it takes to pass testing. Winning algorithms will contribute to speedier testing, resulting in lower carbon dioxide emissions without reducing Daimler’s standards.\n\n== Evaluation ===\nSubmissions are evaluated on the R^2 value, also called the\ncoefficient of determination\n.\nSubmission File\nFor each 'ID' in the test set, you must predict the 'y' variable. The file should contain a header and have the following format:\nID,y\n1\n,\n100\n2,100.33\n3,105.81\n...\ncontent_copy",
+    "source_metric": "r2"
+  },
+  {
+    "source_record": 349,
+    "title": "Sberbank Russian Housing Market: Can you predict realty price fluctuations in Russia’s volatile economy?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/sberbank-russian-housing-market",
+    "description": "\n== Description ===\nHousing costs demand a significant investment from both consumers and developers. And when it comes to planning a budget—whether personal or corporate—the last thing anyone needs is uncertainty about one of their biggets expenses.\nSberbank\n, Russia’s oldest and largest bank, helps their customers by making predictions about realty prices so renters, developers, and lenders are more confident when they sign a lease or purchase a building.\nAlthough the housing market is relatively stable in Russia, the country’s volatile economy makes forecasting prices as a function of apartment characteristics a unique challenge. Complex interactions between housing features such as number of bedrooms and location are enough to make pricing predictions complicated. Adding an unstable economy to the mix means Sberbank and their customers need more than simple regression models in their arsenal.\nIn this competition, Sberbank is challenging Kagglers to develop algorithms which use a broad spectrum of features to predict realty prices. Competitors will rely on a rich dataset that includes housing data and macroeconomic patterns. An accurate forecasting model will allow Sberbank to provide more certainty to their customers in an uncertain economy.\n\n== Evaluation ===\nSubmissions are evaluated on the\nRMSLE\nbetween their predicted prices and the actual data. The target variable, called\nprice_doc\nin the training set, is the sale price of each property.\nSubmission File\nFor each id in the test set, you must predict the price that the property sold for. The file should contain a header and have the following format:\nid,price_doc\n30474,7118500.44\n30475,7118500.44\n30476,7118500.44\netc.",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 354,
+    "title": "Two Sigma Connect; Rental Listing Inquiries: How much interest will a new rental listing on RentHop receive?",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/two-sigma-connect-rental-listing-inquiries",
+    "description": "\n== Description ===\nFinding the perfect place to call your new home should be more than browsing through endless listings.\nRentHop\nmakes apartment search smarter by using data to sort rental listings by quality. But while looking for the perfect apartment is difficult enough, structuring and making sense of all available real estate data programmatically is even harder.\nTwo Sigma\nand RentHop, a portfolio company of Two Sigma Ventures, invite Kagglers to unleash their creative engines to uncover business value in this unique recruiting competition.\nTwo Sigma invites you to apply your talents in this recruiting competition featuring rental listing data from RentHop. Kagglers will predict the number of inquiries a new listing receives based on the listing’s creation date and other features. Doing so will help RentHop better handle fraud control, identify potential listing quality issues, and allow owners and agents to better understand renters’ needs and preferences.\nTwo Sigma has been at the forefront of applying technology and data science to financial forecasts. While their pioneering advances in big data, AI, and machine learning in the financial world have been pushing the industry forward, as with all other scientific progress, they are driven to make continual progress. This challenge is an opportunity for competitors to gain a sneak peek into Two Sigma's data science work outside of finance.\nAcknowledgments\nThis competition is co-hosted by Two Sigma and RentHop (a portfolio company of Two Sigma Ventures, which is a division of Two Sigma Investments) to encourage creativity in using real world data to solve everyday problems.\n\n== Evaluation ===\nSubmissions are evaluated using the\nmulti-class logarithmic loss\n. Each listing has one true class. For each listing, you must submit a set of predicted probabilities (one for every listing). The formula is then,\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\nN\n∑\ni\n=\n1\nM\n∑\nj\n=\n1\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\n∑\ni\n=\n1\nN\n∑\nj\n=\n1\nM\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nwhere N is the number of listings in the test set, M is the number of class labels (3 classes),  \\\\(log\\\\) is the natural logarithm, \\\\(y_{ij}\\\\) is 1 if observation \\\\(i\\\\) belongs to class \\\\(j\\\\) and 0 otherwise, and \\\\(p_{ij}\\\\) is the predicted probability that observation \\\\(i\\\\) belongs to class \\\\(j\\\\).\nThe submitted probabilities for a given listing are not required to sum to one because they are rescaled prior to being scored (each row is divided by the row sum). In order to avoid the extremes of the log function, predicted probabilities are replaced with \\\\(max(min(p,1-10^{-15}),10^{-15})\\\\).\nSubmission File\nYou must submit a csv file with the listing_id, and a probability for each class.\nThe order of the rows does not matter. The file must have a header and should look like the following:\nlisting_id,high,medium,low\n7065104,0.07743170693194379,0.2300252644876046,0.6925430285804516\n7089035,0.0, 1.0, 0.0\n...",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 363,
+    "title": "Allstate Claims Severity: How severe is an insurance claim?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/allstate-claims-severity",
+    "description": "\n== Description ===\nWhen you’ve been devastated by a serious car accident, your focus is on the things that matter the most: family, friends, and other loved ones. Pushing paper with your insurance agent is the last place you want your time or mental energy spent. This is why\nAllstate\n, a personal insurer in the United States, is continually seeking fresh ideas to improve their claims service for the over 16 million households they protect.\nAllstate is currently developing automated methods of predicting the cost, and hence severity, of claims. In this recruitment challenge, Kagglers are invited to show off their creativity and flex their technical chops by creating an algorithm which accurately predicts claims severity. Aspiring competitors will demonstrate insight into better ways to predict claims severity for the chance to be part of Allstate’s efforts to ensure a worry-free customer experience.\nNew to Kaggle? This competition is a recruiting competition, your chance to get a foot in the door with the hiring team at Allstate.\n\n== Evaluation ===\nSubmissions are evaluated on the\nmean absolute error (MAE)\nbetween the predicted loss and the actual loss.\nSubmission File\nFor every id in the test set, you should predict the loss value. The file should contain a header and have the following format:\nid,loss\n4,0\n6,1\n9,99.3\netc.",
+    "source_metric": "mae"
+  },
+  {
+    "source_record": 368,
+    "title": "TalkingData Mobile User Demographics: Get to know millions of mobile device users",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/talkingdata-mobile-user-demographics",
+    "description": "\n== Description ===\nNothing is more comforting than being greeted by your favorite drink just as you walk through the door of the corner café. While a thoughtful barista knows you take a macchiato every Wednesday morning at 8:15, it’s much more difficult in a digital space for your preferred brands to personalize your experience.\nTalkingData\n, China’s largest third-party mobile data platform, understands that everyday choices and behaviors paint a picture of who we are and what we value. Currently, TalkingData is seeking to leverage behavioral data from more than 70% of the 500 million mobile devices active daily in China to help its clients better understand and interact with their audiences.\nIn this competition, Kagglers are challenged to build a model predicting users’ demographic characteristics based on their app usage, geolocation, and mobile device properties. Doing so will help millions of developers and brand advertisers around the world pursue data-driven marketing efforts which are relevant to their users and catered to their preferences.\nAcknowledgements\n\n== Evaluation ===\nSubmissions are evaluated using the\nmulti-class logarithmic loss\n. Each device has been labeled with one true class. For each device, you must submit a set of predicted probabilities (one for each class). The formula is then,\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\n∑\ni\n=\n1\nN\n∑\nj\n=\n1\nM\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\n∑\ni\n=\n1\nN\n∑\nj\n=\n1\nM\ny\ni\nj\nlog\n⁡\n(\np\ni\nj\n)\n,\nwhere N is the number of devices in the test set, M is the number of class labels,  \\\\(log\\\\) is the natural logarithm, \\\\(y_{ij}\\\\) is 1 if device \\\\(i\\\\) belongs to class \\\\(j\\\\) and 0 otherwise, and \\\\(p_{ij}\\\\) is the predicted probability that observation \\\\(i\\\\) belongs to class \\\\(j\\\\).\nThe submitted probabilities for a given device are not required to sum to one because they are rescaled prior to being scored (each row is divided by the row sum), but they need to be in the range of [0, 1]. In order to avoid the extremes of the log function, predicted probabilities are replaced with \\\\(max(min(p,1-10^{-15}),10^{-15})\\\\).\nSubmission File\nYou must submit a csv file with the device id, and a probability for each class.\nThe 12 classes to predict are:\n'F23-', 'F24-26','F27-28','F29-32', 'F33-42', 'F43+',\n'M22-', 'M23-26', 'M27-28', 'M29-31', 'M32-38', 'M39+'\nThe order of the rows does not matter. The file must have a header and should look like the following:\ndevice_id,F23-,F24-26,F27-28,F29-32,F33-42,F43+,M22-,M23-26,M27-28,M29-31,M32-38,M39+\n1234,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833\n5678,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833,0.0833\n...",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 387,
+    "title": "Liberty Mutual Group; Property Inspection Prediction: Quantify property hazards before time of inspection",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/liberty-mutual-group-property-inspection-prediction",
+    "description": "\n== Description ===\nA Fortune 100 company,\nLiberty Mutual Insurance\nhas provided a wide range of insurance products and services designed to meet their customers' ever-changing needs for over 100 years.\nTo ensure that Liberty Mutual’s portfolio of home insurance policies aligns with their business goals, many newly insured properties receive a home inspection. These inspections review the condition of key attributes of the property, including things like the foundation, roof, windows and siding. The results of an inspection help Liberty Mutual determine if the property is one they want to insure.\nIn this challenge, your task is to predict a transformed count of hazards or pre-existing damages using a dataset of property information. This will enable Liberty Mutual to more accurately identify high risk homes that require additional examination to confirm their insurability.\nLiberty Mutual is interested in hiring predictive modelers like you to work on one of many growing analytics teams within our company. As a member of Liberty Mutual’s advanced analytics community, you will have the opportunity to apply sophisticated, cutting-edge techniques, similar to those used in this competition, to large data sets in departments such as Actuarial, Product, Claims, Marketing, Distribution, Human Resources, and Finance.\nClick to view available positions.\nBecause we seek to tap innovation both inside and outside the company, certain eligible Liberty Mutual employees are encouraged to participate in this challenge for development purposes. Refer to the\ncompetition rules\nfor the full details.\n\n== Evaluation ===\nSubmissions are evaluated on the\nnormalized Gini coefficient\n.\nTo calculate the normalized Gini, your predictions are sorted from largest to smallest. This is the only step where the explicit prediction values are used (i.e. only the order of your predictions matters). We then move from largest to smallest, asking \"In the leftmost x% of the data, how much of the observed loss have you accumulated?\" With no model, you expect to accumulate 10% of the loss in 10% of the predictions, so no model (or a \"null\" model) achieves a straight line. The area between your curve and this straight line is the Gini coefficient.\nThere is a maximum achievable area for a perfect model. The normalized Gini is obtained by dividing the Gini coefficient of your model by the Gini coefficient of a perfect model.\nSubmission File\nThe file should contain a header and have the following format:\nId,Hazard\n6,0\n7,0\n8,0\netc.",
+    "source_metric": "unknown"
+  },
+  {
+    "source_record": 396,
+    "title": "Otto Group Product Classification Challenge: Classify products into the correct category",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/otto-group-product-classification-challenge",
+    "description": "\n== Description ===\nGet started on this competition through Kaggle Scripts\nThe Otto Group is one of the world’s biggest e-commerce companies, with subsidiaries in more than 20 countries, including Crate & Barrel (USA), Otto.de (Germany) and 3 Suisses (France). We are selling millions of products worldwide every day, with several thousand products being added to our product line.\nA consistent analysis of the performance of our products is crucial. However, due to our diverse global infrastructure, many identical products get classified differently. Therefore, the quality of our product analysis depends heavily on the ability to accurately cluster similar products. The better the classification, the more insights we can generate about our product range.\nFor this competition, we have provided a dataset with 93 features for more than 200,000 products. The objective is to build a predictive model which is able to distinguish between our main product categories. The winning models will be open sourced.\n\n== Evaluation ===\nSubmissions are evaluated using the multi-class logarithmic loss. Each product has been labeled with one true category. For each product, you must submit a set of predicted probabilities (one for every category). The formula is then,\nl\no\ng\nl\no\ns\ns\n=\n−\n1\nN\nN\n∑\ni\n=\n1\nM\n∑\nj\n=\n1\ny\ni\nj\nlog\n(\np\ni\nj\n)\n,\nwhere N is the number of products in the test set, M is the number of class labels, \\\\(log\\\\) is the natural logarithm, \\\\(y_{ij}\\\\) is 1 if observation \\\\(i\\\\) is in class \\\\(j\\\\) and 0 otherwise, and \\\\(p_{ij}\\\\) is the predicted probability that observation \\\\(i\\\\) belongs to class \\\\(j\\\\).\nThe submitted probabilities for a given product are not required to sum to one because they are rescaled prior to being scored (each row is divided by the row sum). In order to avoid the extremes of the log function, predicted probabilities are replaced with \\\\(max(min(p,1-10^{-15}),10^{-15})\\\\).\nSubmission Format\nYou must submit a csv file with the product id, all candidate class names, and a probability for each class. The order of the rows does not matter. The file must have a header and should look like the following:\nid,Class_1,Class_2,Class_3,Class_4,Class_5,Class_6,Class_7,Class_8,Class_9\n1,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0\n2,0.0,0.2,0.3,0.3,0.0,0.0,0.1,0.1,0.0\n...\netc.",
+    "source_metric": "log_loss"
+  },
+  {
+    "source_record": 398,
+    "title": "Restaurant Revenue Prediction: Predict annual restaurant sales based on objective measurements",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/restaurant-revenue-prediction",
+    "description": "\n== Description ===\nWith over 1,200 quick service restaurants across the globe, TFI is the company behind some of the world's most well-known brands: Burger King, Sbarro, Popeyes, Usta Donerci, and Arby’s. They employ over 20,000 people in Europe and Asia and make significant daily investments in developing new restaurant sites.\nRight now, deciding when and where to open new restaurants is largely a subjective process based on the personal judgement and experience of development teams. This subjective data is difficult to accurately extrapolate across geographies and cultures.\nNew restaurant sites take large investments of time and capital to get up and running. When the wrong location for a restaurant brand is chosen, the site closes within 18 months and operating losses are incurred.\nFinding a mathematical model to increase the effectiveness of investments in new restaurant sites would allow TFI to invest more in other important business areas, like sustainability, innovation, and training for new employees. Using demographic, real estate, and commercial data, this competition challenges you to predict the annual restaurant sales of 100,000 regional locations.\nTFI would love to hire an expert Kaggler like you to head up their growing data science team in Istanbul or Shanghai. You'd be tackling problems like the one featured in this competition on a global scale.\nSee the job description here >>\n\n== Evaluation ===\nRoot Mean Squared Error (RMSE)\nSubmissions are scored on the root mean squared error. RMSE is very common and is a suitable general-purpose error metric. Compared to the Mean Absolute Error, RMSE punishes large errors:\nRMSE\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\ny\ni\n−\nˆ\ny\ni\n)\n2\n,\nwhere y hat is the predicted value and y is the original value.\nSubmission File\nFor every restaurant in the dataset\n, submission files should contain two columns: Id and Prediction.\nThe file should contain a header and have the following format:\nId,Prediction\n0,1.0\n1,1.0\n2,1.0\netc.",
+    "source_metric": "mae"
+  },
+  {
+    "source_record": 446,
+    "title": "Online Product Sales: Predict the online sales of a consumer product based on a data set of product features.",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    },
+    "url": "https://www.kaggle.com/c/online-sales",
+    "description": "\n== Description ===\nThe objective of the competition is to help us build as good a model as possible to predict monthly online sales of a product. Imagine the products are online  self-help programs following an initial advertising campaign.\nWe have shared the data in the comma separated values (CSV) format.  Each row in this data set represents a different consumer product.\nThe first 12 columns (Outcome_M1 through Outcome_M12) contains the monthly online sales for the first 12 months after the product launches.\nDate_1 is the day number the major advertising campaign began and the product launched.\nDate_2 is the day number the product was announced and a pre-release advertising campaign began.\nOther columns in the data set are features of the product and the advertising campaign.  Quan_x are quantitative variables and Cat_x are categorical variables. Binary categorical variables are measured as (1) if the product had the feature and (0) if it\n did not.\n\n== Evaluation ===\nPredict the first 12 months of online sales for a product based on product features.\nThe evaluation metric is RMSLE (root mean square logarithmic error) across all 12 prediction columns.\nThe RMSLE is calculated as\nϵ\n=\n√\n1\nn\nn\n∑\ni\n=\n1\n(\nlog\n(\np\ni\n+\n1\n)\n−\nlog\n(\na\ni\n+\n1\n)\n)\n2\nWhere:\n\\\\(\\epsilon\\\\) is the RMSLE value (score)\n\\\\(n\\\\) is the total sales in the (public/private) data set\n\\\\(p_i\\\\) is your prediction\n\\\\(a_i\\\\) is the actual sales for  \\\\(i\\\\)\n\\\\(\\log(x)\\\\) is the natural logarithim of \\\\(x\\\\)",
+    "source_metric": "unknown"
+  }
+]

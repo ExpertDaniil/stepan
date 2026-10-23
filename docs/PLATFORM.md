@@ -47,6 +47,13 @@ python3 solution.py "data_for_participants/Регрессия/task.md" --env-fil
 и происхождение находятся в [описании подборки](research/notebooks/README.md).
 Инструмент отдаёт выбранную ячейку без её исторического вывода и не обращается к внешним сайтам.
 
+Кроме этих пяти файлов в `stepan_resources.py` включены шесть ресурсов `recipes/knowledge`:
+`manifest.json`, `cards.json`, `competitions.json`, `sources.jsonl`, `selection.json` и `UPSTREAM_LICENSE.txt`.
+Это отдельная текстовая библиотека и собственные примеры проекта; её 154 разбора не выдаются за
+оригинальные `.ipynb`. Подготовка корпуса выполняется заранее. На платформе не нужны исходный архив,
+`scripts/prepare_knowledge.py`, сеть или новая модель поиска. Содержимое возвращается как изучаемый
+материал через `search_knowledge`; подробности и происхождение — [KNOWLEDGE.md](KNOWLEDGE.md).
+
 `requirements.runtime.txt` — разрешённое подмножество для быстрой локальной среды и Dockerfile. `requirements.txt`/`requirements.organizers.txt` сохраняют полный предоставленный список. Это не утверждение, что полный список зависимостей был успешно установлен в среде подготовки: фактические ограничения проверки указаны в `VALIDATION.md`.
 
 ## Подключение модели

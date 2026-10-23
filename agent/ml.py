@@ -6,6 +6,7 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
+from agent.preprocessing import MISSING_CATEGORY, preprocessing_policy
 
 
 def sanitize_frame(frame):
@@ -14,7 +15,7 @@ def sanitize_frame(frame):
         if pd.api.types.is_numeric_dtype(result[column]) and not pd.api.types.is_bool_dtype(result[column]):
             result[column] = pd.to_numeric(result[column], errors="coerce").replace([np.inf, -np.inf], np.nan)
         else:
-            result[column] = result[column].astype("object").where(result[column].notna(), "__MISSING__").astype(str)
+            result[column] = result[column].astype("object").where(result[column].notna(), MISSING_CATEGORY).astype(str)
     return result
 
 
@@ -115,20 +116,22 @@ def build_pipeline(recipe_id, task_spec, params):
     if recipe_id.startswith("catboost-"):
         model = CatBoostFrameModel(regression, params, threads, seed)
         return Pipeline([("interactions", NumericInteractions()), ("model", model)]) if interactions else model
-    numerical = Pipeline([("impute", SimpleImputer(strategy="median", keep_empty_features=True))])
+    policy = preprocessing_policy(recipe_id)
+    numerical = Pipeline([("impute", SimpleImputer(strategy=policy['numeric_missing'], keep_empty_features=True))])
+    encoder = (OneHotEncoder(handle_unknown="ignore", min_frequency=2, sparse_output=True)
+               if policy['categorical_encoding'] == 'one_hot'
+               else OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1))
     if recipe_id.startswith("linear-"):
-        numerical.steps.append(("scale", StandardScaler()))
-        encoder = OneHotEncoder(handle_unknown="ignore", min_frequency=2, sparse_output=True)
         estimator = Ridge(solver="lsqr", **params) if regression else LogisticRegression(max_iter=500, random_state=seed, **params)
     elif recipe_id.startswith("hist-gradient-"):
-        encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
         estimator = (HistGradientBoostingRegressor if regression else HistGradientBoostingClassifier)(random_state=seed, **params)
     elif recipe_id.startswith(("random-forest-", "extra-trees-")):
-        encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
         family = (ExtraTreesRegressor if regression else ExtraTreesClassifier) if recipe_id.startswith("extra-trees-") else (RandomForestRegressor if regression else RandomForestClassifier)
         estimator = family(n_jobs=threads, random_state=seed, **params)
     else:
         raise ValueError("Unsupported recipe: " + recipe_id)
+    if policy['numeric_scaling']:
+        numerical.steps.append(("scale", StandardScaler()))
     categorical = Pipeline([("encode", encoder)])
     prepare = ColumnTransformer([
         ("numeric", numerical, make_column_selector(dtype_include=np.number)),

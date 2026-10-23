@@ -38,5 +38,10 @@
     "file": "examples/G14/response-refine-best.json",
     "schema": "G14_Response",
     "contract_id": "G14"
+  },
+  {
+    "contract_id": "C10",
+    "file": "examples/research-action-with-notes.json",
+    "schema": "ResearchAction"
   }
 ]

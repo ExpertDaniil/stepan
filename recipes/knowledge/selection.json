@@ -1,0 +1,6053 @@
+[
+  {
+    "source_record": 1,
+    "title": "2019 Kaggle ML & DS Survey: The most comprehensive dataset available on the state of ML and data science",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 2,
+    "title": "Categorical Feature Encoding Challenge: Binary classification, with every feature a categorical",
+    "accepted": true,
+    "task_kinds": [
+      "regression",
+      "multiclass_classification"
+    ],
+    "scope": "general_method_transfer",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 3,
+    "title": "BigQuery-Geotab Intersection Congestion: Can you predict wait times at major city intersections?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 4,
+    "title": "Kannada MNIST: MNIST like datatset for Kannada handwritten digits",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 5,
+    "title": "ASHRAE - Great Energy Predictor III: How much energy will a building consume?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 6,
+    "title": "NFL 1st and Future - Analytics: Can you investigate the relationship between the playing surface and the injury and performance of NFL athletes?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Feature Selection",
+        "Representation Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 7,
+    "title": "NFL Big Data Bowl: How many yards will an NFL player gain after receiving a handoff?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 8,
+    "title": "Santas Workshop Tour 2019: In the notebook we can build a model, and pretend that it will optimize...",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 9,
+    "title": "Santa 2019: Revenge of the Accountants: Oh what fun it is to revise . . .",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 10,
+    "title": "Peking University/Baidu - Autonomous Driving: Can you predict vehicle angle in different settings?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Object Detection",
+        "Pose Estimation"
+      ]
+    }
+  },
+  {
+    "source_record": 11,
+    "title": "2019 Data Science Bowl: Uncover the factors to help measure how young children learn",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 12,
+    "title": "TensorFlow 2.0 Question Answering: Identify the answers to real user questions about Wikipedia page content",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Question Answering"
+      ]
+    }
+  },
+  {
+    "source_record": 13,
+    "title": "Google QUEST Q&A Labeling: Improving automated understanding of complex question answer content",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Question Answering"
+      ]
+    }
+  },
+  {
+    "source_record": 14,
+    "title": "Bengali.AI Handwritten Grapheme Classification: Classify the components of handwritten Bengali",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Optical Character Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 15,
+    "title": "DS4G: Environmental Insights Explorer: Exploring alternatives for emissions factor calculations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 16,
+    "title": "COVID19 Local US-CA Forecasting (Week 1): Forecast daily COVID-19 spread in California, USA",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 17,
+    "title": "Categorical Feature Encoding Challenge II: Binary classification, with every feature a categorical (and interactions!)",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 18,
+    "title": "COVID19 Global Forecasting (Week 4): Forecast daily COVID-19 spread in regions around world",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 19,
+    "title": "Deepfake Detection Challenge: Identify videos with facial or voice manipulations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Video Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 20,
+    "title": "Google Cloud & NCAA® March Madness Analytics: Uncover the madness of March Madness®",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 21,
+    "title": "COVID19 Global Forecasting (Week 5): Forecast daily COVID-19 spread in regions around world",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 22,
+    "title": "Flower Classification with TPUs: Use TPUs to classify 104 types of flowers",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 23,
+    "title": "University of Liverpool - Ion Switching: Identify the number of channels open at each time point",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 24,
+    "title": "Herbarium 2020 - FGVC7: Identify plant species from herbarium specimens. Data from New York Botanical Garden.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 25,
+    "title": "iWildCam 2020 - FGVC7: Categorize animals in the wild",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 26,
+    "title": "iMaterialist (Fashion) 2020 at FGVC7: Fine-grained segmentation task for fashion and apparel",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 27,
+    "title": "Plant Pathology 2020 - FGVC7: Identify the category of foliar diseases in apple trees",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 28,
+    "title": "Abstraction and Reasoning Challenge: Create an AI capable of solving reasoning tasks it has never seen before",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Transfer Learning",
+        "Representation Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 29,
+    "title": "Tweet Sentiment Extraction: Extract support phrases for sentiment labels",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Sentiment Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 30,
+    "title": "Jigsaw Multilingual Toxic Comment Classification: Use TPUs to identify toxicity comments across multiple languages",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Sentiment Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 31,
+    "title": "TReNDS Neuroimaging: Multiscanner normative age and assessments prediction with brain function, structure, and connectivity",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 32,
+    "title": "M5 Forecasting - Uncertainty: Estimate the uncertainty distribution of Walmart unit sales.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 33,
+    "title": "M5 Forecasting - Accuracy: Estimate the unit sales of Walmart retail goods",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 34,
+    "title": "ALASKA2 Image Steganalysis: Detect secret data hidden within digital images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 35,
+    "title": "Prostate cANcer graDe Assessment (PANDA) Challenge: Prostate cancer diagnosis using the Gleason grading system",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 36,
+    "title": "Hash Code Archive - Photo Slideshow Optimization: Optimizing a photo album from Hash Code 2019",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Sequential Modeling"
+      ]
+    }
+  },
+  {
+    "source_record": 37,
+    "title": "SIIM-ISIC Melanoma Classification: Identify melanoma in lesion images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 38,
+    "title": "Google Landmark Retrieval 2020: Given an image, can you find all of the same landmarks in a dataset?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 39,
+    "title": "Global Wheat Detection: Can you help identify wheat heads using image analysis?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 40,
+    "title": "Cornell Birdcall Identification: Build tools for bird population monitoring",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 41,
+    "title": "Halite by Two Sigma: Collect the most halite during your match in space",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 42,
+    "title": "Google Landmark Recognition 2020: Label famous (and not-so-famous) landmarks in images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 43,
+    "title": "OpenVaccine: COVID-19 mRNA Vaccine Degradation Prediction: Urgent need to bring the COVID-19 vaccine to mass production",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 44,
+    "title": "OSIC Pulmonary Fibrosis Progression: Predict lung function decline",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 45,
+    "title": "RSNA STR Pulmonary Embolism Detection: Classify Pulmonary Embolism cases in chest CT scans",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 46,
+    "title": "Lyft Motion Prediction for Autonomous Vehicles: Build motion prediction models for self-driving vehicles",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Trajectory Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 47,
+    "title": "Conways Reverse Game of Life 2020: Reverse the arrow of time in the Game of Life",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Reverse Cellular Automata Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 48,
+    "title": "Mechanisms of Action (MoA) Prediction: Can you improve the algorithm that classifies drugs based on their biological activity?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Model Regularization",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 49,
+    "title": "Google Research Football with Manchester City F.C.: Train agents to master the worlds most popular sport",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 50,
+    "title": "Hash Code Archive - Drone Delivery: Can you help coordinate the drone delivery supply chain?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Optimization and Scheduling"
+      ]
+    }
+  },
+  {
+    "source_record": 51,
+    "title": "NFL 1st and Future - Impact Detection: Detect helmet impacts in videos of NFL plays",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 52,
+    "title": "INGV - Volcanic Eruption Prediction: Discover hidden precursors in geophysical data to help emergency response",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing"
+      ],
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Event Detection in Sequences"
+      ]
+    }
+  },
+  {
+    "source_record": 53,
+    "title": "Riiid Answer Correctness Prediction: Track knowledge states of 1M+ students in the wild",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 54,
+    "title": "Tabular Playground Series - Jan 2021: Practice your ML regression skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 55,
+    "title": "Rainforest Connection Species Audio Detection: Automate the detection of bird and frog species in a tropical soundscape",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 56,
+    "title": "Cassava Leaf Disease Classification: Identify the type of disease present on a Cassava Leaf image",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 57,
+    "title": "Rock, Paper, Scissors: Shoot!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Policy Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 58,
+    "title": "Santa 2020 - The Candy Cane Contest: May your workdays be merry and bright",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Bandit Optimization"
+      ]
+    }
+  },
+  {
+    "source_record": 59,
+    "title": "Tabular Playground Series - Feb 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 60,
+    "title": "RANZCR CLiP - Catheter and Line Position Challenge: Classify the presence and correct placement of tubes on chest x-rays to save lives",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 61,
+    "title": "VinBigData Chest X-ray Abnormalities Detection: Automatically localize and classify thoracic abnormalities from chest radiographs",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 62,
+    "title": "Tabular Playground Series - Mar 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 63,
+    "title": "March Machine Learning Mania 2021 - NCAAW - Spread: Predict the margin of victory in the 2021 womens tournament",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 64,
+    "title": "March Machine Learning Mania 2021 - NCAAW: Predict the 2021 NCAAW Basketball Tournament",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 65,
+    "title": "March Machine Learning Mania 2021 - NCAAM: Predict the 2021 NCAAM Basketball Tournament",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 66,
+    "title": "Tabular Playground Series - Apr 2021: Synthanic - Youre going to need a bigger boat",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 67,
+    "title": "Shopee - Price Match Guarantee: Determine if two products are the same by their images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 68,
+    "title": "HuBMAP - Hacking the Kidney: Identify glomeruli in human kidney tissue images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 69,
+    "title": "Human Protein Atlas - Single Cell Classification: Find individual human cell differences in microscope images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 70,
+    "title": "Indoor Location & Navigation: Identify the position of a smartphone in a shopping mall",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 71,
+    "title": "Hotel-ID to Combat Human Trafficking 2021 - FGVC8: Recognizing hotels to aid Human trafficking investigations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 72,
+    "title": "Plant Pathology 2021 - FGVC8: Identify the category of foliar diseases in apple trees",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 73,
+    "title": "Herbarium 2021 - Half-Earth Challenge - FGVC8: Identify plant species of the Americas, Oceania and the Pacific from herbarium specimens",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 74,
+    "title": "iWildcam 2021 - FGVC8: Count the number of animals of each species present in a sequence of images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Counting and Tracking"
+      ]
+    }
+  },
+  {
+    "source_record": 75,
+    "title": "Tabular Playground Series - May 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 76,
+    "title": "Bristol-Myers Squibb – Molecular Translation: Can you translate chemical images to text?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Image-to-Text"
+      ]
+    }
+  },
+  {
+    "source_record": 77,
+    "title": "Coleridge Initiative - Show US the Data: Discover how data is used for the public good",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Named Entity Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 78,
+    "title": "Tabular Playground Series - Jun 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 79,
+    "title": "Tabular Playground Series - Jul 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 80,
+    "title": "CommonLit Readability Prize: Rate the complexity of literary passages for grades 3-12 classroom use",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 81,
+    "title": "Google Smartphone Decimeter Challenge: Improve high precision GNSS positioning and navigation accuracy on smartphones",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 82,
+    "title": "SIIM-FISABIO-RSNA COVID-19 Detection: Identify and localize COVID-19 abnormalities on chest radiographs",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 83,
+    "title": "Hungry Geese: Dont. Stop. Eating.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 84,
+    "title": "SETI Breakthrough Listen - E.T. Signal Search: Find extraterrestrial signals in data from deep space",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Anomaly Detection": [
+        "Point Anomaly Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 85,
+    "title": "Jane Street Market Prediction: Test your model against future real market data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 86,
+    "title": "Tabular Playground Series - Aug 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 87,
+    "title": "MLB Player Digital Engagement Forecasting: Predict fan engagement with baseball player digital content",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 88,
+    "title": "G2Net Gravitational Wave Detection: Find gravitational wave signals from binary black hole collisions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Gravitational Wave Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 89,
+    "title": "Tabular Playground Series - Sep 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 90,
+    "title": "Google Landmark Recognition 2021: Label famous, and not-so-famous, landmarks in images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 91,
+    "title": "Google Landmark Retrieval 2021: Given an image, can you find all of the same landmarks in a dataset?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 92,
+    "title": "RSNA-MICCAI Brain Tumor Radiogenomic Classification: Predict the status of a genetic biomarker important for brain cancer treatment",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 93,
+    "title": "Tabular Playground Series - Oct 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 94,
+    "title": "NFL Health & Safety - Helmet Assignment: Segment and label helmets in video footage",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 95,
+    "title": "Google Brain - Ventilator Pressure Prediction: Simulate a ventilator connected to a sedated patients lung",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ],
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 96,
+    "title": "chaii - Hindi and Tamil Question Answering: Identify the answer to questions found in Indian language passages",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Question Answering"
+      ]
+    }
+  },
+  {
+    "source_record": 97,
+    "title": "Tabular Playground Series - Nov 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 98,
+    "title": "Lux AI: Gather the most resources and survive the night!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 99,
+    "title": "Sartorius - Cell Instance Segmentation: Detect single neuronal cells in microscopy images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 100,
+    "title": "Tabular Playground Series - Dec 2021: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 101,
+    "title": "Optiver Realized Volatility Prediction: Apply your data science skills to make financial markets better",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 102,
+    "title": "Santa 2021 - The Merry Movie Montage: Optimize television programming for the winter season",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Feature Selection",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 103,
+    "title": "PetFinder.my - Pawpularity Contest: Predict the popularity of shelter pet photos",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 104,
+    "title": "Tabular Playground Series - Jan 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 105,
+    "title": "Jigsaw Rate Severity of Toxic Comments: Rank relative ratings of toxicity between comments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 106,
+    "title": "TensorFlow - Help Protect the Great Barrier Reef: Detect crown-of-thorns starfish in underwater image data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 107,
+    "title": "Tabular Playground Series - Feb 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 108,
+    "title": "Feedback Prize - Evaluating Student Writing: Analyze argumentative writing elements from students grade 6-12",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 109,
+    "title": "Tabular Playground Series - Mar 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 110,
+    "title": "March Machine Learning Mania 2022 - Womens: Predict the 2022 College Womens Basketball Tournament",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 111,
+    "title": "March Machine Learning Mania 2022 - Men’s: Predict the 2022 College Mens Basketball Tournament",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 112,
+    "title": "Kore 2022 - Beta: Collect the maximum amount of Kore against your opponents",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 113,
+    "title": "Happywhale - Whale and Dolphin Identification: Identify whales and dolphins by unique characteristics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 114,
+    "title": "Tabular Playground Series - Apr 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 115,
+    "title": "NBME - Score Clinical Patient Notes: Identify Key Phrases in Patient Notes from Medical Licensing Exams",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Named Entity Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 116,
+    "title": "G-Research Crypto Forecasting: Use your ML expertise to predict real crypto market data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 117,
+    "title": "H&M Personalized Fashion Recommendations: Provide product recommendations based on previous purchases",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Hybrid Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 118,
+    "title": "GeoLifeCLEF 2022 - LifeCLEF 2022 x FGVC9: Location-based species presence prediction",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Multi-modal Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 119,
+    "title": "BirdCLEF 2022: Identify bird calls in soundscapes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 120,
+    "title": "Hotel-ID to Combat Human Trafficking 2022 - FGVC9: Recognizing hotels to aid Human trafficking investigations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 121,
+    "title": "Sorghum -100 Cultivar Identification - FGVC 9: Identify crop varietals",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 122,
+    "title": "iWildCam 2022 - FGVC9: Count the number of animals in a sequence of images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 123,
+    "title": "Tabular Playground Series - May 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Feature Selection",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 124,
+    "title": "Image Matching Challenge 2022: Register two images from different viewpoints",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Reconstruction",
+        "Feature Point Detection",
+        "Pose Estimation"
+      ]
+    }
+  },
+  {
+    "source_record": 125,
+    "title": "U.S. Patent Phrase to Phrase Matching: Help Identify Similar Phrases in U.S. Patents",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Semantic Similarity",
+        "Information Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 126,
+    "title": "Tabular Playground Series - Jun 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 127,
+    "title": "Foursquare - Location Matching: Match point of interest data across datasets",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 128,
+    "title": "UW-Madison GI Tract Image Segmentation: Track healthy organs in medical scans to improve cancer treatment",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 129,
+    "title": "Ubiquant Market Prediction: Make predictions against future market data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting",
+        "Probabilistic Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 130,
+    "title": "Kore 2022: Use a fleet of spaceships to mine minerals before your opponents",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems",
+        "Policy Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 131,
+    "title": "Google Smartphone Decimeter Challenge 2022: Improve high precision GNSS positioning and navigation accuracy on smartphones",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Trajectory Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 132,
+    "title": "Tabular Playground Series - Jul 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Representation Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 133,
+    "title": "Feedback Prize - Predicting Effective Arguments: Rate the effectiveness of argumentative writing elements from students grade 6-12",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 134,
+    "title": "American Express - Default Prediction: Predict if a customer will default in the future",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 135,
+    "title": "Tabular Playground Series - Aug 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 136,
+    "title": "AI Village Capture the Flag @ DEFCON: Hack AI! Collect flags by evading, poisoning, stealing, and fooling AI/ML",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Security and Privacy": [
+        "Cybersecurity",
+        "AI Security"
+      ]
+    }
+  },
+  {
+    "source_record": 137,
+    "title": "HuBMAP + HPA - Hacking the Human Body: Segment multi-organ functional tissue units",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 138,
+    "title": "Tabular Playground Series - Sep 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 139,
+    "title": "Mayo Clinic - STRIP AI: Image Classification of Stroke Blood Clot Origin",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 140,
+    "title": "JPX Tokyo Stock Exchange Prediction: Explore the Tokyo market with your data science skills",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 141,
+    "title": "Google Universal Image Embedding: Create image representations that work across many visual domains",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 142,
+    "title": "RSNA 2022 Cervical Spine Fracture Detection: Identify cervical fractures from scans",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 143,
+    "title": "Google AI4Code – Understand Code in Python Notebooks: Predict the relationship between code and comments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Relation Extraction"
+      ]
+    }
+  },
+  {
+    "source_record": 144,
+    "title": "Open Problems - Multimodal Single-Cell Integration: Predict how DNA, RNA & protein measurements co-vary in single cells",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Multi-modal Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 145,
+    "title": "2022 Kaggle Machine Learning & Data Science Survey: The most comprehensive dataset available on the state of ML and data science",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Exploratory Data Analysis and Storytelling"
+      ]
+    }
+  },
+  {
+    "source_record": 146,
+    "title": "Feedback Prize - English Language Learning: Evaluating language knowledge of ELL students from grades 8-12",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Semantic Similarity"
+      ]
+    }
+  },
+  {
+    "source_record": 147,
+    "title": "Tabular Playground Series - Nov 2022: Practice your ML skills on this approachable dataset!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 148,
+    "title": "DFL - Bundesliga Data Shootout: Identify plays based upon video footage",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Video Analysis",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 149,
+    "title": "G2Net Detecting Continuous Gravitational Waves: Help us detect long-lasting gravitational-wave signals!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 150,
+    "title": "Novozymes Enzyme Stability Prediction: Help identify the thermostable mutations in enzymes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 151,
+    "title": "Playground Series Season 3, Episode 1: Tabular Regression with the California Housing Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 152,
+    "title": "Playground Series Season 3, Episode 2: Tabular Classification with a Stroke Prediction Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 153,
+    "title": "Santa 2022 - The Christmas Card Conundrum: Optimize the configuration space for printing an image",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 154,
+    "title": "Playground Series Season 3, Episode 3: Tabular Classification with an Employee Attrition Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 155,
+    "title": "Playground Series Season 3, Episode 4: Tabular Classification with a Credit Card Fraud Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Anomaly Detection": [
+        "Point Anomaly Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 156,
+    "title": "OTTO – Multi-Objective Recommender System: Build a recommender system based on real-world e-commerce sessions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Multi-criteria Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 157,
+    "title": "Playground Series - Season 3, Episode 5: Tabular Ordinal Regression with a Wine Quality Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 158,
+    "title": "Playground Series - Season 3, Episode 6: Tabular Regression with a Paris Housing Price Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 159,
+    "title": "RSNA Screening Mammography Breast Cancer Detection: Find breast cancers in screening mammograms",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 160,
+    "title": "Playground Series - Season 3, Episode 7: Tabular Classification with a Reservation Cancellation Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 161,
+    "title": "1st and Future - Player Contact Detection: Detect Player Contacts from Sensor and Video Data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 162,
+    "title": "Playground Series - Season 3, Episode 8: Tabular Regression with a Gemstone Price Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 163,
+    "title": "Playground Series - Season 3, Episode 9: Tabular Regression with a Concrete Strength Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 164,
+    "title": "Learning Equality - Curriculum Recommendations: Enhance learning by matching K-12 content to target topics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Content-Based Filtering",
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 165,
+    "title": "Playground Series - Season 3, Episode 10: Binary Classification with a Pulsar Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 166,
+    "title": "Playground Series - Season 3, Episode 11: Regression with a Tabular Media Campaign Cost Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 167,
+    "title": "March Machine Learning Mania 2023: Forecast the 2023 NCAA Basketball Tournaments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 168,
+    "title": "Playground Series - Season 3, Episode 12: Binary Classification with a Tabular Kidney Stone Prediction Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 169,
+    "title": "IceCube - Neutrinos in Deep Ice: Reconstruct the direction of neutrinos from the Universe to the South Pole",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 170,
+    "title": "Google - Isolated Sign Language Recognition: Enhance PopSigns educational games for learning ASL",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Gesture Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 171,
+    "title": "Playground Series - Season 3, Episode 13: Classification with a Tabular Vector Borne Disease Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 172,
+    "title": "Lux AI Season 2: Terraform Mars!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 173,
+    "title": "Stable Diffusion - Image to Prompts: Deduce the prompts that generated our \"highly detailed, sharp focus, illustration, 3d renders of majestic, epic\" images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Image-to-Text"
+      ]
+    }
+  },
+  {
+    "source_record": 174,
+    "title": "Playground Series - Season 3, Episode 14: Prediction of Wild Blueberry Yield",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 175,
+    "title": "AMP®-Parkinsons Disease Progression Prediction: Use protein and peptide data measurements from Parkinsons Disease patients to predict progression of the disease.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 176,
+    "title": "BirdCLEF 2023: Identify bird calls in soundscapes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 177,
+    "title": "Playground Series - Season 3, Episode 15: Feature Imputation with a Heat Flux Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 178,
+    "title": "Parkinsons Freezing of Gait Prediction: Event detection from wearable sensor data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Event Detection in Sequences"
+      ]
+    }
+  },
+  {
+    "source_record": 179,
+    "title": "Image Matching Challenge 2023: Reconstruct 3D scenes from 2D images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Reconstruction"
+      ]
+    }
+  },
+  {
+    "source_record": 180,
+    "title": "Playground Series - Season 3, Episode 16: Regression with a Crab Age Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 181,
+    "title": "Vesuvius Challenge - Ink Detection: Resurrect an ancient library from the ashes of a volcano",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 182,
+    "title": "GoDaddy - Microbusiness Density Forecasting: Forecast Next Month’s Microbusiness Density",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 183,
+    "title": "Benetech - Making Graphs Accessible: Use ML to create tabular data from graphs",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 184,
+    "title": "Playground Series - Season 3, Episode 17: Binary Classification of Machine Failures",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 185,
+    "title": "Predict Student Performance from Game Play: Trace student learning from Jo Wilder online educational game",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 186,
+    "title": "HuBMAP - Hacking the Human Vasculature: Segment instances of microvascular structures from healthy human kidney tissue slides.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 187,
+    "title": "Playground Series - Season 3, Episode 19: Forecasting Mini-Course Sales",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 188,
+    "title": "Google Research - Identify Contrails to Reduce Global Warming: Train ML models to identify contrails in satellite images and help prevent their formation",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 189,
+    "title": "ICR - Identifying Age-Related Conditions: Use Machine Learning to detect conditions with measurements of anonymous characteristics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 190,
+    "title": "Playground Series - Season 3, Episode 20: Predict CO2 Emissions in Rwanda",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 191,
+    "title": "Google - American Sign Language Fingerspelling Recognition: Train fast and accurate American Sign Language fingerspelling recognition models",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Gesture Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 192,
+    "title": "Playground Series - Season 3, Episode 21: Improve a Fixed Model the Data-Centric Way!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 193,
+    "title": "Playground Series - Season 3, Episode 22: Predict Health Outcomes of Horses",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 194,
+    "title": "Kaggle - LLM Science Exam: Use LLMs to answer difficult science questions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Question Answering"
+      ]
+    }
+  },
+  {
+    "source_record": 195,
+    "title": "CommonLit - Evaluate Student Summaries: Automatically assess summaries written by students in grades 3-12",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Semantic Similarity"
+      ]
+    }
+  },
+  {
+    "source_record": 196,
+    "title": "RSNA 2023 Abdominal Trauma Detection: Detect and classify traumatic abdominal injuries",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 197,
+    "title": "Bengali.AI Speech Recognition: Recognize Bengali speech from out-of-distribution audio recordings",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 198,
+    "title": "Playground Series - Season 3, Episode 23: Binary Classification with a Software Defects Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 199,
+    "title": "AI Village Capture the Flag @ DEFCON31: Collect flags by evading, poisoning, stealing, and fooling AI/ML",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Security and Privacy": [
+        "Cybersecurity",
+        "AI Security"
+      ]
+    }
+  },
+  {
+    "source_record": 200,
+    "title": "Playground Series - Season 3, Episode 24: Binary Prediction of Smoker Status using Bio-Signals",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 201,
+    "title": "Google - Fast or Slow? Predict AI Model Runtime: Predict how fast an AI model runs",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 202,
+    "title": "NeurIPS 2023 - Machine Unlearning: Erase the influence of requested samples without hurting accuracy",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 203,
+    "title": "Open Problems – Single-Cell Perturbations: Predict how small molecules change gene expression in different cell types",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Transfer Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 204,
+    "title": "Child Mind Institute - Detect Sleep States: Detect sleep onset and wake from wrist-worn accelerometer data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Event Detection in Sequences"
+      ]
+    }
+  },
+  {
+    "source_record": 205,
+    "title": "Stanford Ribonanza RNA Folding: Create a model that predicts the structures of any RNA molecule",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 206,
+    "title": "CAFA 5 Protein Function Prediction: [Closed to new entrants] Predict the biological function of a protein",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 207,
+    "title": "Playground Series - Season 3, Episode 26: Multi-Class Prediction of Cirrhosis Outcomes",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 208,
+    "title": "UBC Ovarian Cancer Subtype Classification and Outlier Detection (UBC-OCEAN): Navigating Ovarian Cancer; Unveiling Common Histotypes and Unearthing Rare Variants",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 209,
+    "title": "Linking Writing Processes to Writing Quality: Use typing behavior to predict essay quality",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 210,
+    "title": "LLM - Detect AI Generated Text: Identify which essay was written by a large language model",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 211,
+    "title": "Santa 2023 - The Polytope Permutation Puzzle: Solve twisty puzzles in the fewest moves",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Permutation Puzzles"
+      ]
+    }
+  },
+  {
+    "source_record": 212,
+    "title": "Playground Series - Season 4, Episode 1: Binary Classification with a Bank Churn Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 213,
+    "title": "SenNet + HOA - Hacking the Human Vasculature in 3D: Segment vasculature in 3D scans of human kidney",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 214,
+    "title": "Playground Series - Season 4, Episode 2: Multi-Class Prediction of Obesity Risk",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 215,
+    "title": "Optiver - Trading at the Close: Predict US stocks closing movements",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 216,
+    "title": "Playground Series - Season 4, Episode 3: Steel Plate Defect Prediction",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 217,
+    "title": "HMS - Harmful Brain Activity Classification: Classify seizures and other patterns of harmful brain activity in critically ill patients",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 218,
+    "title": "March Machine Learning Mania 2024: Forecast the 2024 College Basketball Tournaments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 219,
+    "title": "LLM Prompt Recovery: Recover the prompt used to transform a given text",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Generation",
+        "Semantic Similarity"
+      ]
+    }
+  },
+  {
+    "source_record": 220,
+    "title": "The Learning Agency Lab - PII Data Detection: Develop automated techniques to detect and remove PII from educational data.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Named Entity Recognition"
+      ],
+      "Security and Privacy": [
+        "AI Security"
+      ]
+    }
+  },
+  {
+    "source_record": 221,
+    "title": "Enefit - Predict Energy Behavior of Prosumers: Predict Prosumer Energy Patterns and Minimize Imbalance Costs.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 222,
+    "title": "Playground Series - Season 4, Episode 4: Regression with an Abalone Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 223,
+    "title": "Home Credit - Credit Risk Model Stability: Create a model measured against feature stability over time",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Model Regularization",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 224,
+    "title": "Playground Series - Season 4, Episode 5: Regression with a Flood Prediction Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 225,
+    "title": "PlantTraits2024 - FGVC11: Uncovering the biosphere; Predicting 6 Vital Plant Traits from Plant Images for Ecosystem Health",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 226,
+    "title": "Image Matching Challenge 2024 - Hexathlon: Reconstruct 3D scenes from 2D images over six different domains",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Reconstruction"
+      ]
+    }
+  },
+  {
+    "source_record": 227,
+    "title": "BirdCLEF 2024: Bird species identification from audio, focused on under-studied species in the Western Ghats, a major biodiversity hotspot in India.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 228,
+    "title": "AI Mathematical Olympiad - Progress Prize 1: Solve national-level math challenges using artificial intelligence models",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 229,
+    "title": "Playground Series - Season 4, Episode 6: Classification with an Academic Success Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 230,
+    "title": "Learning Agency Lab - Automated Essay Scoring 2.0: Improve upon essay scoring algorithms to improve student learning outcomes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 231,
+    "title": "NeurIPS 2024 - Predict New Medicines with BELKA: Predict small molecule-protein interactions using the Big Encoded Library for Chemical Assessment (BELKA)",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 232,
+    "title": "LEAP - Atmospheric Physics using AI (ClimSim): Simulate higher resolution atmospheric processes within E3SM-MMF, a climate model supported by the U.S. Department of Energy",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 233,
+    "title": "USPTO - Explainable AI for Patent Professionals: Help patent professionals understand AI results through a familiar query language",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Information Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 234,
+    "title": "Playground Series - Season 4, Episode 7: Binary Classification of Insurance Cross Selling",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 235,
+    "title": "LMSYS - Chatbot Arena Human Preference Predictions: Predicting Human Preferences in the Wild",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 236,
+    "title": "LLM 20 Questions: Guess the secret word in this cooperative game of question asking and answering",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Question Answering"
+      ]
+    }
+  },
+  {
+    "source_record": 237,
+    "title": "Playground Series - Season 4, Episode 8: Binary Prediction of Poisonous Mushrooms",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 238,
+    "title": "ISIC 2024 - Skin Cancer Detection with 3D-TBP: Identify cancers among skin lesions cropped from 3D total body photographs",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 239,
+    "title": "Playground Series - Season 4, Episode 9: Regression of Used Car Prices",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 240,
+    "title": "RSNA 2024 Lumbar Spine Degenerative Classification: Classify lumbar spine degenerative conditions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 241,
+    "title": "NeurIPS - Ariel Data Challenge 2024: Derive exoplanet signals from Ariels optical instruments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing",
+        "Custom Tag: Exoplanet Signal Detrending"
+      ]
+    }
+  },
+  {
+    "source_record": 242,
+    "title": "Playground Series - Season 4, Episode 10: Loan Approval Prediction",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 243,
+    "title": "ARC Prize 2024: Create an AI capable of solving reasoning tasks it has never seen before",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Transfer Learning",
+        "Representation Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 244,
+    "title": "Playground Series - Season 4, Episode 11: Exploring Mental Health Data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 245,
+    "title": "UM - Game-Playing Strength of MCTS Variants: Predict which variants of Monte-Carlo Tree Search will perform well or poorly against each other in hundreds of board games",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 246,
+    "title": "Eedi - Mining Misconceptions in Mathematics: Predict affinity between misconceptions and incorrect answers (distractors) in multiple-choice questions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Semantic Similarity",
+        "Information Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 247,
+    "title": "Child Mind Institute — Problematic Internet Use: Relating Physical Activity to Problematic Internet Use",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 248,
+    "title": "Playground Series - Season 4, Episode 12: Regression with an Insurance Dataset",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 249,
+    "title": "Playground Series - Season 5, Episode 1: Forecasting Sticker Sales",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 250,
+    "title": "Santa 2024 - The Perplexity Permutation Puzzle: Help Rudolph descramble holiday-related words to make the LLMs happy!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Generation"
+      ]
+    }
+  },
+  {
+    "source_record": 251,
+    "title": "CZII - CryoET Object Identification: Find small biological structures in large 3D volumes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Object Detection",
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 252,
+    "title": "Playground Series - Season 5, Episode 2: Backpack Prediction Challenge",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 253,
+    "title": "LLMs - You Cant Please Them All: Are LLM-judges robust to adversarial inputs?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Generation"
+      ]
+    }
+  },
+  {
+    "source_record": 254,
+    "title": "CIBMTR - Equity in post-HCT Survival Predictions: Improve prediction of transplant survival rates equitably for allogeneic HCT patients",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Model Regularization"
+      ]
+    }
+  },
+  {
+    "source_record": 255,
+    "title": "FIDE & Google Efficient Chess AI Challenge: Create agents to play chess with resource constraints",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems",
+        "Policy Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 256,
+    "title": "WSDM Cup - Multilingual Chatbot Arena: Predict human preference across multiple languages from real votes in the Chatbot Arena.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 257,
+    "title": "NeurIPS 2024 - Lux AI Season 3: Deep space exploration!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Reinforcement Learning": [
+        "Multi-Agent Systems",
+        "Policy Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 258,
+    "title": "Playground Series - Season 5, Episode 3: Binary Prediction with a Rainfall Dataset",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 259,
+    "title": "Understanding Clouds from Satellite Images: Can you classify cloud structures from satellites?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 260,
+    "title": "RSNA Intracranial Hemorrhage Detection: Identify acute intracranial hemorrhage and its subtypes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 261,
+    "title": "Lyft 3D Object Detection for Autonomous Vehicles: Can you advance the state of the art in 3D object detection?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "3D Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 262,
+    "title": "Severstal; Steel Defect Detection: Can you detect and classify defects in steel?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 263,
+    "title": "Kuzushiji Recognition: Opening the door to a thousand years of Japanese culture",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Optical Character Recognition"
+      ]
+    }
+  },
+  {
+    "source_record": 264,
+    "title": "The 3rd YouTube-8M Video Understanding Challenge: Temporal localization of topics within video",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 265,
+    "title": "IEEE-CIS Fraud Detection: Can you detect fraud from customer transactions?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Anomaly Detection": [
+        "Point Anomaly Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 266,
+    "title": "Open Images 2019 - Instance Segmentation: Outline segmentation masks of objects in images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 267,
+    "title": "Open Images 2019 - Object Detection: Detect objects in varied and complex images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 268,
+    "title": "Open Images 2019 - Visual Relationship: Detect pairs of objects in particular relationships",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 269,
+    "title": "Recursion Cellular Image Classification: CellSignal; Disentangling biological signal from experimental noise in cellular images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 270,
+    "title": "APTOS 2019 Blindness Detection: Detect diabetic retinopathy to stop blindness before it is too late",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 271,
+    "title": "Ciphertext Challenge III: -",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 272,
+    "title": "SIIM-ACR Pneumothorax Segmentation: Identify Pneumothorax disease in chest x-rays",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 273,
+    "title": "Predicting Molecular Properties: Can you measure the magnetic interactions between a pair of atoms?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 274,
+    "title": "Generative Dog Images: Experiment with creating puppy pics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Generation"
+      ]
+    }
+  },
+  {
+    "source_record": 275,
+    "title": "Northeastern SMILE Lab - Recognizing Faces in the Wild: Can you determine if two individuals are related?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 276,
+    "title": "Jigsaw Unintended Bias in Toxicity Classification: Detect toxicity across a diverse range of conversations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 277,
+    "title": "Instant Gratification: A synchronous Kernels-only competition",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 278,
+    "title": "Freesound Audio Tagging 2019: Automatically recognize sounds and apply tags of varying natures",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 279,
+    "title": "iMaterialist (Fashion) 2019 at FGVC6: Fine-grained segmentation task for fashion and apparel",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 280,
+    "title": "iMet Collection 2019 - FGVC6: Recognize artwork attributes from The Metropolitan Museum of Art",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 281,
+    "title": "iWildCam 2019 - FGVC6: Categorize animals in the wild",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 282,
+    "title": "Google Landmark Retrieval 2019: Given an image, can you find all of the same landmarks in a dataset?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 283,
+    "title": "LANL Earthquake Prediction: Can you predict upcoming laboratory earthquakes?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 284,
+    "title": "Google Landmark Recognition 2019: Label famous (and not-so-famous) landmarks in images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 285,
+    "title": "Dont Overfit! II: A Fistful of Samples",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Model Regularization",
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 286,
+    "title": "Gendered Pronoun Resolution: Pair pronouns to their correct entities",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Coreference Resolution"
+      ]
+    }
+  },
+  {
+    "source_record": 287,
+    "title": "CareerCon 2019 - Help Navigate Robots: Compete to get your resume in front of our sponsors",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 288,
+    "title": "Santander Customer Transaction Prediction: Can you identify who will make a transaction?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 289,
+    "title": "PetFinder.my Adoption Prediction: How cute is that doggy in the shelter?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Multimodal Fusion Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 290,
+    "title": "Google Cloud & NCAA® ML Competition 2019-Men: Apply Machine Learning to NCAA® March Madness®",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 291,
+    "title": "Google Cloud & NCAA® ML Competition 2019-Women: Apply Machine Learning to NCAA® March Madness®",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 292,
+    "title": "Histopathologic Cancer Detection: Identify metastatic tissue in histopathologic scans of lymph node sections",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 293,
+    "title": "VSB Power Line Fault Detection: Can you detect faults in above-ground electrical lines?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Signal Processing for Electrical Engineering"
+      ]
+    }
+  },
+  {
+    "source_record": 294,
+    "title": "Microsoft Malware Prediction: Can you predict if a machine will soon be hit with malware?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Security and Privacy": [
+        "Cybersecurity"
+      ]
+    }
+  },
+  {
+    "source_record": 295,
+    "title": "Humpback Whale Identification: Can you identify a whale by its tail?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 296,
+    "title": "Elo Merchant Category Recommendation: Help understand customer loyalty",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Hybrid Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 297,
+    "title": "Google Analytics Customer Revenue Prediction: Predict how much GStore customers will spend",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 298,
+    "title": "Quora Insincere Questions Classification: Detect toxic content to improve online conversations",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 299,
+    "title": "Reducing Commercial Aviation Fatalities: Can you tell when a pilot is heading for trouble?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 300,
+    "title": "PUBG Finish Placement Prediction (Kernels Only): Can you predict the battle royale finish of PUBG Players?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 301,
+    "title": "20 Newsgroups Ciphertext Challenge: -",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 302,
+    "title": "Human Protein Atlas Image Classification: Classify subcellular protein patterns in human cells",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 303,
+    "title": "Traveling Santa 2018 - Prime Paths: But does your code recall, the most efficient route of all?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Graph Learning": [
+        "Path Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 304,
+    "title": "PLAsTiCC Astronomical Classification: Can you help make sense of the Universe?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 305,
+    "title": "Quick, Draw! Doodle Recognition Challenge: How accurately can you identify a doodle?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 306,
+    "title": "Airbus Ship Detection Challenge: Find ships on satellite images as quickly as possible",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection",
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 307,
+    "title": "Inclusive Images Challenge: Stress test image classifiers across new geographic distributions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 308,
+    "title": "TGS Salt Identification Challenge: Segment salt deposits beneath the Earths surface",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 309,
+    "title": "Forest Cover Type (Kernels Only): Use cartographic variables to classify forest categories",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 310,
+    "title": "Google AI Open Images - Visual Relationship Track: Detect pairs of objects in particular relationships.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 311,
+    "title": "Google AI Open Images - Object Detection Track: Detect objects in varied and complex images.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 312,
+    "title": "Home Credit Default Risk: Can you predict how capable each applicant is of repaying a loan?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 313,
+    "title": "Santander Value Prediction Challenge: Predict the value of transactions for potential customers.",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 314,
+    "title": "TrackML Particle Tracking Challenge: High Energy Physics particle tracking in CERN detectors",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 315,
+    "title": "The 2nd YouTube-8M Video Understanding Challenge: Can you create a constrained-size model to predict video labels?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Video Classification",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 316,
+    "title": "Freesound General-Purpose Audio Tagging Challenge: Can you automatically recognize sounds from a wide range of real-world environments?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 317,
+    "title": "Avito Demand Prediction Challenge: Predict demand for an online classified ad",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 318,
+    "title": "iMaterialist Challenge (Fashion) at FGVC5: Image classification of fashion products.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 319,
+    "title": "iMaterialist Challenge (Furniture) at FGVC5: Image Classification of Furniture & Home Goods.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 320,
+    "title": "Google Landmark Recognition Challenge: Label famous (and not-so-famous) landmarks in images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 321,
+    "title": "Google Landmark Retrieval Challenge: Given an image, can you find all of the same landmarks in a dataset?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 322,
+    "title": "TalkingData AdTracking Fraud Detection Challenge: Can you detect fraudulent click traffic for mobile app ads?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 323,
+    "title": "2018 Data Science Bowl: Find the nuclei in divergent images to advance medical discovery",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 324,
+    "title": "Google Cloud & NCAA® ML Competition 2018-Mens: Apply Machine Learning to NCAA® March Madness®",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 325,
+    "title": "Google Cloud & NCAA® ML Competition 2018-Womens: Apply machine learning to NCAA® March Madness®",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 326,
+    "title": "Toxic Comment Classification Challenge: Identify and classify toxic online comments",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 327,
+    "title": "Mercari Price Suggestion Challenge: Can you automatically suggest product prices to online sellers?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 328,
+    "title": "Nomad2018 Predicting Transparent Conductors: Predict the key properties of novel transparent semiconductors",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 329,
+    "title": "IEEEs Signal Processing Society - Camera Model Identification: Identify from which camera an image was taken",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 330,
+    "title": "Recruit Restaurant Visitor Forecasting: Predict how many future visitors a restaurant will receive",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 331,
+    "title": "Statoil/C-CORE Iceberg Classifier Challenge: Ship or iceberg, can you decide from space?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 332,
+    "title": "TensorFlow Speech Recognition Challenge: Can you build an algorithm that understands simple speech commands?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 333,
+    "title": "Corporación Favorita Grocery Sales Forecasting: Can you accurately predict sales for a large grocery chain?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 334,
+    "title": "Santa Gift Matching Challenge: Down through the chimney with lots of toys...",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Multi-criteria Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 335,
+    "title": "Zillow Prize; Zillow’s Home Value Prediction (Zestimate): Can you improve the algorithm that changed the world of real estate?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 336,
+    "title": "WSDM - KKBoxs Music Recommendation Challenge: Can you build the best music recommendation system?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering"
+      ]
+    }
+  },
+  {
+    "source_record": 337,
+    "title": "WSDM - KKBoxs Churn Prediction Challenge: Can you predict when subscribers will churn?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 338,
+    "title": "Passenger Screening Algorithm Challenge: Improve the accuracy of the Department of Homeland Securitys threat recognition algorithms",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 339,
+    "title": "Cdiscount’s Image Classification Challenge: Categorize e-commerce photos",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 340,
+    "title": "Porto Seguro’s Safe Driver Prediction: Predict if a driver will file an insurance claim next year.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 341,
+    "title": "Text Normalization Challenge - English Language: Convert English text from written expressions into spoken forms",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Normalization"
+      ]
+    }
+  },
+  {
+    "source_record": 342,
+    "title": "Text Normalization Challenge - Russian Language: Convert Russian text from written expressions into spoken forms",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Normalization"
+      ]
+    }
+  },
+  {
+    "source_record": 343,
+    "title": "Web Traffic Time Series Forecasting: Forecast future traffic to Wikipedia pages",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 344,
+    "title": "NIPS 2017; Non-targeted Adversarial Attack: Imperceptibly transform images in ways that fool classification models",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ],
+      "Security and Privacy": [
+        "AI Security"
+      ]
+    }
+  },
+  {
+    "source_record": 345,
+    "title": "Carvana Image Masking Challenge: Automatically identify the boundaries of the car in an image",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 346,
+    "title": "New York City Taxi Trip Duration: Share code and data to improve ride time predictions",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 347,
+    "title": "Planet; Understanding the Amazon from Space: Use satellite data to track the human footprint in the Amazon rainforest",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 348,
+    "title": "Mercedes-Benz Greener Manufacturing: Can you cut the time a Mercedes-Benz spends on the test bench?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 349,
+    "title": "Sberbank Russian Housing Market: Can you predict realty price fluctuations in Russia’s volatile economy?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 350,
+    "title": "NOAA Fisheries Steller Sea Lion Population Count: How many sea lions do you see?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 351,
+    "title": "Intel & MobileODT Cervical Cancer Screening: Which cancer treatment will be most effective?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 352,
+    "title": "Quora Question Pairs: Can you identify question pairs that have the same intent?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Semantic Similarity"
+      ]
+    }
+  },
+  {
+    "source_record": 353,
+    "title": "Google Cloud & YouTube-8M Video Understanding Challenge: Can you produce the best video tag predictions?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Video Classification",
+        "Video Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 354,
+    "title": "Two Sigma Connect; Rental Listing Inquiries: How much interest will a new rental listing on RentHop receive?",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 355,
+    "title": "The Nature Conservancy Fisheries Monitoring: Can you detect and classify species of fish?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification",
+        "Object Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 356,
+    "title": "Data Science Bowl 2017: Can you improve lung cancer detection?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 357,
+    "title": "Dstl Satellite Imagery Feature Detection: Can you train an eye in the sky?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Segmentation"
+      ]
+    }
+  },
+  {
+    "source_record": 358,
+    "title": "Two Sigma Financial Modeling Challenge: Can you uncover predictive value in an uncertain world?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 359,
+    "title": "Santas Uncertain Bags: ♫ Bells are ringing, children singing, all is merry and bright. Santas elves made a big mistake, now he needs your help tonight ♫",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Combinatorial Optimization"
+      ]
+    }
+  },
+  {
+    "source_record": 360,
+    "title": "Outbrain Click Prediction: Can you predict which recommended content each user will click?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Click-Through Rate Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 361,
+    "title": "Facial Keypoints Detection: Detect the location of keypoints on face images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Feature Point Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 362,
+    "title": "Santander Product Recommendation: Can you pair products with people?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering",
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 363,
+    "title": "Allstate Claims Severity: How severe is an insurance claim?",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 364,
+    "title": "Melbourne University AES/MathWorks/NIH Seizure Prediction: Predict seizures in long-term human intracranial EEG recordings",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 365,
+    "title": "Bosch Production Line Performance: Reduce manufacturing failures",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Anomaly Detection": [
+        "Point Anomaly Detection"
+      ]
+    }
+  },
+  {
+    "source_record": 366,
+    "title": "Integer Sequence Learning: 1, 2, 3, 4, 5, 7?!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 367,
+    "title": "Predicting Red Hat Business Value: Classify customer potential",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 368,
+    "title": "TalkingData Mobile User Demographics: Get to know millions of mobile device users",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular_with_structure",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 369,
+    "title": "Grupo Bimbo Inventory Demand: Maximize sales and minimize returns of bakery goods",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 370,
+    "title": "State Farm Distracted Driver Detection: Can computer vision spot distracted drivers?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 371,
+    "title": "Facebook V; Predicting Check Ins: Identify the correct place for check ins",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 372,
+    "title": "Draper Satellite Image Chronology: Can you put order to space and time?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Temporal Image Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 373,
+    "title": "Expedia Hotel Recommendations: Which hotel type will an Expedia customer book?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Context-Aware Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 374,
+    "title": "Santander Customer Satisfaction: Which customers are happy customers?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 375,
+    "title": "Home Depot Product Search Relevance: Predict the relevance of search results on homedepot.com",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 376,
+    "title": "BNP Paribas Cardif Claims Management: Can you accelerate BNP Paribas Cardifs claims management process?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 377,
+    "title": "Prudential Life Insurance Assessment: Can you make buying life insurance easier?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Model Regularization"
+      ]
+    }
+  },
+  {
+    "source_record": 378,
+    "title": "Airbnb New User Bookings: Where will a new guest book their first travel experience?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering",
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 379,
+    "title": "The Winton Stock Market Challenge: Join a multi-disciplinary team of research scientists",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 380,
+    "title": "Santas Stolen Sleigh: ♫ Alarm bells ring, are you listening? Santas sleigh has gone missing ♫",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Route Optimization"
+      ]
+    }
+  },
+  {
+    "source_record": 381,
+    "title": "Rossmann Store Sales: Forecast sales using store, promotion, and competitor data",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 382,
+    "title": "How Much Did It Rain? II: Predict hourly rainfall using data from polarimetric radars",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 383,
+    "title": "Springleaf Marketing Response: Determine whether to send a direct mail piece to a customer",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 384,
+    "title": "Flavours of Physics; Finding τ  →  μμμ: Identify a rare decay phenomenon",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 385,
+    "title": "Denoising Dirty Documents: Remove noise from printed text",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image-to-Image Translation"
+      ]
+    }
+  },
+  {
+    "source_record": 386,
+    "title": "Coupon Purchase Prediction: Predict which coupons a customer will buy",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 387,
+    "title": "Liberty Mutual Group; Property Inspection Prediction: Quantify property hazards before time of inspection",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Ensemble Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 388,
+    "title": "ICDM 2015; Drawbridge Cross-Device Connections: Identify individual users across their digital devices",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 389,
+    "title": "Avito Context Ad Clicks: Predict if context ads will earn a users click",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Click-Through Rate Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 390,
+    "title": "Diabetic Retinopathy Detection: Identify signs of diabetic retinopathy in eye images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 391,
+    "title": "Crowdflower Search Results Relevance: Predict the relevance of search results from eCommerce sites",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Information Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 392,
+    "title": "ECML/PKDD 15; Taxi Trajectory Prediction (I): Predict the destination of taxi trips based on initial partial trajectories",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Trajectory Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 393,
+    "title": "ECML/PKDD 15; Taxi Trip Time Prediction (II): Predict the total travel time of taxi trips based on their initial partial trajectories",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Trajectory Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 394,
+    "title": "Facebook Recruiting IV; Human or Robot?: Predict if an online bid is made by a machine or a human",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 395,
+    "title": "Walmart Recruiting II; Sales in Stormy Weather: Predict how sales of weather-sensitive products are affected by snow and rain",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 396,
+    "title": "Otto Group Product Classification Challenge: Classify products into the correct category",
+    "accepted": true,
+    "task_kinds": [
+      "multiclass_classification"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 397,
+    "title": "How Much Did It Rain?: Predict probabilistic distribution of hourly rain given polarimetric radar measurements",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Radar and Sonar Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 398,
+    "title": "Restaurant Revenue Prediction: Predict annual restaurant sales based on objective measurements",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 399,
+    "title": "15.071x - The Analytics Edge (Spring 2015): Test your analytics skills by predicting which New York Times blog articles will be the most popular",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 400,
+    "title": "Billion Word Imputation: Find and impute missing words in the billion word corpus",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Generation"
+      ]
+    }
+  },
+  {
+    "source_record": 401,
+    "title": "Microsoft Malware Classification Challenge (BIG 2015): Classify malware into families based on file content and characteristics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Security and Privacy": [
+        "Cybersecurity"
+      ]
+    }
+  },
+  {
+    "source_record": 402,
+    "title": "Finding Elo: Predict a chess players FIDE Elo rating from one game",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 403,
+    "title": "National Data Science Bowl: Predict ocean health, one plankton at a time",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 404,
+    "title": "BCI Challenge @ NER 2015: A spell on you if you cannot detect errors!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 405,
+    "title": "Click-Through Rate Prediction: Predict whether a mobile ad will be clicked",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 406,
+    "title": "American Epilepsy Society Seizure Prediction Challenge: Predict seizures in intracranial EEG recordings",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 407,
+    "title": "Learning Social Circles in Networks: Model friend memberships to multiple circles",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Graph Learning": [
+        "Node Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 408,
+    "title": "Africa Soil Property Prediction Challenge: Predict physical and chemical properties of soil using spectral measurements",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 409,
+    "title": "CIFAR-10 - Object Recognition in Images: Identify the subject of 60,000 labeled images",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 410,
+    "title": "Display Advertising Challenge: Predict click-through rates on display ads",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 411,
+    "title": "The Hunt for Prohibited Content: Predict which ads contain illicit content",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 412,
+    "title": "UPenn and Mayo Clinics Seizure Detection Challenge: Detect seizures in intracranial EEG recordings",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 413,
+    "title": "DecMeg2014 - Decoding the Human Brain: Predict visual stimuli from MEG recordings of human brain activity",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Biomedical Signal Processing"
+      ]
+    }
+  },
+  {
+    "source_record": 414,
+    "title": "MLSP 2014 Schizophrenia Classification Challenge: Diagnose schizophrenia using multimodal features from MRI scans",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Multimodal Fusion Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 415,
+    "title": "KDD Cup 2014 - Predicting Excitement at DonorsChoose.org: Predict funding requests that deserve an A+",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ],
+      "Recommender Systems": [
+        "Content-Based Filtering"
+      ]
+    }
+  },
+  {
+    "source_record": 416,
+    "title": "Greek Media Monitoring Multilabel Classification (WISE 2014): Multi-label classification of printed media articles to topics",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 417,
+    "title": "Acquire Valued Shoppers Challenge: Predict which shoppers will become repeat buyers",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Click-Through Rate Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 418,
+    "title": "The Analytics Edge (15.071x): Learn what predicts happiness by using informal polling questions.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 419,
+    "title": "Walmart Recruiting - Store Sales Forecasting: Use historical markdown data to predict store sales",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 420,
+    "title": "Large Scale Hierarchical Text Classification: Classify Wikipedia documents into one of 325,056 categories",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 421,
+    "title": "Galaxy Zoo - The Galaxy Challenge: Classify the morphologies of distant galaxies in our Universe",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 422,
+    "title": "Conways Reverse Game of Life: Reverse the arrow of time in the Game of Life",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 423,
+    "title": "Personalized Web Search Challenge: Re-rank web documents using personal preferences",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking",
+        "Context-Aware Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 424,
+    "title": "Facebook Recruiting III - Keyword Extraction: Identify keywords and tags from millions of text questions",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Information Retrieval"
+      ]
+    }
+  },
+  {
+    "source_record": 425,
+    "title": "Partly Sunny with a Chance of Hashtags: What can a #machine learn from tweets about the #weather?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Sentiment Analysis",
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 426,
+    "title": "See Click Predict Fix: Predict which 311 issues are most important to citizens",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 427,
+    "title": "StumbleUpon Evergreen Classification Challenge: Build a classifier to categorize webpages as evergreen or non-evergreen",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 428,
+    "title": "The Big Data Combine Engineered by BattleFin: Predict short term movements in stock prices using news and sentiment data provided by RavenPack",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Sentiment Analysis"
+      ],
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 429,
+    "title": "MLSP 2013 Bird Classification Challenge: Predict the set of bird species present in an audio recording, collected in field conditions.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 430,
+    "title": "Amazon.com - Employee Access Challenge: Predict an employees access needs, given his/her job role",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 431,
+    "title": "Yelp Recruiting Competition: How many \"useful\" votes will a Yelp review receive? Show off your skills to land an interview for a position on a Yelp data mining team!",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Model Regularization",
+        "Feature Selection"
+      ]
+    }
+  },
+  {
+    "source_record": 432,
+    "title": "The ICML 2013 Whale Challenge - Right Whale Redux: Develop recognition solutions to detect and classify right whales for BIG data mining and exploration studies",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Signal Processing": [
+        "Audio Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 433,
+    "title": "Challenges in Representation Learning; Facial Expression Recognition Challenge: Learn facial expressions from an image",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Computer Vision": [
+        "Image Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 434,
+    "title": "Challenges in Representation Learning; The Black Box Learning Challenge: Competitors train a classifier on a dataset that is not human readable, without knowledge of what the data consists of.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification",
+        "Representation Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 435,
+    "title": "Challenges in Representation Learning; Multi-modal Learning: The multi-modal learning challenge",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Cross-Modal Processing": [
+        "Multi-modal Learning"
+      ]
+    }
+  },
+  {
+    "source_record": 436,
+    "title": "Event Recommendation Engine Challenge: Predict what events our users will be interested in based on user actions, event metadata, and demographic information.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 437,
+    "title": "Traveling Santa Problem: Solve ye olde traveling salesman problem to help Santa Claus deliver his presents",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Graph Learning": [
+        "Path Prediction"
+      ]
+    }
+  },
+  {
+    "source_record": 438,
+    "title": "Data Mining Hackathon on BIG DATA (7GB) Best Buy mobile web site: Predict which BestBuy product a mobile web visitor will be most interested in based on their search query or behavior over 2 years (7 GB).",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering"
+      ]
+    }
+  },
+  {
+    "source_record": 439,
+    "title": "Detecting Insults in Social Commentary: Predict whether a comment posted during a public discussion is considered insulting to one of the participants.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 440,
+    "title": "Raising Money to Fund an Organizational Mission: Help worthy organizations more efficiently target and recruit loyal donors to support their causes.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression",
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 441,
+    "title": "Practice Fusion Diabetes Classification: Identify patients diagnosed with Type 2 Diabetes",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 442,
+    "title": "EMC Israel Data Science Challenge: Match source code files to the open source code project",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 443,
+    "title": "Million Song Dataset Challenge: Predict which songs a user will listen to.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering",
+        "Hybrid Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 444,
+    "title": "EMI Music Data Science Hackathon - July 21st - 24 hours: Can you predict if a listener will love a new song?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Hybrid Recommender Systems"
+      ]
+    }
+  },
+  {
+    "source_record": 445,
+    "title": "Facebook Recruiting Competition: Show them your talent, not just your resume.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Recommender Systems": [
+        "Collaborative Filtering",
+        "Recommendation Ranking"
+      ]
+    }
+  },
+  {
+    "source_record": 446,
+    "title": "Online Product Sales: Predict the online sales of a consumer product based on a data set of product features.",
+    "accepted": true,
+    "task_kinds": [
+      "regression"
+    ],
+    "scope": "tabular",
+    "reason": "explicit_initial_tabular_selection",
+    "original_tags": {
+      "General Machine Learning": [
+        "Regression"
+      ]
+    }
+  },
+  {
+    "source_record": 447,
+    "title": "Personality Prediction Based on Twitter Stream: Identify the best performing model(s) to predict personality traits based on Twitter usage",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Natural Language Processing": [
+        "Text Classification",
+        "Sentiment Analysis"
+      ]
+    }
+  },
+  {
+    "source_record": 448,
+    "title": "Algorithmic Trading Challenge: Develop new models to accurately predict the market response to large trades.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "Sequential Modeling": [
+        "Time Series Forecasting"
+      ]
+    }
+  },
+  {
+    "source_record": 449,
+    "title": "Semi-Supervised Feature Learning: Theres been a lot of recent work done in unsupervised feature learning for classification and there are a ton of older methods that also work well. The purpose of this competition is to find out which of these methods work best on relatively large-scale high dimensional learning tasks.",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Representation Learning",
+        "Feature Selection",
+        "Classification"
+      ]
+    }
+  },
+  {
+    "source_record": 450,
+    "title": "Dont Overfit!: With nearly as many variables as training cases, what are the best techniques to avoid disaster?",
+    "accepted": false,
+    "task_kinds": [],
+    "scope": null,
+    "reason": "outside_initial_reviewed_scope",
+    "original_tags": {
+      "General Machine Learning": [
+        "Model Regularization",
+        "Feature Selection"
+      ]
+    }
+  }
+]

@@ -18,6 +18,12 @@
 Неисправный необязательный индекс даёт предупреждение и не препятствует первому проверенному ответу.
 Сведения о формате и реальный пример `search/read` — в [PROJECT_GUIDE.md](PROJECT_GUIDE.md).
 
+Отдельный `search_knowledge` читает подготовленные текстовые разборы, карточки и примеры проекта;
+это не дополнительные оригинальные тетради. Ссылки идут в `knowledge_ids`, измеренные факты —
+в `evidence_ids`. Необязательные `research_notes` и проекция `research_memory` сохраняют выраженные
+вопросы, основания выбора и отложенные альтернативы без новой машины состояний или дополнительной
+модели. Подробнее: [KNOWLEDGE.md](KNOWLEDGE.md), [RESEARCH-DECISION-FIXES.md](RESEARCH-DECISION-FIXES.md).
+
 ## Problem and scope
 
 The ab9dbc6c run spent 46 of 63 completed evaluations on program-generated local variants.
@@ -47,13 +53,16 @@ deduplication and publication. A rationale is not proof that a research directio
 ## Protected context and on-demand analysis
 
 `profile_summary.data.core_profile` packs column name, dtype and train/test missingness together.
-The core, task contract and measured base remain mandatory when verbose profile fields and
-redundant history are removed. Schemas and tool replies also count against the API request cap;
-the Gateway can compact duplicate profile/history without removing the core or base source.
-An oversized mandatory core fails explicitly instead of silently losing all data information.
+In adaptive mode, ContextBuilder and Gateway do not truncate or reject input using the local
+byte/token heuristics. MAX_CONTEXT_TOKENS and GRAPH_CONTEXT_BYTES retain their legacy meaning
+in catalog/code mode, but do not cap adaptive requests, including bootstrap. The actual Qwen
+service context window still applies; this change does not enlarge the model's physical window.
+The request retains task contract, measured base, history, schemas and tool replies without
+client byte-budget compaction. Global deadline, API call and output-token budgets remain enforced.
 The compact core includes at most 128 columns and reports omissions. Larger schemas are
 discoverable using `kind=schema`, `offset`, `limit` and `next_offset`; knowing omitted column
-names in advance is unnecessary.
+names in advance is unnecessary. The bounded C03 profile and each tool's own reply/read limits
+remain in force; disabling client input-context caps does not mean sending entire raw tables.
 
 `analyze_data` accepts at most 12 selected feature columns and these query kinds:
 
@@ -93,7 +102,13 @@ created controlled branches can still reject unverifiable custom code under hard
 Generated pipelines run in the existing watched worker with sanitized environment, thread
 limits and the same timeout/RSS controls. A worker IO audit guard denies raw artifact/dataset
 opens, network, subprocesses and file mutations during construction/fit/predict. Installed
-code remains importable. Joblib uses threads inside these workers. The guard is disabled only
+code remains importable from the active interpreter's installation directories, including
+venv site-packages outside sys.base_prefix. The worker validates the source and preloads its
+declared allowed imports before applying threadpool limits and activating the guard. This
+allows normal native-library initialization without granting generated code arbitrary ctypes
+loading. Missing packages are not installed; required missing imports still fail. Preloading
+does not execute the generated module. File-denial errors include the blocked path.
+Joblib uses threads inside these workers. After activation, the guard is disabled only
 for trusted output writing/snapshot code. AST checks and the Python audit guard are defense
 in depth, **not an OS sandbox or a proof of arbitrary Python semantics**. Estimators requiring
 extra files/processes may fail; the verified incumbent is preserved. No packages are installed
@@ -115,6 +130,14 @@ owned catalogue fallback remains possible and is logged; it never runs generated
 A voluntary adaptive `stop` is respected. Two peers may propose different actions and see
 compact measured results from their shared visible lineage.
 
+The last attempt of a dialogue with tools offers no tools and requests the final action JSON.
+This uses the existing attempt allowance (at most seven tool rounds then one decision with
+the current eight-attempt setting), rather than executing a last tool call with no return turn.
+The controller cannot guarantee that the model produces valid JSON or that the API remains
+available. A provider tool call on this final turn is rejected without executing it.
+Recipe metadata describes the owned preprocessing so estimator capabilities are not confused
+with transformations that precede it, such as median imputation before HistGradientBoosting.
+
 Successful empirical transformations do not automatically trigger G14 component transfer or
 an accept/reject fork in adaptive mode. A solution remains available in history without making
 its transformations mandatory for descendants. G06/G02 remain available for deliberately
@@ -131,7 +154,7 @@ similar work. No direction quotas, bandit scores or RL policy are introduced wit
 `RESEARCH_MODE=adaptive` is the CLI/config default and is shown in `.env.example`. Existing
 `.env` files explicitly setting `catalog` must be changed to enable it. `catalog` and `code`
 remain compatibility/comparison paths. C00-C24 and ExperimentPlan wire schemas remain unchanged;
-GResearchContext allows ResearchAction-v1 and two internal schemas document its producer/tools.
+GResearchContext allows ResearchAction-v1; internal schemas document the action and supported queries.
 The flat package includes the new modules and readable prompt. Reconstruction keeps the custom
 source and enables the same worker IO guard for refit.
 
@@ -146,3 +169,21 @@ the organizers' exact pinned environment and public/private benchmark quality re
 measurement. Compare catalogue and adaptive policies under equal time/API budgets, use a
 control split not exposed to the planner, and measure final quality, completion rate, repeats,
 action distribution and wall time. More feature operations alone are not success.
+
+## First-run corrections
+
+- Authorize explicit tuning before deduplicating its starting configuration. A cached starting
+  fit consumes its place in max_trials, but does not cancel the remaining authorized variants.
+- Clear expired/completed authorizations and keep unselected axes fixed when rebasing a series.
+- Do not replay provider reasoning in tool messages. Compact older report bodies by artifact ID;
+  keep the latest tool result and valid assistant/tool-call pairs. Bound malformed repair text.
+- Return actionable target/group query errors; cache replies and history cannot be mutated by callers.
+- An invalid proposal that consumed API attempts can be followed by another decision with bounded
+  failure feedback, while API capacity remains. Zero-call deterministic failures do not spin.
+  Catalogue fallback after API unavailability remains explicit in telemetry. Normal adaptive
+  duplicates are returned through Store/Graph deduplication rather than silently starting tuning.
+- Finalization failures preserve the verified CSV and try the best remaining comparable evaluated
+  candidate. A failed refit is excluded from repeated publication attempts, not from scientific history.
+
+The graph, peer scheduling, refinement policy, validation split and search action set are retained.
+These are execution fixes; no new scientific scheduler, role hierarchy or direction quotas are added.

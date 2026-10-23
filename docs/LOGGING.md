@@ -17,13 +17,33 @@
 исторические outputs и не превращаются в measured `evidence_ids`. `research.references_unavailable`
 предупреждает о недоступном необязательном индексе; получение первого проверенного ответа продолжается.
 
+`knowledge.loaded` фиксирует версию/объём локальной библиотеки и доступность пакетов.
+`knowledge.seeded` и `knowledge.retrieved` связывают запрос с выданными knowledge IDs и
+артефактом `knowledge/query-*.json`. Одинаковые обращения могут переиспользовать артефакт.
+`knowledge.unavailable` явно сообщает об отключении библиотеки. В `research.action_proposed`
+и `research/intent-plan-*.json` сохранены knowledge_ids; это внешние гипотезы, не измерения.
+
+В adaptive `llm.request_budget_checked` содержит `limit_bytes=null` и
+`input_limit_owner=provider`: локальная отсечка входного контекста отключена.
+`llm.final_decision_requested` отмечает последний ход диалога без инструментов.
+`research.context_failed` фиксирует ошибку сборки одного поручения без прерывания всей партии;
+если ни один peer не смог начать работу, причина остановки — `context_unavailable`.
+
 В adaptive-режиме `research.analysis_completed` связывает запрос со scope, числом строк и полным
 артефактом отчёта; недоступные метки holdout не журналируются. `research.action_proposed` и
 `research.action_admitted` фиксируют тип действия, evidence IDs и явный бюджет локальной серии.
 `research.stop_requested` фиксирует добровольное завершение. Поручение сохраняется в
 `research/intent-plan-*.json`; обычные experiment/evaluation/publication события содержат его
-измеренный исход через plan_id/experiment_id. Реальный API-request snapshot учитывает сокращение
-после добавления схем и ответов инструментов. Подробности: [OPEN-RESEARCH.md](OPEN-RESEARCH.md).
+измеренный исход через plan_id/experiment_id. Реальный API-request snapshot содержит фактически
+отправленные схемы, историю и ответы инструментов; в `adaptive` локального сокращения по пределу
+входных байтов нет. Подробности: [OPEN-RESEARCH.md](OPEN-RESEARCH.md).
+
+Исправления adaptive: `search.tuning_base_reused` означает использование известной базы перед
+новыми разрешёнными испытаниями. `research.feedback_recorded` сохраняет причину ошибки/отказа
+для следующего контекста. `search.fallback_started` явно отмечает резервный каталог после
+недоступности API. `submission.refit_failed` с `retained_output=true` сохраняет проверенный CSV
+и исключает этот кандидат из повторной финализации. `search.finished.stop_reason` различает
+`researchers_stopped`, `research_unavailable` и `no_affordable_candidates`.
 
 Все записи используют UTC ISO-8601. `run_id` разделяет запуски, `trace_id` объединяет переходы запуска, `request_id` определяет попытку вызова, `span_id`/`parent_span_id` связывают вложенные C09 → C10 → C11. `experiment_id`, `job_id`, `submission_job_id` привязывают события к вычислению и публикации.
 
@@ -67,6 +87,15 @@ llm.waiting каждые LLM_PROGRESS_SECONDS секунд показывает 
 llm.output_truncated и llm.output_budget_increased отличают обрыв от синтаксической ошибки JSON.
 llm.output_validated означает, что структурированный ответ принят; llm.call_completed лишь фиксирует
 получение API-ответа. Raw reasoning не печатается в терминал; доступный provider snapshot сохраняется.
+
+llm.tool_batch_normalized показывает raw_calls/unique_calls/new_calls/reused_calls и число
+invalid_arguments. llm.tool_no_progress означает переход к финальному решению после раунда
+полностью повторных запросов. llm.json_fence_recovered отмечает извлечение единственного блока
+JSON с последующей полной проверкой схемы. Исходный ответ остаётся в response snapshot.
+research.decision_saved содержит artifact_id, work_order_id, action и notes_supplied.
+research/decision-*.json отделяет модельные объяснения от фактической конфигурации;
+profile_summary.research_memory добавляет проверенные наблюдения из Store. Запись open_ideas
+не означает ни доказанную полезность, ни обязанность потратить на неё бюджет.
 
 Поиск: search.catalog_warmup, search.round_started, фактические параметры/гипотеза, validation.created,
 worker.constructing/fit_started/prediction_completed, job.progress, оценка и относительное улучшение

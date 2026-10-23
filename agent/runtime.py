@@ -86,10 +86,17 @@ def bootstrap(config, started, task_path, run_id, root, log):
         proposal = interpreter.choose_validation(spec)
         validation = bus.call("C05", {"task_spec_id": spec["task_spec_id"], "dataset_id": spec["dataset_id"], "proposal": proposal}, evaluator.create_protocol)["data"]
         analysis = None
+        knowledge = None
         if config.research_mode == 'adaptive':
             from tools.analysis import AnalysisService
             analysis = AnalysisService(spec, validation, artifacts, budget, log, schemas=bus.schemas)
             gateway.tools.analysis = analysis
+            from tools.knowledge import KnowledgeService
+            try:
+                knowledge = KnowledgeService(spec, profile['summary'], catalog, artifacts, log)
+                gateway.tools.knowledge = knowledge
+            except AgentError as exc:
+                log.event('knowledge.unavailable', level='WARNING', message=str(exc))
             from tools.notebooks import NotebookLibrary
             try:
                 gateway.tools.notebooks = NotebookLibrary(spec, gateway.tools.inspector.profile, artifacts, schemas=bus.schemas)
@@ -100,7 +107,7 @@ def bootstrap(config, started, task_path, run_id, root, log):
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log)
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,
                                   evaluator=evaluator, submission=submission, researcher=researcher, spec=spec,
-                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"], analysis=analysis)
+                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"], analysis=analysis, knowledge=knowledge)
         try:
             controller.run()
         except Exception as exc:

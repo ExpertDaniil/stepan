@@ -7,7 +7,7 @@ from agent.catalog import factory_source
 from agent.errors import AgentError
 from tools.code import write_code
 from agent.context import research_schema
-from agent.research_actions import validate_action
+from agent.research_actions import validate_action, validate_research_notes
 
 
 class Researcher:
@@ -25,6 +25,8 @@ class Researcher:
         tool_names = ['analyze_data'] if adaptive else [] if catalog_mode else ['write_code']
         if adaptive and getattr(getattr(self.gateway, 'tools', None), 'notebooks', None) is not None:
             tool_names.append('consult_notebook')
+        if adaptive and getattr(getattr(self.gateway, 'tools', self.gateway), 'knowledge', None) is not None:
+            tool_names.append('search_knowledge')
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
                                         "tool_schema_ids": tool_names,
@@ -34,18 +36,39 @@ class Researcher:
         if adaptive:
             validate_action(proposed, self.catalog)
             user = json.loads(context['messages'][1]['content'])
+            memory = user.get('profile_summary', user).get('research_memory', {})
             evidence = {f['source_id'] for f in user.get('facts', [])}
             for fact in user.get('facts', []):
                 evidence.update(fact.get('artifact_ids', []))
             evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
             evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
             evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
-            # Source examples are useful study material, never measured task evidence.
-            evidence.update(call['artifact_id'] for call in answer['tool_calls']
-                            if call.get('artifact_id') and call['name'] == 'analyze_data')
+            evidence.update(r['artifact_id'] for r in user.get('analysis_history', []))
+            evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
+            evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
+            # External source examples never become measured task evidence.
+            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id') and call.get('name') == 'analyze_data')
+            for decision in memory.get('decisions', []):
+                evidence.update(decision['evidence_ids'])
+                for observation in decision['observations']:
+                    evidence.add(observation['experiment_id'])
+                    if observation.get('diagnostics_artifact_id'):
+                        evidence.add(observation['diagnostics_artifact_id'])
+            for idea in memory.get('open_ideas', []):
+                evidence.update(idea['evidence_ids'])
             if not set(proposed['evidence_ids']) <= evidence:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
+            knowledge = user.get('profile_summary', user).get('knowledge', {})
+            visible_knowledge = {r['id'] for r in knowledge.get('results', [])}
+            visible_knowledge.update(ident for call in answer['tool_calls'] for ident in call.get('knowledge_ids', []))
+            for idea in memory.get('open_ideas', []):
+                visible_knowledge.update(idea['knowledge_ids'])
+            if not set(proposed.get('knowledge_ids', [])) <= visible_knowledge:
+                raise AgentError('INVALID_RESEARCH_ACTION', 'Unseen knowledge_ids: '+', '.join(sorted(set(proposed.get('knowledge_ids', []))-visible_knowledge))+
+                                 '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
+            validate_research_notes(proposed.get('research_notes'), memory, evidence, visible_knowledge)
             if proposed['action'] == 'stop':
+                self.save_decision(proposed, None, payload, context, answer)
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
                         'plan': None, 'decision': 'stop', 'stop_reason': proposed['hypothesis']}
@@ -94,13 +117,38 @@ class Researcher:
         self.catalog.validate_plan(plan, self.spec, self.validation_id, self.artifacts)
         if adaptive:
             self.artifacts.write_json('research/intent-'+plan['plan_id']+'.json',
-                {k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
+                {**{k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
+                 'knowledge_ids': proposed.get('knowledge_ids', []),
+                 'research_notes': proposed.get('research_notes'),
+                 'knowledge_retrieval_artifact_ids': list(dict.fromkeys(
+                    ([knowledge['artifact_id']] if knowledge.get('artifact_id') else [])+
+                    [call['artifact_id'] for call in answer['tool_calls'] if call.get('name') == 'search_knowledge' and call.get('artifact_id')]))},
                 'research_intent', ident='intent-'+plan['plan_id'])
+            self.save_decision(proposed, plan, payload, context, answer)
             self.log.event('research.action_proposed', plan_id=plan['plan_id'], researcher_id=payload['researcher_id'],
-                           action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'])
+                           action=proposed['action'], tuning=proposed['tuning'], evidence_ids=proposed['evidence_ids'],
+                           knowledge_ids=proposed.get('knowledge_ids', []))
         self.log.event("research.hypothesis_proposed", researcher_id=payload["researcher_id"],
                        context_id=payload["context_id"], model_output_artifact_id=answer["output_artifact_id"],
                        hypothesis=plan["hypothesis"], expected_effect=plan["expected_effect"], recipe_id=plan["recipe_id"],
                        hyperparameters=params, source_mode=self.config.research_mode, code_artifact_id=code["artifact_id"])
         return {"proposal_id": "proposal-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                 "plan": plan, "decision": "propose", "stop_reason": None}
+
+    def save_decision(self, proposed, plan, payload, context, answer):
+        """Immutable artifact only; SQLite/measurement updates stay in the dispatcher."""
+        binding = context['metadata'].get('graph_binding', {})
+        configuration = None
+        if plan is not None:
+            from agent.store import Store
+            configuration = {'plan_id': plan['plan_id'], 'code_artifact_id': plan['code_artifact_id'],
+                'fingerprint_core': Store.fingerprint_core(plan, self.artifacts.meta(plan['code_artifact_id'])['sha256'])}
+        record = {key: proposed[key] for key in ('action', 'hypothesis', 'expected_effect', 'evidence_ids')}
+        record.update(research_notes=proposed.get('research_notes'), knowledge_ids=proposed.get('knowledge_ids', []),
+            researcher_id=payload['researcher_id'], context_id=payload['context_id'],
+            work_order_id=binding.get('work_order_id'), branch_id=binding.get('branch_id'),
+            output_artifact_id=answer['output_artifact_id'], configuration=configuration)
+        art = self.artifacts.write_json('research/decision-'+uuid.uuid4().hex[:16]+'.json', record, 'research_decision')
+        self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
+            action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,
+            work_order_id=binding.get('work_order_id'))

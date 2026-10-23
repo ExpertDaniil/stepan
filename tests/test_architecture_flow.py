@@ -1,4 +1,5 @@
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from agent.errors import AgentError
@@ -8,6 +9,24 @@ from tests.graph_helpers import GraphHarness
 
 
 class ArchitectureFlowTests(unittest.TestCase):
+    def test_external_material_cautions_use_the_requesting_peers_own_base(self):
+        h = GraphHarness()
+        try:
+            observed = []
+            class Knowledge:
+                def search(self, query, facts):
+                    observed.append(facts['recipe_id'])
+                    return {'artifact_id': 'source-reference', 'results': [{'id': 'method-example'}]}
+            tools = ResearchTools(h.g.bus, h.g.artifacts, knowledge=Knowledge())
+            for family in ('catboost-regressor-v1', 'linear-regressor-v1'):
+                context = {'messages': [{'role': 'system', 'content': ''}, {'role': 'user', 'content': json.dumps({
+                    'profile_summary': {'current_pipeline_facts': {'recipe_id': family}}})}]}
+                result, trace = tools.execute('search_knowledge', {'query': 'missing values'}, context)
+                self.assertEqual(trace['knowledge_ids'], ['method-example'])
+            self.assertEqual(observed, ['catboost-regressor-v1', 'linear-regressor-v1'])
+        finally:
+            h.close()
+
     def test_complete_schema_is_pageable_without_rows_or_target_values(self):
         profile = {'train_columns': ['c' + str(i) for i in range(300)], 'train_dtypes': {}, 'train_missing_fraction': {}}
         inspector = SchemaInspection(profile)

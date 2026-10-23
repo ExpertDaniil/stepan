@@ -34,6 +34,12 @@ RESOURCE_FILES = (
     "docs/research/notebooks/osic-artkulak/LICENSE",
     "docs/research/notebooks/osic-artkulak/simple-logreg.ipynb",
     "docs/research/notebooks/osic-artkulak/inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
+    "recipes/knowledge/manifest.json",
+    "recipes/knowledge/cards.json",
+    "recipes/knowledge/competitions.json",
+    "recipes/knowledge/sources.jsonl",
+    "recipes/knowledge/selection.json",
+    "recipes/knowledge/UPSTREAM_LICENSE.txt",
 )
 
 

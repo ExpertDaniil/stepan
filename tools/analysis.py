@@ -14,9 +14,11 @@ ANALYSIS_SCHEMA = {
     "type": "object", "properties": {
         "kind": {"enum": ["summary", "association", "group", "compare", "dictionary", "report", "schema"]},
         "report_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
-        "columns": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 12},
-        "group_by": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
-        "include_target": {"type": "boolean"},
+        "columns": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 12,
+                    "description": "Input features only; never include the target. [] chooses bounded defaults, or an empty schema/report request."},
+        "group_by": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+                     "description": "For kind=group, a selected input feature from columns. Otherwise null."},
+        "include_target": {"type": "boolean", "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report/schema."},
         "offset": {"type": "integer", "minimum": 0},
         "limit": {"type": "integer", "minimum": 1, "maximum": 12},
         "filter": {"anyOf": [{"type": "object", "properties": {
@@ -166,7 +168,7 @@ class AnalysisService:
         digest = hashlib.sha256(canonical(query).encode()).hexdigest()
         with self.lock:
             if digest in self.cache:
-                return self.cache[digest]
+                return deepcopy(self.cache[digest])
         target = self.spec['target_column']
         excluded = set(self.spec['excluded_features']) | {target}
         if query['kind'] == 'schema':
@@ -185,15 +187,20 @@ class AnalysisService:
         if not requested:
             requested = [c for c in self.train_columns if c not in excluded][:8]
         if any(c not in self.train_columns or c in excluded for c in requested):
-            raise AgentError("INVALID_ANALYSIS", "Select existing input features; request target through include_target")
+            raise AgentError("INVALID_ANALYSIS", "columns must contain existing input features only. Remove the target/excluded columns; use include_target=true for fit-only target summaries.",
+                             details={'invalid_columns': [c for c in requested if c not in self.train_columns or c in excluded],
+                                      'target_column': target})
         columns = requested + ([target] if query['include_target'] else [])
         # Deterministic, bounded computation; row-level labels never leave this service.
         if query['kind'] in {'compare', 'dictionary'} and query['include_target']:
             raise AgentError('INVALID_ANALYSIS', 'Feature comparisons and dictionary queries do not expose test targets')
         if query['kind'] != 'group' and query['group_by'] is not None:
             raise AgentError('INVALID_ANALYSIS', 'group_by is only valid for group queries')
-        if query['kind'] == 'compare' and any(c not in self.test_columns for c in requested + ([condition['column']] if condition else [])):
-            raise AgentError('INVALID_ANALYSIS', 'Comparison columns must also exist in test')
+        if query['kind'] == 'compare':
+            missing = [c for c in requested + ([condition['column']] if condition else []) if c not in self.test_columns]
+            if missing:
+                raise AgentError('INVALID_ANALYSIS', 'Selected features are absent from the unlabelled test table',
+                                 details={'missing_test_columns': missing})
         if query['kind'] == 'dictionary' and condition:
             raise AgentError('INVALID_ANALYSIS', 'Dictionary metadata cannot be filtered by row values')
         data, population, _ = self._sample('fit', columns, condition, started) if query['kind'] != 'dictionary' else (pd.DataFrame(), 0, 0)
@@ -231,8 +238,8 @@ class AnalysisService:
                 raise AgentError("INVALID_ANALYSIS", "group_by must be one of the selected input columns")
             values = data[group]
             if pd.api.types.is_numeric_dtype(values) and values.nunique() > 12:
-                values = pd.qcut(values.replace([np.inf, -np.inf], np.nan), 5, duplicates='drop').astype(object)
-            values = values.fillna('__MISSING__').astype(str)
+                values = pd.qcut(values.replace([np.inf, -np.inf], np.nan), 5, duplicates='drop')
+            values = values.astype(object).where(values.notna(), '__MISSING__').astype(str)
             counts = values.value_counts().head(12)
             result['groups'] = []
             for label, count in counts.items():
@@ -270,7 +277,7 @@ class AnalysisService:
         response = {'artifact_id': art['artifact_id'], 'report': reply}
         with self.lock:
             self.cache[digest] = response
-            self.records.append({'artifact_id': art['artifact_id'], 'query': query, 'scope': result['scope']})
+            self.records.append({'artifact_id': art['artifact_id'], 'query': deepcopy(query), 'scope': result['scope']})
         self.log.event('research.analysis_completed', artifact_id=art['artifact_id'], kind=query['kind'],
                        columns=requested, rows=result.get('analyzed_rows', 0), scope=result['scope'])
-        return response
+        return deepcopy(response)

@@ -7,3 +7,4 @@
 *.zip binary
 *.ipynb -text
 docs/research/notebooks/osic-artkulak/LICENSE -text
+recipes/knowledge/* -text

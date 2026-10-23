@@ -197,7 +197,7 @@ else:
         controller = Orchestrator.__new__(Orchestrator)
         for key, value in dict(config=self.h.config, bus=self.h.bus, artifacts=self.h.artifacts,
                                store=self.h.store, log=self.h.log, spec=self.h.spec, budget=budget,
-                               runner=runner, submission=submission, graph=None).items():
+                               runner=runner, submission=submission, graph=None, failed_refits=set()).items():
             setattr(controller, key, value)
         with patch('agent.runner.subprocess.Popen', side_effect=OSError('synthetic refit spawn failure')):
             with self.assertRaises(AgentError):

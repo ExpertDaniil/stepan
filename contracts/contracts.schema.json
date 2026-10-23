@@ -3,20 +3,6 @@
   "$id": "urn:alfa-hack:automl:contracts:0.1.0",
   "title": "AutoML internal message contracts v0.1.0",
   "$defs": {
-    "NotebookQuery": {
-      "type": "object",
-      "properties": {
-        "kind": {"enum": ["search", "read"]},
-        "keywords": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 80}, "maxItems": 8},
-        "approach_id": {"type": "string", "minLength": 1, "maxLength": 100},
-        "cell_index": {"type": "integer", "minimum": 0},
-        "offset": {"type": "integer", "minimum": 0},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 2},
-        "max_chars": {"type": "integer", "minimum": 1, "maximum": 5000}
-      },
-      "required": ["kind"],
-      "additionalProperties": false
-    },
     "ArtifactRef": {
       "type": "object",
       "properties": {
@@ -13898,6 +13884,124 @@
             "minLength": 1
           },
           "maxItems": 12
+        },
+        "knowledge_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 12
+        },
+        "research_notes": {
+          "type": "object",
+          "properties": {
+            "idea_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "mechanism": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "decision_reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "previous_result_interpretation": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "alternatives": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "idea_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "question": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "mechanism": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "next_test": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "why_deferred": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "evidence_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 12
+                  },
+                  "knowledge_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 12
+                  }
+                },
+                "required": [
+                  "idea_id",
+                  "question",
+                  "mechanism",
+                  "next_test",
+                  "why_deferred",
+                  "evidence_ids",
+                  "knowledge_ids"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 8
+            }
+          },
+          "required": [
+            "idea_id",
+            "question",
+            "mechanism",
+            "decision_reason",
+            "previous_result_interpretation",
+            "alternatives"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -13944,7 +14048,8 @@
             "type": "string",
             "minLength": 1
           },
-          "maxItems": 12
+          "maxItems": 12,
+          "description": "Input features only; never include the target. [] chooses bounded defaults, or an empty schema/report request."
         },
         "group_by": {
           "anyOf": [
@@ -13955,10 +14060,12 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "For kind=group, a selected input feature from columns. Otherwise null."
         },
         "include_target": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Add fit-only target summaries separately from columns. False for compare/dictionary/report/schema."
         },
         "offset": {
           "type": "integer",
@@ -14013,6 +14120,206 @@
         "columns",
         "group_by",
         "include_target"
+      ],
+      "additionalProperties": false
+    },
+    "KnowledgeQuery": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Concrete data/method question, in English when possible; empty when reading IDs."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "maxItems": 8,
+          "description": "Ranking hints, not an AND filter. Partial tag matches remain eligible."
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 3,
+          "description": "Known method-/kg- IDs to read instead of searching."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "description": "Character offset for reading long source write-ups by ID."
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "ResearchNotes": {
+      "type": "object",
+      "properties": {
+        "idea_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "mechanism": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "decision_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "previous_result_interpretation": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "idea_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "mechanism": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "next_test": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "why_deferred": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 12
+              },
+              "knowledge_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 12
+              }
+            },
+            "required": [
+              "idea_id",
+              "question",
+              "mechanism",
+              "next_test",
+              "why_deferred",
+              "evidence_ids",
+              "knowledge_ids"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "idea_id",
+        "question",
+        "mechanism",
+        "decision_reason",
+        "previous_result_interpretation",
+        "alternatives"
+      ],
+      "additionalProperties": false
+    },
+    "NotebookQuery": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "search",
+            "read"
+          ]
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "maxItems": 8
+        },
+        "approach_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "cell_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "kind"
       ],
       "additionalProperties": false
     },

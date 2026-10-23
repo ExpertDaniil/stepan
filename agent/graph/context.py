@@ -5,6 +5,7 @@ import uuid
 from agent.contracts import canonical
 from agent.errors import AgentError
 from agent.graph.identity import dependency_closure
+from agent.research_memory import build_research_memory
 
 
 class WorkService:
@@ -152,6 +153,16 @@ class WorkService:
                 'omitted_count': len(priority)-len(selected),
                 'instruction': 'Measured trials on your own visible lineage. changes_from_base overrides the current base parameters. Do not repeat a tested configuration; use its measured score, including old regressions.'}
 
+    def research_memory(self, branch_id, donors):
+        orders = set()
+        for line, cut in self.lineage_cuts(branch_id):
+            rows = self.db.execute("SELECT DISTINCT w.work_order_id FROM g_work_orders w JOIN g_events e ON e.run_id=w.run_id AND json_extract(e.record_json,'$.entity_id')=w.work_order_id WHERE w.run_id=? AND w.branch_id=? AND e.event_seq<=? AND json_extract(e.record_json,'$.operation')='G04'", (self.run_id, line, cut))
+            orders.update(row[0] for row in rows)
+        # Donor measurements are explicit, but donor branch decisions are not
+        # silently imported into this branch's pre-idea memory.
+        ids = [*self.visible_history(branch_id), *donors]
+        return build_research_memory(self.store, self.artifacts, ids, work_order_ids=orders)
+
     def expire_work(self):
         expired = self.db.execute("SELECT work_order_id,order_json FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, self.elapsed())).fetchall()
         if not expired:
@@ -225,6 +236,8 @@ class WorkService:
                            "response_cost_plan": base_exp['plan'] if base_exp else None, "observed_recipes": observed_recipes,
                            "search_memory": self.search_memory(branch['branch_id'], head),
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
+            if self.config.research_mode == 'adaptive':
+                graph_input['research_memory'] = self.research_memory(branch['branch_id'], binding['allowed_donor_experiment_ids'])
             args = {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"], "tools_catalog_version": p["tools_catalog_version"],
                     "researcher_id": p["researcher_id"], "assignment": assignment, "max_input_tokens": self.policy["context"]["max_input_tokens"]}
             context = self.bus.call("C08", args, lambda value: self.context.build(value, snapshot, graph=graph_input))["data"]

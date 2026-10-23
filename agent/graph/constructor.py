@@ -29,6 +29,8 @@ class Constructor:
                      "recipes/catalog.json", "recipes/components.json", "recipes/graph-policy.json"]
         paths = [ROOT / relative for relative in resources]
         paths += list((ROOT / "prompts").glob("*.md"))
+        from tools.knowledge import KNOWLEDGE_RESOURCES
+        paths += [ROOT / relative for relative in KNOWLEDGE_RESOURCES if (ROOT / relative).is_file()]
         for directory in ("agent", "tools"):
             paths += [p for p in (ROOT / directory).rglob("*.py") if "__pycache__" not in p.parts]
         files = {}

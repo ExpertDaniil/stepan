@@ -165,6 +165,17 @@ class EndToEndTests(unittest.TestCase):
             with self.subTest(graph=graph),tempfile.TemporaryDirectory() as temp:
                 task=make_demo(Path(temp)/'task')
                 lease=Budget.lease;can_train=Budget.can_train;override=set();clipped=[]
+                spawn=subprocess.Popen;delayed=[]
+                def slow_clipped_worker(command, **kwargs):
+                    if clipped and not delayed and '-m' in command and 'agent.worker' in command:
+                        job = json.loads(Path(command[-1]).read_text())
+                        if job['phase'] == 'train':
+                            delayed.append(True)
+                            # Force the clipped deadline path independently of
+                            # which family is selected and how fast this CPU is.
+                            wrapper = 'import time,runpy,sys; time.sleep(5); sys.argv=["agent.worker",sys.argv[1]]; runpy.run_module("agent.worker",run_name="__main__")'
+                            command = [command[0], '-u', '-c', wrapper, command[-1]]
+                    return spawn(command, **kwargs)
                 def estimate(budget,plan):
                     if id(budget) in override:
                         return {'allowed':True,'estimated_seconds':.1,'reserve_seconds':budget.reserve_seconds(),'remaining_seconds':budget.remaining(),'family':plan['model']['family']}
@@ -179,12 +190,13 @@ class EndToEndTests(unittest.TestCase):
                         finally:override.remove(id(budget))
                     return lease(budget,payload)
                 settings={**self.env(),'GRAPH_ENABLED':str(int(graph)),'GRAPH_REFINEMENT_ENABLED':'0','TIME_BUDGET_SECONDS':'90'}
-                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),redirect_stderr(io.StringIO()) as stderr:
+                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),patch('agent.runner.subprocess.Popen',side_effect=slow_clipped_worker),redirect_stderr(io.StringIO()) as stderr:
                     code=main([str(task),'--work-dir',str(Path(temp)/'runs')])
                 self.assertEqual(code,0,stderr.getvalue()[-3000:])
                 run=next((Path(temp)/'runs').glob('run-*'))
                 events=[json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
                 self.assertTrue(clipped)
+                self.assertTrue(delayed)
                 self.assertTrue(any(e['event']=='search.budget_trial_timed_out' for e in events))
                 self.assertTrue((task.parent/'submission.csv').is_file())
                 self.assertIn('State: completed',(run/'summary.md').read_text())

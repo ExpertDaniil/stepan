@@ -27,6 +27,10 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
     if isinstance(base_recipe_id, str):
         if base_recipe_id.startswith('catboost-'):
             modules.add('catboost')
+        elif base_recipe_id.startswith('lightgbm-'):
+            modules.add('lightgbm')
+        elif base_recipe_id.startswith('xgboost-'):
+            modules.add('xgboost')
         elif base_recipe_id.startswith('linear-'):
             modules.add('sklearn.linear_model')
         elif base_recipe_id.startswith(('hist-gradient-', 'random-forest-', 'extra-trees-')):
@@ -47,6 +51,11 @@ class PipelineGuard:
         self.active = False
         self.trusted_thread = trusted_thread
         self.code = Path(code_path).resolve()
+        # The approved boosters use ctypes for their already-loaded C API.
+        # Permit symbol lookup only on those exact library objects, never dlopen.
+        self.native_modules = tuple(sys.modules[name] for name in ('lightgbm.basic', 'xgboost.core')
+                                    if name in sys.modules and hasattr(sys.modules[name], '_LIB'))
+        self.native_libraries = tuple(module._LIB for module in self.native_modules)
         # A venv's packages need not live under base_prefix (e.g. /usr).
         # Trust installation directories, not the whole venv/project directory.
         roots = [sys.base_prefix, *site.getsitepackages()]
@@ -62,8 +71,18 @@ class PipelineGuard:
             return
         if threading.current_thread() is self.trusted_thread:
             return
+        if event in {'ctypes.create_string_buffer', 'ctypes.create_unicode_buffer'}:
+            return  # Allocation; resource limits still apply to the worker.
+        if event == 'ctypes.dlsym' and any(args[0] is library for library in self.native_libraries):
+            return
+        if event in {'ctypes.addressof', 'ctypes.cdata', 'ctypes.cdata/buffer', 'ctypes.string_at'}:
+            # Buffer interop is needed inside the approved C bindings. Do not
+            # expose arbitrary-address access to the generated Python module.
+            caller = sys._getframe(1).f_globals
+            if any(caller is module.__dict__ for module in self.native_modules):
+                return
         if event.startswith(('socket.', 'subprocess.', 'ctypes.')) or event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}:
-            raise PermissionError('Generated pipeline cannot start processes or use network/native loaders')
+            raise PermissionError('Generated pipeline cannot start processes or use network/native loaders: '+event)
         if event == 'open':
             filename, mode, flags = args
             if isinstance(filename, int):

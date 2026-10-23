@@ -1,7 +1,7 @@
 """Recipe implementations. This module is imported inside training processes."""
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, clone
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, StandardScaler
@@ -63,6 +63,27 @@ class SequentialTargets(BaseEstimator):
 
     def predict(self, X):
         return np.column_stack([np.asarray(model.predict(X)).reshape(-1) for model in self.models_])
+
+
+class EncodedClassifier(ClassifierMixin, BaseEstimator):
+    """Adapt XGBoost's consecutive integer classes to the task's original labels."""
+    def __init__(self, estimator):
+        self.estimator = estimator
+
+    def fit(self, X, y):
+        from sklearn.preprocessing import LabelEncoder
+        self.label_encoder_ = LabelEncoder().fit(y)
+        self.classes_ = self.label_encoder_.classes_
+        self.estimator_ = clone(self.estimator)
+        self.estimator_.fit(X, self.label_encoder_.transform(y))
+        return self
+
+    def predict(self, X):
+        indices = np.asarray(self.estimator_.predict(X), dtype=int)
+        return self.label_encoder_.inverse_transform(indices)
+
+    def predict_proba(self, X):
+        return self.estimator_.predict_proba(X)
 
 
 class ShiftedLogTargetModel(BaseEstimator):
@@ -154,6 +175,18 @@ def build_pipeline(recipe_id, task_spec, params):
     elif recipe_id.startswith(("random-forest-", "extra-trees-")):
         family = (ExtraTreesRegressor if regression else ExtraTreesClassifier) if recipe_id.startswith("extra-trees-") else (RandomForestRegressor if regression else RandomForestClassifier)
         estimator = family(n_jobs=threads, random_state=seed, **params)
+    elif recipe_id.startswith('lightgbm-'):
+        from lightgbm import LGBMClassifier, LGBMRegressor
+        family = LGBMRegressor if regression else LGBMClassifier
+        estimator = family(n_jobs=threads, random_state=seed, device_type='cpu',
+                           deterministic=True, force_col_wise=True, verbosity=-1, **params)
+    elif recipe_id.startswith('xgboost-'):
+        from xgboost import XGBClassifier, XGBRegressor
+        family = XGBRegressor if regression else XGBClassifier
+        estimator = family(n_jobs=threads, random_state=seed, device='cpu', tree_method='hist',
+                           verbosity=0, **params)
+        if not regression:
+            estimator = EncodedClassifier(estimator)
     else:
         raise ValueError("Unsupported recipe: " + recipe_id)
     if policy['numeric_scaling']:

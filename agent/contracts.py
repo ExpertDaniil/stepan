@@ -1,9 +1,8 @@
 """Local calls with the exact C00–C24 envelopes; no HTTP server is needed."""
 from copy import deepcopy
+from functools import lru_cache
 import hashlib
 import json
-import math
-import re
 import threading
 import time
 import uuid
@@ -17,84 +16,49 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
-class Schemas:
-    """Validates the schema vocabulary used by this frozen contract package.
+@lru_cache(maxsize=8)
+def _validator(serialized):
+    """Compile a local contract document once per process; never retrieve URLs."""
+    from jsonschema import Draft202012Validator, validators
+    from referencing import Registry, Resource
+    schema = json.loads(serialized)
+    Draft202012Validator.check_schema(schema)
+    # Resource quantities and row indices deliberately require JSON integer
+    # tokens, preserving the original contract (3.0 is not an integer here).
+    checker = Draft202012Validator.TYPE_CHECKER.redefine(
+        'integer', lambda _, value: isinstance(value, int) and not isinstance(value, bool))
+    validator_type = validators.extend(Draft202012Validator, type_checker=checker)
+    registry = Registry().with_resource(schema['$id'], Resource.from_contents(schema))
+    return validator_type(schema, registry=registry)
 
-    Fails closed on unsupported validation keywords; uses only stdlib so a demo
-    does not need a second dependency installation. Full schemas are also usable
-    with the organizers' jsonschema==4.23.0.
-    """
+
+class Schemas:
+    """Pinned JSON Schema validation with the project's existing error boundary."""
     def __init__(self, root=ROOT / "contracts"):
         self.schema = json.loads((root / "contracts.schema.json").read_text(encoding="utf-8"))
         registry = json.loads((root / "contracts.json").read_text(encoding="utf-8"))
         self.operations = {c["id"]: c for c in registry["contracts"]}
+        self.validator = _validator(canonical(self.schema))
 
     def validate(self, value, name):
         try:
-            canonical(value)  # Reject non-JSON objects and NaN even in extensible maps.
             self._check(value, self.schema["$defs"][name], "$")
         except (ValueError, TypeError, KeyError) as exc:
             raise AgentError("CONTRACT_VIOLATION", f"{name}: {exc}") from exc
 
-    def _check(self, v, s, path):
-        allowed = {"$ref", "$defs", "$schema", "$id", "title", "description", "type", "enum", "const",
-                   "properties", "required", "additionalProperties", "items", "minItems", "maxItems",
-                   "minLength", "maxLength", "pattern", "minimum", "maximum", "exclusiveMinimum",
-                   "exclusiveMaximum", "oneOf", "anyOf", "default", "examples"}
-        if set(s) - allowed:
-            raise ValueError(f"unsupported schema keywords: {set(s) - allowed}")
-        if "$ref" in s:
-            return self._check(v, self.schema["$defs"][s["$ref"].split("/")[-1]], path)
-        for key in ("oneOf", "anyOf"):
-            if key in s:
-                matches = 0
-                for candidate in s[key]:
-                    try:
-                        self._check(v, candidate, path)
-                        matches += 1
-                    except (ValueError, TypeError, KeyError):
-                        pass
-                if (key == "oneOf" and matches != 1) or (key == "anyOf" and matches == 0):
-                    raise ValueError(f"{path}: {key} matched {matches} schemas")
-        if "enum" in s and not any(type(v) is type(e) and v == e for e in s["enum"]):
-            raise ValueError(f"{path}: invalid enum {v!r}")
-        if "const" in s and (type(v) is not type(s["const"]) or v != s["const"]):
-            raise ValueError(f"{path}: const mismatch")
-        typ = s.get("type")
-        kinds = {"object": isinstance(v, dict), "array": isinstance(v, list), "string": isinstance(v, str),
-                 "boolean": isinstance(v, bool), "null": v is None,
-                 "integer": isinstance(v, int) and not isinstance(v, bool),
-                 "number": isinstance(v, (int, float)) and not isinstance(v, bool)}
-        if typ and not kinds[typ]:
-            raise ValueError(f"{path}: expected {typ}")
-        if isinstance(v, (float, int)) and not isinstance(v, bool) and not math.isfinite(v):
-            raise ValueError(f"{path}: non-finite JSON number")
-        if typ == "object":
-            for k in s.get("required", []):
-                if k not in v:
-                    raise ValueError(f"{path}: missing {k}")
-            for k, x in v.items():
-                if k in s.get("properties", {}):
-                    self._check(x, s["properties"][k], path + "." + k)
-                elif s.get("additionalProperties", True) is False:
-                    raise ValueError(f"{path}: unknown field {k}")
-                elif isinstance(s.get("additionalProperties"), dict):
-                    self._check(x, s["additionalProperties"], path + "." + k)
-        if typ == "array":
-            if len(v) < s.get("minItems", 0) or len(v) > s.get("maxItems", float("inf")):
-                raise ValueError(f"{path}: invalid length")
-            for i, x in enumerate(v):
-                self._check(x, s.get("items", {}), f"{path}[{i}]")
-        if typ == "string":
-            if len(v) < s.get("minLength", 0) or len(v) > s.get("maxLength", float("inf")):
-                raise ValueError(f"{path}: invalid string length")
-            if "pattern" in s and not re.search(s["pattern"], v):
-                raise ValueError(f"{path}: invalid string pattern")
-        if typ in {"integer", "number"}:
-            for key, bad in [("minimum", lambda a, b: a < b), ("maximum", lambda a, b: a > b),
-                             ("exclusiveMinimum", lambda a, b: a <= b), ("exclusiveMaximum", lambda a, b: a >= b)]:
-                if key in s and bad(v, s[key]):
-                    raise ValueError(f"{path}: {key} violation")
+    def _check(self, value, schema, path):
+        from jsonschema.exceptions import ValidationError
+        from referencing.exceptions import Unresolvable
+        canonical(value)  # Finite JSON only, including extensible parameter maps.
+        try:
+            self.validator.evolve(schema=schema).validate(value)
+        except ValidationError as exc:
+            location = path + ''.join('['+str(p)+']' if isinstance(p, int) else '.'+p for p in exc.absolute_path)
+            detail = ('does not match the permitted schema variants' if exc.validator in {'oneOf', 'anyOf'}
+                      else exc.message[:600])
+            raise ValueError(location+': '+detail) from exc
+        except Unresolvable as exc:
+            raise ValueError(path+': schema reference is not in the local registry') from exc
 
 
 class ContractBus:

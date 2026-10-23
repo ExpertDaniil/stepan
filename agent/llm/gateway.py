@@ -60,7 +60,7 @@ class MockTransport:
                 params = {"alpha": 1.0+round_no} if "regressor" in recipe else {"C": 1.0/(round_no+1)}
             elif recipe.startswith("catboost-"):
                 params = {"iterations": 100+20*round_no}
-            elif recipe.startswith(("random-forest-", "extra-trees-")):
+            elif recipe.startswith(("random-forest-", "extra-trees-", "lightgbm-", "xgboost-")):
                 params = {"n_estimators": 60+10*round_no}
             else:
                 params = {"max_iter": 40+10*round_no}

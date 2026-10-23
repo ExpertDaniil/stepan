@@ -37,6 +37,12 @@ class DurationModel:
             size = params.get("iterations", 800) * 2 ** params.get("depth", 6)
         elif family == "hist_gradient":
             size = params.get("max_iter", 300) * params.get("max_leaf_nodes", 15)
+        elif family == 'lightgbm':
+            leaves = min(params.get('num_leaves', 31), max(2, rows / params.get('min_child_samples', 20)))
+            size = params.get('n_estimators', 200) * leaves * params.get('colsample_bytree', 1.0)
+        elif family == 'xgboost':
+            size = (params.get('n_estimators', 200) * 2 ** params.get('max_depth', 6)
+                    * params.get('subsample', 1.0) * params.get('colsample_bytree', 1.0))
         elif family in {"random_forest", "extra_trees"}:
             leaf = max(1, params.get("min_samples_leaf", 1))
             depth = min(params.get("max_depth") or rows, max(1, math.log2(max(2, rows / leaf))))

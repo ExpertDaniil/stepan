@@ -6,11 +6,23 @@
 `knowledge.unavailable` явно сообщает об отключении библиотеки. В `research.action_proposed`
 и `research/intent-plan-*.json` сохранены knowledge_ids; это внешние гипотезы, не измерения.
 
-В adaptive `llm.request_budget_checked` содержит `limit_bytes=null` и
-`input_limit_owner=provider`: локальная отсечка входного контекста отключена.
-`llm.final_decision_requested` отмечает последний ход диалога без инструментов.
-`research.context_failed` фиксирует ошибку сборки одного поручения без прерывания всей партии;
-если ни один peer не смог начать работу, причина остановки — `context_unavailable`.
+В adaptive `llm.request_budget_checked` показывает фактический размер полного запроса и
+предел байтов с резервом ответа. `llm.context_compacted` / `llm.reasoning_history_compacted`
+явно отмечают сокращения. `llm.configuration` различает platform/development и показывает
+неподтверждённость применения необязательных provider-параметров.
+
+`research.feedback_delivered` связывает реально отправленный запрос с revision/артефактом,
+experiment IDs и series IDs. `research.peer_resumed_while_waiting` показывает rolling dispatch;
+`research.peer_deferred` — повтор без новой информации и условие возобновления.
+`search.fallback_started/finished` содержат причину и длительность; fallback_seconds не надо
+складывать с перекрывающимися API/train durations для расчёта wall time.
+`llm.late_result_discarded` отличает оплату/получение ответа от принятия действия.
+
+`validation.confirmation_reserved` фиксирует selection/withheld rows либо причину отказа.
+`validation.finalists_confirmed` появляется только после закрытия исследования;
+`submission.published.selection_basis` отличает primary validation и одноразовый final report.
+`experiments/<experiment_id>/execution.json` хранит точный план/spec/runtime hashes для refit.
+Текущая реализация и ограничения: [MASTER-UPDATE.md](MASTER-UPDATE.md).
 
 В adaptive-режиме `research.analysis_completed` связывает запрос со scope, числом строк и полным
 артефактом отчёта; недоступные метки holdout не журналируются. `research.action_proposed` и

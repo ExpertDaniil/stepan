@@ -1,3 +1,6 @@
+> Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).
+> Описания прежних defaults/отключённого byte cap ниже относятся к истории изменений.
+
 # Research dialogue completion and training progress
 
 The observed run spent its exploration API allowance on tool turns and malformed JSON,

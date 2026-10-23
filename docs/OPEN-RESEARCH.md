@@ -29,12 +29,12 @@ deduplication and publication. A rationale is not proof that a research directio
 ## Protected context and on-demand analysis
 
 `profile_summary.data.core_profile` packs column name, dtype and train/test missingness together.
-In adaptive mode, ContextBuilder and Gateway do not truncate or reject input using the local
-byte/token heuristics. MAX_CONTEXT_TOKENS and GRAPH_CONTEXT_BYTES retain their legacy meaning
-in catalog/code mode, but do not cap adaptive requests, including bootstrap. The actual Qwen
-service context window still applies; this change does not enlarge the model's physical window.
-The request retains task contract, measured base, history, schemas and tool replies without
-client byte-budget compaction. Global deadline, API call and output-token budgets remain enforced.
+Adaptive requests now have a full-body LLM_REQUEST_MAX_BYTES boundary and an output reserve
+within LLM_CONTEXT_WINDOW_TOKENS. Older optional details are compacted with explicit provenance
+and counts; mandatory task/base/code that cannot fit is rejected. Byte counts are not tokenizer
+measurements or proof of the proxy context window. MAX_CONTEXT_TOKENS / GRAPH_CONTEXT_BYTES
+retain their legacy catalog/code meaning. Current mechanisms and verification limits:
+[MASTER-UPDATE.md](MASTER-UPDATE.md).
 The compact core includes at most 128 columns and reports omissions; larger schemas are
 inspectable by explicit column names through the analysis tool.
 

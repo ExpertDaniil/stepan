@@ -91,6 +91,17 @@ there is no mandatory ablation sequence or one-change rule. Model interpretation
 ideas or create hard search bans in the controller.
 
 Actions:
+- features: construct an owned composable feature program. recipe_id is the owned learned
+  base, hyperparameters are its parameters, code=null, tuning=null, feature_steps=[].
+  Supply feature_program=[{op,name,columns, optional group_by}], using the operators in
+  profile_summary.feature_engineering (or feature_engineering in graph-disabled mode).
+  Named operations may build on previous generated columns. All learned statistics are
+  fitted on fit rows and frozen for validation/test. Use real column meanings and units.
+  feature_memory contains measured executable representations and complete parameters;
+  evolve those programs or propose a different representation, rather than only changing
+  model capacity. Read source provenance; measured configurations do not prove mechanisms.
+  Arbitrary approved action=pipeline is still available for richer transformations. A
+  programme may coordinate multiple feature operations and model changes in one experiment.
 - catalog: one owned recipe and its declared parameters. code=null, tuning=null,
   feature_steps=[] (the controller derives the effective feature manifest).
 - pipeline: recipe_id="python-pipeline-v1", explicit Python source in code and arbitrary

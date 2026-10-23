@@ -1,5 +1,6 @@
 """Explicit research decisions, persisted separately from the frozen ExperimentPlan."""
 from agent.errors import AgentError
+from agent.feature_schema import FEATURE_PROGRAM_SCHEMA
 
 CUSTOM_RECIPE = 'python-pipeline-v1'
 IDEA_SCHEMA = {
@@ -42,7 +43,8 @@ TUNING_SCHEMA = {
     'required': ['max_trials', 'budget_seconds'], 'additionalProperties': False}
 ACTION_SCHEMA = {
     'type': 'object', 'properties': {
-        'action': {'enum': ['catalog', 'pipeline', 'tune', 'stop']},
+        'action': {'enum': ['catalog', 'pipeline', 'features', 'tune', 'stop']},
+        'feature_program': FEATURE_PROGRAM_SCHEMA,
         'recipe_id': {'type': 'string', 'minLength': 1},
         'hyperparameters': {'type': 'object'},
         'hypothesis': {'type': 'string', 'minLength': 1},
@@ -73,6 +75,13 @@ def validate_research_notes(notes, memory, evidence, knowledge):
 
 def validate_action(action, catalog):
     kind = action['action']
+    if kind == 'features':
+        if (action['code'] is not None or action['tuning'] is not None
+                or action['recipe_id'] == CUSTOM_RECIPE or action['recipe_id'].startswith('dummy-')
+                or not action.get('feature_program') or action['feature_steps']):
+            raise AgentError('INVALID_RESEARCH_ACTION', 'features needs an owned learned recipe, feature_program, code/tuning=null and feature_steps=[]')
+    elif 'feature_program' in action:
+        raise AgentError('INVALID_RESEARCH_ACTION', 'feature_program belongs only to features actions')
     if kind == 'stop':
         if action['code'] is not None or action['tuning'] is not None:
             raise AgentError('INVALID_RESEARCH_ACTION', 'Stop cannot execute code or start tuning')

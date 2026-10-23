@@ -238,6 +238,8 @@ class WorkService:
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
             if self.config.research_mode == 'adaptive':
                 graph_input['research_memory'] = self.research_memory(branch['branch_id'], binding['allowed_donor_experiment_ids'])
+                graph_input['visible_experiment_ids'] = list(dict.fromkeys([
+                    *self.visible_history(branch['branch_id']), *binding['allowed_donor_experiment_ids']]))
             args = {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"], "tools_catalog_version": p["tools_catalog_version"],
                     "researcher_id": p["researcher_id"], "assignment": assignment, "max_input_tokens": self.policy["context"]["max_input_tokens"]}
             context = self.bus.call("C08", args, lambda value: self.context.build(value, snapshot, graph=graph_input))["data"]

@@ -97,17 +97,34 @@ class Researcher:
                 self.log.event("research.constraints_applied", researcher_id=payload["researcher_id"], context_id=payload["context_id"],
                                branch_id=branch_user["branch_id"], work_order_id=branch_user["work_order_id"], changes=constraint_changes)
             params = effective
-        source = factory_source(proposed["recipe_id"]) if catalog_mode else user['base_code'] if custom_base else proposed["code"]
+        plan_recipe = proposed['recipe_id']
+        feature_manifest = None
+        if adaptive and proposed['action'] == 'features':
+            from agent.feature_schema import FACTORY_SOURCE, validate_program
+            from agent.predictions import targets
+            profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
+            excluded = [*targets(self.spec), *self.spec['excluded_features']]
+            try:
+                program = validate_program(proposed['feature_program'],
+                    [c for c in profile['train_columns'] if c not in excluded], excluded)
+            except (ValueError, KeyError) as error:
+                raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
+            params = {'base_recipe_id': plan_recipe, 'model_parameters': params, 'feature_program': program}
+            plan_recipe = 'python-pipeline-v1'
+            source = FACTORY_SOURCE
+            feature_manifest = [{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only'}]
+        else:
+            source = factory_source(proposed["recipe_id"]) if catalog_mode else user['base_code'] if custom_base else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
         code = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts),
                              key="code/" + hashlib.sha256(canonical(args).encode()).hexdigest())["data"]["artifact"]
         plan = {"plan_id": "plan-" + uuid.uuid4().hex[:12], "researcher_id": payload["researcher_id"],
                 "parent_ids": payload["base_experiment_ids"], "hypothesis": proposed["hypothesis"],
-                "expected_effect": proposed["expected_effect"], "recipe_id": proposed["recipe_id"],
+                "expected_effect": proposed["expected_effect"], "recipe_id": plan_recipe,
                 "task_spec_id": self.spec["task_spec_id"], "dataset_id": self.spec["dataset_id"],
                 "validation_id": self.validation_id, "seed": self.config.seed, "fidelity": "full",
-                "model": {"family": self.catalog.recipes[proposed["recipe_id"]]["family"], "hyperparameters": params},
-                "feature_steps": self.catalog.feature_steps(params) if catalog_mode else custom_base['feature_steps'] if custom_base else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
+                "model": {"family": self.catalog.recipes[plan_recipe]["family"], "hyperparameters": params},
+                "feature_steps": feature_manifest if feature_manifest is not None else self.catalog.feature_steps(params) if catalog_mode else custom_base['feature_steps'] if custom_base else proposed["feature_steps"], "code_artifact_id": code["artifact_id"],
                 "resources": {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
                               "timeout_seconds": self.config.experiment_timeout_seconds}}
         if constraint_changes:

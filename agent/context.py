@@ -44,12 +44,15 @@ class ContextBuilder:
                 "assignment": payload["assignment"], "researcher_id": payload["researcher_id"]}
         if self.catalog.config.research_mode == 'adaptive':
             user['optimizer_facts'] = optimizer_facts()
+            from agent.feature_memory import archive, interface
+            user['feature_engineering'] = interface()
             if getattr(self, 'store', None):
                 from agent.research_memory import build_research_memory
                 ids = [row[0] for row in self.store.db.execute('SELECT experiment_id FROM experiments WHERE run_id=?', (self.store.run_id,))]
                 user['research_memory'] = build_research_memory(self.store, self.artifacts, ids)
                 from agent.research_feedback import compact_memory
                 user['research_memory'] = compact_memory(user['research_memory'])
+                user['feature_memory'] = archive(self.store, self.artifacts, ids)
             user['recipes'] = self.catalog.branch_recipes(allowed, {'required_capability_ids': [], 'forbidden_capability_ids': []})
             user['research_feedback'] = list(getattr(self, 'research_feedback', []))
             if getattr(self, 'analysis', None):
@@ -146,6 +149,11 @@ class ContextBuilder:
                 'max_output_tokens': self.catalog.config.llm_max_output_tokens}
             user['profile_summary']['current_pipeline_facts'] = self.catalog.pipeline_facts(user.get('base_result'))
             user['profile_summary']['optimizer_facts'] = optimizer_facts()
+            from agent.feature_memory import archive, interface
+            user['profile_summary']['feature_engineering'] = interface()
+            if getattr(self, 'store', None):
+                user['profile_summary']['feature_memory'] = archive(self.store, self.artifacts,
+                    graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
             from agent.research_feedback import compact_memory
             user['profile_summary']['research_memory'] = compact_memory(user['profile_summary']['research_memory'])

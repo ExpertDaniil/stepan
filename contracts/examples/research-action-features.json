@@ -1,0 +1,28 @@
+{
+  "action": "features",
+  "recipe_id": "hist-gradient-regressor-v1",
+  "hyperparameters": {},
+  "feature_program": [
+    {
+      "op": "cross",
+      "name": "category_pair",
+      "columns": [
+        "category_a",
+        "category_b"
+      ]
+    },
+    {
+      "op": "frequency",
+      "name": "pair_frequency",
+      "columns": [
+        "category_pair"
+      ]
+    }
+  ],
+  "hypothesis": "Test a fit-only joint-category frequency representation.",
+  "expected_effect": "Measure a complete representation/model configuration on the frozen validation.",
+  "feature_steps": [],
+  "code": null,
+  "tuning": null,
+  "evidence_ids": []
+}

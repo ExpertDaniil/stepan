@@ -13940,9 +13940,65 @@
           "enum": [
             "catalog",
             "pipeline",
+            "features",
             "tune",
             "stop"
           ]
+        },
+        "feature_program": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "enum": [
+                  "missing",
+                  "log1p",
+                  "signed_log1p",
+                  "square",
+                  "sum",
+                  "difference",
+                  "product",
+                  "ratio",
+                  "frequency",
+                  "cross",
+                  "group_mean",
+                  "group_std",
+                  "group_rank",
+                  "relative_to_group",
+                  "month",
+                  "dayofweek",
+                  "hour"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "maxItems": 4
+              },
+              "group_by": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "op",
+              "name",
+              "columns"
+            ],
+            "additionalProperties": false
+          }
         },
         "recipe_id": {
           "type": "string",

@@ -5,7 +5,7 @@ import re
 
 from agent.errors import AgentError
 
-ALLOWED_IMPORTS = {"agent.ml", "numpy", "pandas", "scipy", "sklearn", "catboost", "lightgbm", "xgboost", "math"}
+ALLOWED_IMPORTS = {"agent.ml", "agent.feature_engineering", "numpy", "pandas", "scipy", "sklearn", "catboost", "lightgbm", "xgboost", "math"}
 BLOCKED_CALLS = {"exec", "eval", "open", "compile", "__import__", "input", "globals", "locals", "getattr", "setattr", "delattr", "vars", "breakpoint"}
 BLOCKED_ATTRIBUTES = {'os', 'sys', 'environ', 'load', 'save', 'loadtxt', 'savetxt', 'genfromtxt', 'memmap',
                       'fromfile', 'tofile', 'ctypes', 'f2py', 'system', 'popen', 'read_pickle', 'to_pickle', 'eval', 'query'}

@@ -80,6 +80,10 @@ present, so implementation-dependent reuse still calls for reading the source.
 
 ## Verification limits
 
+Следующий абзац описывает состояние исходного коммита `a7c8bdf`, до его согласования
+с архитектурной ревизией. Выполненные проверки объединённой версии приведены в
+[VALIDATION-ARCHITECTURE.md](VALIDATION-ARCHITECTURE.md).
+
 Regression tests were added for batch deduplication, valid siblings with a bad tail, repeat-only
 rounds, real truncation, conservative JSON recovery, soft tags, exact configuration observations,
 deferred-idea retention, stop decisions, reference provenance and graph/legacy visibility.

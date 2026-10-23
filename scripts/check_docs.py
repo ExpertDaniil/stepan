@@ -25,7 +25,7 @@ ACTIVE = [ROOT / 'README.md', *(ROOT / 'docs' / name for name in (
     'PROJECT_GUIDE.md', 'ARCHITECTURE_REVIEW.md', 'IMPLEMENTATION.md',
     'GRAPH.md', 'LOGGING.md', 'OPEN-RESEARCH.md', 'HISTORY.md',
     'PLATFORM.md', 'research/notebooks/README.md', 'KNOWLEDGE.md',
-    'RESEARCH-DECISION-FIXES.md', 'CONTEXT-TOOL-FIXES.md'))]
+    'RESEARCH-DECISION-FIXES.md', 'CONTEXT-TOOL-FIXES.md', 'VALIDATION-ARCHITECTURE.md'))]
 
 
 def heading_ids(body):

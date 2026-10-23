@@ -2,6 +2,7 @@
 
 **Начните с [полного руководства по проекту](docs/PROJECT_GUIDE.md): Ubuntu, 15 схем, путь от задачи до проверенного CSV, настоящий искусственный пример, разбор ошибок и расширение.**
 Результаты ревизии по фактическому коду: [ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md).
+Выполненные проверки и их пределы: [VALIDATION-ARCHITECTURE.md](docs/VALIDATION-ARCHITECTURE.md).
 Документы с разборами прежних запусков и выпусков — [исторические материалы](docs/HISTORY.md), а не текущая инструкция.
 
 В Ubuntu по умолчанию видны краткие русские сообщения (`CONSOLE_LOG_FORMAT=concise`); подробные события сохраняются в `events.jsonl`.

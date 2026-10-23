@@ -1,5 +1,8 @@
 # Adaptive execution fixes: verification
 
+Исторический отчёт исходной ветки исправлений. Он не заменяет
+[проверку объединённой архитектурной версии](VALIDATION-ARCHITECTURE.md).
+
 The architecture, four research actions, graph policy and validation protocol are retained.
 No live API calls or public/private dataset experiments were performed.
 

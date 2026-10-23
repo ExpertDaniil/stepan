@@ -15,6 +15,7 @@
 | [VALIDATION-FINAL-REFINEMENT.md](VALIDATION-FINAL-REFINEMENT.md) | Испытания перехода к доводке в соответствующем выпуске |
 | [VALIDATION-GRAPH.md](VALIDATION-GRAPH.md) | Проверки первоначальной версии графа |
 | [VALIDATION-OPEN-RESEARCH.md](VALIDATION-OPEN-RESEARCH.md) | Проверки первого адаптивного интерфейса |
+| [VALIDATION-ADAPTIVE-FIXES.md](VALIDATION-ADAPTIVE-FIXES.md) | Проверки исправлений команды до объединения с архитектурной ревизией |
 | [VALIDATION-PACKAGING.md](VALIDATION-PACKAGING.md) | Проверки плоской поставки определённого выпуска |
 | [VALIDATION-RESEARCH.md](VALIDATION-RESEARCH.md) | Проверки исследования и параметров в предыдущей версии |
 | [VALIDATION-RUN-REVIEW.md](VALIDATION-RUN-REVIEW.md) | Пределы проверки исправлений после разбора запуска |

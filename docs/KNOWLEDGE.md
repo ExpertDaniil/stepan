@@ -91,8 +91,8 @@ models. The script retains full selected write-ups and records all exclusions.
 
 ## Verification status
 
-Final implementation, example pipelines, live API integration and platform package were not
-run or tested locally at the user's explicit request. tests/test_knowledge.py adds regressions
-for task filtering, real source/example delivery, paging, cache isolation and corpus integrity.
-Existing gateway, graph, reconstruction and packaging checks remain applicable. No quality
-gain or fully verified release is claimed.
+В исходном коммите этой библиотеки проверки не выполнялись. После согласования с
+архитектурной ревизией выполнены проверки выдачи материалов, целостности,
+диалога и поставки. Точные результаты объединённой версии и ограничения находятся в
+[VALIDATION-ARCHITECTURE.md](VALIDATION-ARCHITECTURE.md).
+Настоящий API и качество на соревновании этими проверками не подтверждаются.

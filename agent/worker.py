@@ -166,12 +166,25 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     from agent.feature_engineering import FeatureProgram
     from sklearn.pipeline import Pipeline
     fitted = model.models_ if hasattr(model, 'models_') else [model]
+    execution = []
+    from agent.ml import NumericInteractions
     for target_index, fitted_model in enumerate(fitted):
-        if isinstance(fitted_model, Pipeline):
-            transformer = fitted_model.named_steps.get('features')
-            if isinstance(transformer, FeatureProgram):
-                print('AUTOML_WORKER '+json.dumps({'stage': 'features_fitted', 'target_index': target_index,
-                    'report': transformer.report_}, allow_nan=False), flush=True)
+        objects = [fitted_model]
+        if hasattr(fitted_model, 'get_params'):
+            objects.extend(fitted_model.get_params(deep=True).values())
+        seen = set()
+        for transformer in objects:
+            if id(transformer) in seen:
+                continue
+            seen.add(id(transformer))
+            if isinstance(transformer, (FeatureProgram, NumericInteractions)):
+                item = {'target_index': target_index, 'report': transformer.report_,
+                        'verification': 'owned_transformer_executed', 'units': 'not_inferred'}
+                execution.append(item)
+                print('AUTOML_WORKER '+json.dumps({'stage': 'features_fitted', **item}, allow_nan=False), flush=True)
+    # Declarations for arbitrary custom code are never promoted to execution proof.
+    Path(job['result_path']).with_name('features.json').write_text(json.dumps({
+        'owned_transformers': execution, 'custom_semantics_verified': False}, allow_nan=False), encoding='utf-8')
     output = Path(job["prediction_path"])
     print("AUTOML_WORKER "+json.dumps({"stage": "prediction_completed", "phase": job["phase"], "fit_seconds": fit_seconds, "prediction_rows": len(frame)}),flush=True)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -180,7 +193,7 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     snapshot = save_snapshot(model, model_path, job.get("model_snapshot_max_bytes", 16777216))
     return {"success": True, "fit_seconds": fit_seconds, "total_seconds": time.monotonic() - started,
             "rows": len(frame), "prediction_path": str(output),
-            "model_path": str(model_path) if model_path.is_file() else None, "model_snapshot": snapshot}
+            "feature_execution": execution, "model_path": str(model_path) if model_path.is_file() else None, "model_snapshot": snapshot}
 
 
 def main():

@@ -4082,7 +4082,10 @@
     "Champion",
     "Error",
     "WorkerEvent",
-    "ToolDefinition"
+    "ToolDefinition",
+    "ResearchAction",
+    "AnalysisQuery",
+    "MemoryRead"
   ],
   "owners": {
     "A": {

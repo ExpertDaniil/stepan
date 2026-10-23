@@ -32,6 +32,8 @@ class Budget:
         self.phase_output_limit = None
         self.phase_deadline = None
         self.llm_durations = deque(maxlen=32)
+        self.analysis_active = False
+        self.analysis_seconds_total = 0.0
 
     def set_phase_caps(self, *, calls=None, output_tokens=None, deadline=None):
         with self.lock:
@@ -133,7 +135,7 @@ class Budget:
             cpu = sum(v["lease"]["cpu_threads"] for v in self.leases.values())
             memory = sum(v["lease"]["memory_limit_mb"] for v in self.leases.values())
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
-                    "cpu_threads_available": max(0, 6 - cpu), "memory_mb_available": max(0, 20480 - memory),
+                    "cpu_threads_available": max(0, 6 - cpu - int(self.analysis_active)), "memory_mb_available": max(0, 20480 - memory - 1024*int(self.analysis_active)),
                     "llm_calls_remaining": self.bounded_count(self.call_limit() - self.calls - self._dialogue_calls()),
                     "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
@@ -292,3 +294,31 @@ class Budget:
                                              "heartbeat_deadline": time.monotonic() + 30, "lease": lease,
                                              "plan": plan}
             return {"granted": True, "lease": dict(lease), "retry_after_seconds": None, "budget": self.snapshot()}
+
+    def analysis_slot(self):
+        """Serialize 1 CPU / 1 GiB logical analysis admission with train leases.
+
+        Cooperative query limits enforce bounded data and time; this is not a
+        new OS-level memory sandbox. The platform's total limit remains binding.
+        """
+        from contextlib import contextmanager
+        @contextmanager
+        def slot():
+            with self.lock:
+                snapshot = self.snapshot()
+                if (self.analysis_active or not snapshot['search_allowed']
+                        or snapshot['cpu_threads_available'] < 1 or snapshot['memory_mb_available'] < 1024):
+                    raise AgentError('ANALYSIS_RESOURCES_BUSY', 'No shared analysis slot; use saved evidence or choose an affordable action', retryable=True)
+                self.analysis_active = True
+            started = time.monotonic()
+            self.log.event('analysis.resource_acquired', cpu_threads=1, memory_mb=1024)
+            try:
+                yield
+            finally:
+                elapsed = time.monotonic()-started
+                with self.lock:
+                    self.analysis_active = False
+                    self.analysis_seconds_total += elapsed
+                self.log.event('analysis.resource_released', duration_seconds=elapsed,
+                               analysis_seconds_total=self.analysis_seconds_total)
+        return slot()

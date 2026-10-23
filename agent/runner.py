@@ -340,10 +340,13 @@ class Runner:
         if job.prediction_path and job.prediction_path.is_file():
             output_files.add(job.prediction_path)
         for path in sorted(output_files):
-            if path.suffix not in {".csv", ".log", ".joblib"}:
+            if path.suffix not in {".csv", ".log", ".joblib"} and path.name != "features.json":
                 continue
-            kind = ("validation_predictions" if job.phase == "train" else "submission") if path == job.prediction_path else "fitted_pipeline" if path.suffix == ".joblib" else "execution_log"
-            art = self.artifacts.register(path, kind, "text/csv" if path.suffix == ".csv" else "application/octet-stream")
+            kind = ('feature_execution' if path.name == 'features.json' else
+                    ('validation_predictions' if job.phase == 'train' else 'submission') if path == job.prediction_path else
+                    'fitted_pipeline' if path.suffix == '.joblib' else 'execution_log')
+            media = 'application/json' if path.name == 'features.json' else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'
+            art = self.artifacts.register(path, kind, media)
             outputs.append(art["artifact_id"])
         err = None if state == "succeeded" else job.forced_error or AgentError(result.get("error_type") if result.get("error_type") in {"JOB_TIMEOUT", "JOB_MEMORY_LIMIT"} else "WORKER_FAILED", result.get("error", "Worker exited without a successful result"), details={"exit_code": job.process.returncode}).as_dict()
         event = {"event_id": "evt-" + job.job_id + "-terminal", "job_id": job.job_id,

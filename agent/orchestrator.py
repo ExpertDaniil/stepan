@@ -23,10 +23,13 @@ class Orchestrator:
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
         self.context.store = store
+        self.context.validation_id = validation["validation_id"]
+        self.context.validation_sha256 = validation["protocol_sha256"]
         self.researcher.validation_id = validation["validation_id"]
         if config.research_mode == 'adaptive':
             from tools.analysis import AnalysisService
             analysis = AnalysisService(spec, validation, artifacts, budget, log)
+            analysis.error_provider = evaluator.diagnose
             self.context.analysis = analysis
             self.researcher.gateway.analysis = analysis
             from tools.knowledge import KnowledgeService
@@ -175,7 +178,8 @@ class Orchestrator:
                         'researcher_id': exp['plan']['researcher_id'], 'recipe_id': exp['plan']['recipe_id'],
                         'plan_id': exp['plan']['plan_id']})
             from agent.evidence import comparison_context
-            mailbox.publish(scope, {'branch_id': scope, 'validation_id': self.validation['validation_id'],
+            mailbox.publish(scope, {'branch_id': scope, 'dataset_id': self.spec['dataset_id'],
+                'task_spec_id': self.spec['task_spec_id'], 'validation_id': self.validation['validation_id'],
                 'comparison_evidence': comparison_context(self.store, self.artifacts, ids),
                 'measurement_generation': generation, 'activity': activity,
                 'pending_experiments': pending_experiments[-4:],

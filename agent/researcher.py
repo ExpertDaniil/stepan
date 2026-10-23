@@ -25,7 +25,7 @@ class Researcher:
         context = self.artifacts.read_json(payload["context_id"])
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
-                                        "tool_schema_ids": (['analyze_data'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
+                                        "tool_schema_ids": (['analyze_data', 'read_memory'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds,
                                         "attempt_limit": self.config.llm_research_tool_turns + 2 if adaptive else 4}, self.gateway.complete)["data"]
@@ -65,6 +65,18 @@ class Researcher:
                         evidence.add(observation['diagnostics_artifact_id'])
             for idea in memory.get('open_ideas', []):
                 evidence.update(idea['evidence_ids'])
+            for delivery in answer['tool_calls']:
+                if delivery.get('name') == 'read_memory':
+                    evidence.update(delivery.get('evidence_ids', []))
+                    memory.setdefault('open_ideas', []).extend({'idea_id': ident, 'evidence_ids': [], 'knowledge_ids': []} for ident in delivery.get('idea_ids', []))
+            evidence.update(i for i in (self.spec.get('dictionary_artifact_id'), self.spec.get('task_spec_id')) if i)
+            from agent.research_memory import validate_semantic_updates
+            detail_id = context['metadata'].get('detail_artifact_id')
+            semantic_records = self.artifacts.read_json(detail_id)['sections']['semantics'] if detail_id else []
+            validate_semantic_updates(proposed.get('semantic_updates', []), memory, evidence,
+                                      (self.feature_columns + [step['name'] for step in proposed.get('feature_program', [])]
+                                       if self.feature_columns is not None else None),
+                                      context['metadata'].get('detail_scope'), semantic_records)
             if not set(proposed['evidence_ids']) <= evidence:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
             knowledge = user.get('profile_summary', user).get('knowledge', {})
@@ -111,7 +123,7 @@ class Researcher:
         plan_recipe = proposed['recipe_id']
         feature_manifest = None
         if adaptive and proposed['action'] == 'features':
-            from agent.feature_schema import FACTORY_SOURCE, validate_program
+            from agent.feature_schema import FACTORY_SOURCE, validate_program, operation_facts
             from agent.predictions import targets
             profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
             excluded = [*targets(self.spec), *self.spec['excluded_features']]
@@ -125,7 +137,8 @@ class Researcher:
             params = {'base_recipe_id': plan_recipe, 'model_parameters': params, 'feature_program': program}
             plan_recipe = 'python-pipeline-v1'
             source = FACTORY_SOURCE
-            feature_manifest = [{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only'}]
+            feature_manifest = [{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only',
+                'execution_specification': operation_facts(program)}]
         else:
             source = factory_source(proposed["recipe_id"]) if catalog_mode else user['base_code'] if custom_base else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
@@ -192,6 +205,12 @@ class Researcher:
         record['coordination'] = proposed.get('coordination', {})
         record['claims'] = proposed.get('claims', [])
         record['model_interpretations_verified'] = False
+        record['semantic_updates'] = proposed.get('semantic_updates', [])
+        record['semantic_scope'] = context['metadata'].get('detail_scope')
+        if record['semantic_updates']:
+            self.log.event('research.semantic_update_saved', context_id=payload['context_id'],
+                updates=len(record['semantic_updates']), verification='model_statement_unverified',
+                scope=record['semantic_scope'])
         art = self.artifacts.write_json('research/decision-'+uuid.uuid4().hex[:16]+'.json', record, 'research_decision')
         self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
             action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,

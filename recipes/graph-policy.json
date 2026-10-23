@@ -14,7 +14,7 @@
     "max_related_records": 8,
     "max_error_excerpt_bytes": 2000,
     "token_count_mode": "estimated_bytes",
-    "max_api_request_bytes": 36000
+    "max_api_request_bytes": 98304
   },
   "promotion": {
     "min_paired_seeds": 1,

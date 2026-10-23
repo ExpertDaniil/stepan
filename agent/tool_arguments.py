@@ -24,12 +24,18 @@ def normalize_tool_arguments(name, args):
             value.update(query=' '.join(value.get('query', '').casefold().split()), ids=[],
                          tags=sorted(set(value.get('tags', []))), max_results=limit)
         value.setdefault('offset', 0)
+    elif name == 'read_memory':
+        value.setdefault('offset', 0)
+        value.setdefault('limit_bytes', 4000)
     elif name == 'analyze_data':
         if value.get('kind') == 'report':
             # Explicit incompatible new-analysis fields remain errors, not silently ignored.
             value.setdefault('columns', [])
             value.setdefault('group_by', None)
             value.setdefault('include_target', False)
+            if 'offset' in value or 'limit_bytes' in value:
+                value.setdefault('offset', 0)
+                value.setdefault('limit_bytes', 4000)
         columns = value.get('columns')
         if isinstance(columns, list) and all(isinstance(c, str) for c in columns):
             value['columns'] = sorted(set(columns))

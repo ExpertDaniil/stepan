@@ -24,6 +24,26 @@ RESEARCH_NOTES_SCHEMA = {
         'alternatives': {'type': 'array', 'items': IDEA_SCHEMA, 'maxItems': 8}},
     'required': ['idea_id', 'question', 'mechanism', 'decision_reason', 'previous_result_interpretation', 'alternatives'],
     'additionalProperties': False}
+SEMANTIC_UPDATE_SCHEMA = {'type': 'array', 'maxItems': 6, 'items': {
+    'type': 'object', 'properties': {
+        'topic': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+        'kind': {'enum': ['definition', 'observation', 'hypothesis', 'data_error', 'implementation_error', 'execution_error']},
+        'statement': {'type': 'string', 'minLength': 1, 'maxLength': 600},
+        'columns': {'type': 'array', 'maxItems': 12, 'items': {'type': 'string', 'minLength': 1}},
+        'evidence_ids': {'type': 'array', 'maxItems': 8, 'items': {'type': 'string', 'minLength': 1}},
+        'supersedes': {'anyOf': [{'type': 'string', 'minLength': 1}, {'type': 'null'}]},
+        'properties': {'type': 'object', 'properties': {
+            'meaning': {'type': 'string', 'maxLength': 400},
+            'units': {'type': 'string', 'maxLength': 100},
+            'scale': {'type': 'string', 'maxLength': 100},
+            'entity': {'type': 'string', 'maxLength': 100},
+            'grain': {'type': 'string', 'maxLength': 100},
+            'availability': {'type': 'string', 'maxLength': 200},
+            'normalization': {'type': 'string', 'maxLength': 200},
+            'relationships': {'type': 'string', 'maxLength': 400},
+            'unknowns': {'type': 'string', 'maxLength': 400},
+            'operation_id': {'type': 'string', 'maxLength': 100}}, 'additionalProperties': False}},
+    'required': ['topic', 'kind', 'statement', 'columns', 'evidence_ids'], 'additionalProperties': False}}
 DISTRIBUTION_SCHEMA = {'anyOf': [
     {'type': 'object', 'properties': {'type': {'const': 'int'}, 'low': {'type': 'integer'}, 'high': {'type': 'integer'},
         'step': {'type': 'integer', 'minimum': 1}, 'log': {'type': 'boolean'}},
@@ -65,7 +85,7 @@ ACTION_SCHEMA = {
         'tuning': {'anyOf': [TUNING_SCHEMA, {'type': 'null'}]},
         'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
         'knowledge_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
-        'research_notes': RESEARCH_NOTES_SCHEMA},
+        'research_notes': RESEARCH_NOTES_SCHEMA, 'semantic_updates': SEMANTIC_UPDATE_SCHEMA},
     'required': ['action', 'recipe_id', 'hyperparameters', 'hypothesis', 'expected_effect',
                  'feature_steps', 'code', 'tuning', 'evidence_ids'], 'additionalProperties': False}
 

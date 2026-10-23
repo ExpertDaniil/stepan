@@ -87,7 +87,7 @@ def audit(root, official_archive=None):
                 schema_structure(value[key])
     schema_structure(schema)
     declarations = {}
-    for module in ('agent/feature_schema.py', 'agent/research_actions.py'):
+    for module in ('agent/feature_schema.py', 'agent/research_actions.py', 'tools/analysis.py', 'agent/context_details.py'):
         for node in trees[module].body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -95,7 +95,8 @@ def audit(root, official_archive=None):
                         declarations[target.id] = data_value(node.value, declarations)
     for module, name, definition in [('agent/research_actions.py', 'ACTION_SCHEMA', 'ResearchAction'),
                                       ('tools/knowledge.py', 'KNOWLEDGE_SCHEMA', 'KnowledgeQuery'),
-                                      ('tools/analysis.py', 'ANALYSIS_SCHEMA', 'AnalysisQuery')]:
+                                      ('tools/analysis.py', 'ANALYSIS_SCHEMA', 'AnalysisQuery'),
+                                      ('agent/context_details.py', 'READ_SCHEMA', 'MemoryRead')]:
         node = next(n for n in trees[module].body if isinstance(n, ast.Assign)
                     and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
         if data_value(node.value, declarations) != schema['$defs'][definition]:

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from agent.feature_schema import GROUP_OPS, validate_program
+from agent.feature_schema import GROUP_OPS, validate_program, operation_facts
 
 def _keys(values):
     def key(value):
@@ -37,6 +37,7 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
 
     def fit(self, X, y=None):
         self.program_ = validate_program(self.program, X.columns)
+        self.execution_spec_ = operation_facts(self.program_)
         self.input_columns_ = list(X.columns)
         self.statistics_ = {}
         self.report_ = []
@@ -59,15 +60,17 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
             frame[name] = self._apply(frame, step, stats)
             values = frame[name]
             self.report_.append({'name': name, 'op': op, 'inputs': cols,
+                'program_id': self.execution_spec_['program_id'], 'verification': 'owned_operation_executed',
+                'implementation': 'feature-program-2', 'units': 'not_inferred',
                 'group_by': step.get('group_by'), 'fit_rows': len(frame),
                 'missing_fraction': float(values.isna().mean()), 'unique': int(values.nunique()),
                 'statistics_scope': 'fit_rows_without_target'})
         return self
 
     def transform(self, X):
-        if list(X.columns) != self.input_columns_:
-            raise ValueError('Feature program input columns/order changed after fit')
-        frame = X.copy()
+        if set(X.columns) != set(self.input_columns_):
+            raise ValueError('Feature program input column set changed after fit')
+        frame = X.loc[:, self.input_columns_].copy()
         for step in self.program_:
             frame[step['name']] = self._apply(frame, step, self.statistics_[step['name']])
         return frame

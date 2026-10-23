@@ -85,20 +85,36 @@ class ShiftedLogTargetModel(BaseEstimator):
 
 class NumericInteractions(TransformerMixin, BaseEstimator):
     """Bounded squares/products. Column selection is fitted only on training rows."""
-    def __init__(self, max_numeric_columns=8):
+    def __init__(self, max_numeric_columns=8, columns=None):
         self.max_numeric_columns = max_numeric_columns
+        self.columns = columns
 
     def fit(self, X, y=None):
         columns = [c for c in X if pd.api.types.is_numeric_dtype(X[c]) and not pd.api.types.is_bool_dtype(X[c])]
-        columns = columns[:self.max_numeric_columns]
+        if self.columns is not None:
+            if len(set(self.columns)) != len(self.columns) or not set(self.columns) <= set(columns):
+                raise ValueError('NumericInteractions.columns must name existing distinct numeric columns')
+            columns = list(self.columns)
+            if len(columns) > self.max_numeric_columns:
+                raise ValueError('Explicit interactions exceed max_numeric_columns')
+        else:
+            columns = sorted(columns, key=str)[:self.max_numeric_columns]
+        self.selected_columns_ = list(columns)
+        self.input_columns_ = list(X.columns)
         prefix = "__automl_interaction_"
         while any(str(c).startswith(prefix) for c in X):
             prefix = "_"+prefix
         self.pairs_ = [(a, b, prefix+str(i)+"_"+str(j)) for i, a in enumerate(columns) for j, b in enumerate(columns[i:], i)]
+        self.report_ = {'operator': 'squares_and_pairwise_products', 'inputs': columns,
+            'selection_rule': 'explicit_names' if self.columns is not None else 'sorted_numeric_names_then_limit',
+            'operations': [{'inputs': [a, b], 'output': name, 'operator': 'product'} for a, b, name in self.pairs_],
+            'fit_scope': 'fit_schema', 'missing_or_nonfinite': 'missing', 'units': 'not_inferred'}
         return self
 
     def transform(self, X):
-        result = X.copy()
+        if set(X.columns) != set(self.input_columns_):
+            raise ValueError('NumericInteractions input schema changed after fit')
+        result = X.loc[:, self.input_columns_].copy()
         with np.errstate(over="ignore", invalid="ignore"):
             for a, b, name in self.pairs_:
                 values = pd.to_numeric(X[a], errors="coerce") * pd.to_numeric(X[b], errors="coerce")

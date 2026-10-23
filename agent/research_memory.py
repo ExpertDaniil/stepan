@@ -17,9 +17,11 @@ def idea_id(question, mechanism):
 def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=None, branch_cuts=None):
     """Must be called by the dispatcher; model threads never access the store."""
     configurations, observations_by_id = {}, {}
+    identity = None
     for ident in dict.fromkeys(experiment_ids):
         exp = store.get(ident)
         plan = exp['plan']
+        identity = identity or {k: plan[k] for k in ('dataset_id', 'validation_id', 'task_spec_id')}
         core = store.fingerprint_core(plan, artifacts.meta(plan['code_artifact_id'])['sha256'])
         ev = store.experiment_evaluation(ident)
         trusted = exp['state'] == 'evaluated' and ev and ev['valid'] and not ev['violations']
@@ -43,12 +45,15 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
         if old is None or series['revision'] > old['revision']:
             series_latest[series['series_id']] = {**series, 'artifact_id': ident}
     visible_orders = set(work_order_ids) if work_order_ids is not None else None
-    decisions, ideas = [], {}
+    decisions, ideas, semantic_decisions = [], {}, []
     for ident in records:
         record = artifacts.read_json(ident)
         order = record.get('work_order_id')
         if (visible_orders is not None and order not in visible_orders) or (visible_orders is None and order is not None):
             continue
+        scope = record.get('semantic_scope')
+        if scope and scope.get('run_id') == store.run_id and (identity is None or all(scope.get(k) == v for k, v in identity.items())):
+            semantic_decisions.append((ident, record))
         notes = record.get('research_notes')
         if notes is None:
             notes = {'idea_id': None, 'question': record['hypothesis'], 'mechanism': record['expected_effect'],
@@ -130,8 +135,69 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
                 if any(o['primary_metric'] is not None for o in observations) else
                 'No verified measurement is attached to this decision; do not invent an outcome.')})
     return {'open_ideas': list(ideas.values()), 'decisions': decisions,
+        'visible_work_order_ids': sorted(visible_orders) if visible_orders is not None else None,
+        'semantic_records': semantic_projection(semantic_decisions),
         'instruction': 'Ideas persist across decisions. Open means unresolved, not a requirement to test every idea. '
             'Observations come from the controller; interpretations and priority reasons come from the model. '
             'A failed combined pipeline does not refute each component or exhaust a model family. '
             'Tuning_series links the actual Optuna candidates and outcomes to the question. Reaching a trial/time budget does not prove a ceiling. '
             'Reuse idea_id when continuing an existing question. No semantic deduplication or causal attribution is claimed.'}
+
+
+def validate_semantic_updates(updates, memory, evidence, columns, scope, known_records=None):
+    """Validate provenance/shape only, never truth, units or usefulness of prose."""
+    from agent.errors import AgentError
+    visible = {r['record_id'] for r in memory.get('semantic_records', [])} | set(evidence)
+    for item in updates:
+        if columns is not None and not set(item['columns']) <= set(columns):
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Semantic update references absent columns')
+        if not set(item['evidence_ids']) <= evidence:
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Semantic evidence must exist and have been delivered')
+        if item.get('supersedes'):
+            predecessor = next((r for r in (known_records if known_records is not None else memory.get('semantic_records', []))
+                                if r['record_id'] == item['supersedes']), None)
+            if item['supersedes'] not in visible or predecessor is None:
+                raise AgentError('INVALID_SEMANTIC_UPDATE', 'Read an existing semantic predecessor before a correction')
+            content = predecessor['content']
+            if content['topic'].casefold().strip() != item['topic'].casefold().strip() or set(content['columns']) != set(item['columns']):
+                raise AgentError('INVALID_SEMANTIC_UPDATE', 'Correction must preserve topic and column identity')
+        if item['kind'] in {'definition', 'observation', 'data_error', 'implementation_error', 'execution_error'} and not item['evidence_ids']:
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'Definitions/observations/errors require source IDs; use hypothesis for an unsupported interpretation')
+        if not scope:
+            raise AgentError('INVALID_SEMANTIC_UPDATE', 'A scoped context is required')
+
+
+def semantic_projection(decisions, *, dataset_id=None, validation_id=None):
+    """Append-only revisions: a stale correction creates conflict, never overwrites.
+
+    Definitions and computations are separate from predictive usefulness. Even a
+    real evidence link does not verify a model-authored statement about it.
+    """
+    records, heads = [], {}
+    for artifact_id, decision in decisions:
+        scope = decision.get('semantic_scope')
+        if not scope or (dataset_id is not None and scope.get('dataset_id') != dataset_id):
+            continue
+        if validation_id is not None and scope.get('validation_id') != validation_id:
+            continue
+        for index, update in enumerate(decision.get('semantic_updates', [])):
+            key = hashlib.sha256(canonical([update['topic'].casefold().strip(), sorted(update['columns'])]).encode()).hexdigest()[:20]
+            old = heads.get(key)
+            content = {k: v for k, v in update.items() if k != 'supersedes'}
+            if old and old['content'] == content:
+                continue
+            predecessor = update.get('supersedes')
+            ident = 'semantic-'+hashlib.sha256(canonical([artifact_id, index, content]).encode()).hexdigest()[:24]
+            conflict = bool(old and predecessor != old['record_id'])
+            record = {'record_id': ident, 'key': key, 'version': 1+int(old['version'] if old else 0),
+                'supersedes': predecessor, 'status': 'conflicted' if conflict else 'proposed',
+                'verification': 'model_statement_unverified', 'predictive_usefulness': 'not_established',
+                'scope': deepcopy(scope), 'source_decision_artifact_id': artifact_id, 'content': deepcopy(content)}
+            if old:
+                old['status'] = 'conflicted' if conflict else 'superseded'
+                if conflict:
+                    record['conflicts_with'] = old['record_id']
+            records.append(record)
+            if not conflict:
+                heads[key] = record
+    return records

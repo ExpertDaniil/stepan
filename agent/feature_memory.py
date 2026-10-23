@@ -28,6 +28,11 @@ def archive(store, artifacts, experiment_ids, limit=4):
             'implementation': ('owned_program' if program and code == hashlib.sha256(FACTORY_SOURCE.encode()).hexdigest()
                                else 'custom_source_declared_features'),
             'claim_scope': 'Complete configuration measured; feature/component causality not established.'}
+        if record['implementation'] == 'owned_program':
+            from agent.feature_schema import operation_facts
+            record['execution_specification'] = operation_facts(program)
+        else:
+            record['feature_declaration_verified'] = False
         old = representations.get(identity)
         better = old is None or (score < old['primary_metric']['value'] if ev['primary_metric']['direction'] == 'minimize'
                                 else score > old['primary_metric']['value'])

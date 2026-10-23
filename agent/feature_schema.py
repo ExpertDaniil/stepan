@@ -12,7 +12,9 @@ FEATURE_PROGRAM_SCHEMA = {
     'items': {'type': 'object', 'properties': {
         'op': {'enum': list(OPS)}, 'name': {'type': 'string', 'minLength': 1, 'maxLength': 100},
         'columns': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'minItems': 1, 'maxItems': 4},
-        'group_by': {'type': 'string', 'minLength': 1}},
+        'group_by': {'type': 'string', 'minLength': 1},
+        'input_units': {'type': 'object', 'additionalProperties': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
+        'output_unit': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
         'required': ['op', 'name', 'columns'], 'additionalProperties': False}}
 
 FACTORY_SOURCE = ('from agent.feature_engineering import make_feature_pipeline\n\n'
@@ -25,7 +27,7 @@ def validate_program(program, columns=None, excluded=()):
     available = set(columns) if columns is not None else None
     generated = set()
     for step in program:
-        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by'}:
+        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit'}:
             raise ValueError('Unknown feature operation fields')
         op, name, inputs = step.get('op'), step.get('name'), step.get('columns')
         if op not in OPS or not isinstance(name, str) or not 1 <= len(name) <= 100:
@@ -46,7 +48,48 @@ def validate_program(program, columns=None, excluded=()):
         dependencies = inputs + ([group] if group is not None else [])
         if any(c in excluded or (available is not None and c not in available) for c in dependencies):
             raise ValueError('Feature depends on an absent or excluded column')
+        declared = step.get('input_units', {})
+        if (not isinstance(declared, dict) or not set(declared) <= set(dependencies)
+                or any(not isinstance(v, str) or not 1 <= len(v) <= 100 for v in declared.values())):
+            raise ValueError('input_units must name dependencies with nonempty unit strings')
+        if 'output_unit' in step and (not isinstance(step['output_unit'], str) or not 1 <= len(step['output_unit']) <= 100):
+            raise ValueError('output_unit must be a nonempty unit string')
         generated.add(name)
         if available is not None:
             available.add(name)
     return deepcopy(program)
+
+
+PROGRAM_VERSION = 'feature-program-2'
+
+
+def operation_facts(program):
+    """Derived from executable syntax, not a model-authored feature declaration."""
+    import hashlib
+    import json
+    validated = validate_program(program)
+    identity = hashlib.sha256(json.dumps([PROGRAM_VERSION, validated], sort_keys=True,
+        ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
+    return {'schema_version': PROGRAM_VERSION, 'program_id': 'program-'+identity[:24],
+        'verification': 'owned_executable_specification', 'predictive_usefulness': 'not_established',
+        'operations': [{'order': i, 'operator': step['op'], 'output': step['name'],
+            'inputs': list(step['columns']), 'group_by': step.get('group_by'),
+            'fit_scope': 'fit_rows_without_target' if step['op'] in (*GROUP_OPS, 'frequency') else 'rowwise',
+            'formula': {'missing': 'is_missing(x)', 'log1p': 'log(1+x) for x>=0',
+                'signed_log1p': 'sign(x)*log(1+abs(x))', 'square': 'x*x', 'sum': 'sum(inputs)',
+                'difference': 'inputs[0]-inputs[1]', 'product': 'product(inputs)',
+                'ratio': 'inputs[0]/inputs[1]', 'cross': 'length-prefixed typed category keys',
+                'frequency': 'fit_count(key)/fit_rows', 'group_mean': 'fit_group_mean(x)',
+                'group_std': 'fit_group_std(x,ddof=1)', 'group_rank': 'fit_group_ECDF(x), right inclusive',
+                'relative_to_group': 'x/fit_group_mean(x)', 'month': 'UTC month',
+                'dayofweek': 'UTC weekday 0..6', 'hour': 'UTC hour'}[step['op']],
+            'missing': ('typed missing key participates in counts/cross/group lookup'
+                if step['op'] in {'cross', 'frequency', 'group_mean', 'group_std'} else
+                'indicator 1 for missing' if step['op'] == 'missing' else 'missing value propagates'),
+            'zero_denominator': 'missing', 'unseen_group': 'missing', 'unseen_frequency': 0,
+            'units': {'declared_inputs': step.get('input_units', {}), 'declared_output': step.get('output_unit'),
+                      'verification': 'declarations_only; not inferred from names/dtypes'},
+            'warnings': (['Different declared units in addition/subtraction; check scales or explicitly treat this as exploratory.']
+                if step['op'] in {'sum', 'difference'} and len(set(step.get('input_units', {}).values())) > 1 else []),
+            'domain': 'log1p requires nonnegative input; invalid/nonfinite numeric outputs become missing'}
+            for i, step in enumerate(validated)]}

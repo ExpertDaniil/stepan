@@ -149,7 +149,7 @@ class Catalog:
 
     @staticmethod
     def feature_steps(params):
-        result = [{"step": "numeric_interactions", "max_numeric_columns": 8, "fit_scope": "train_only"}] if params.get("numeric_interactions") else []
+        result = [{"step": "numeric_interactions", "max_numeric_columns": 8, "selection_rule": "sorted_numeric_names_then_limit", "resolved_inputs": "worker feature_execution artifact", "fit_scope": "train_only"}] if params.get("numeric_interactions") else []
         if params.get("target_transform") == "shifted_log1p":
             result.append({"step": "target_transform", "name": "shifted_log1p", "fit_scope": "train_only"})
         return result

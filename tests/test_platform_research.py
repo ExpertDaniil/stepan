@@ -83,7 +83,7 @@ class ActualRequestTests(unittest.TestCase):
         gateway.feedback = FeedbackMailbox(g.artifacts)
         transport.gateway = gateway
         class Analysis:
-            def analyze(service, args):
+            def analyze(service, args, context=None):
                 art = g.artifacts.write_json('analysis/test-'+args['columns'][0]+'.json', args, 'research_analysis')
                 return {'artifact_id': art['artifact_id'], 'report': {'scope': 'fit_only', 'columns': args['columns']}}
         gateway.analysis = Analysis()
@@ -149,6 +149,7 @@ class ActualRequestTests(unittest.TestCase):
                 if len(self.requests) == 1:
                     art = outer.h.g.artifacts.write_json('optuna/test-series.json', {'status': 'completed'}, 'optuna_series')
                     self.gateway.feedback.publish(self.branch, {'branch_id': self.branch, 'results': [],
+                        **{k: context['metadata']['detail_scope'][k] for k in ('dataset_id', 'task_spec_id', 'validation_id')},
                         'series': [{'series_id': 'series-finished', 'artifact_id': art['artifact_id'], 'status': 'completed'}]})
                     message = outer.tool(1)
                 else:
@@ -223,7 +224,9 @@ class RollingDispatcherTests(unittest.TestCase):
                     payload['proposal']['plan'] = plan
                     payload['manifest'] = g.constructor.build(plan)
                     h.commit(g.invoke('G04', payload), 10)
-                    gateway.feedback.publish(h.root, {'branch_id': h.root, 'results': [], 'series': [], 'revision_marker': 1})
+                    gateway.feedback.publish(h.root, {'branch_id': h.root, 'results': [],
+                        'task_spec_id': g.spec['task_spec_id'], 'dataset_id': g.spec['dataset_id'],
+                        'validation_id': g.validation['validation_id'], 'series': [], 'revision_marker': 1})
                 return len(plans)
             c.run_training = train
             accepted, _ = research_batch(c, [], [], tickets)

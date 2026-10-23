@@ -8,7 +8,7 @@ from copy import deepcopy
 import uuid
 
 from agent.contracts import canonical
-from agent.feature_schema import FACTORY_SOURCE
+from agent.feature_schema import FACTORY_SOURCE, operation_facts
 
 
 def focus_for_round(round_no, peer_index, peer_count):
@@ -107,7 +107,8 @@ class FeatureSearch:
                 resources=c.resources(),
                 hypothesis='Controller-authorized fit-only representation seed: '+canonical(program),
                 expected_effect='Measure this complete representation; its benefit and mechanism are unknown.',
-                feature_steps=[{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only'}])
+                feature_steps=[{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only',
+                    'execution_specification': operation_facts(program)}])
             from tools.code import write_code
             args = {'researcher_id': 'feature-seeds', 'filename': 'features.py',
                     'content': FACTORY_SOURCE, 'declared_entrypoint': 'make_pipeline'}
@@ -130,14 +131,5 @@ def feature_focus(user):
 
 
 def validate_focus(action, user):
-    if not feature_focus(user) or action['action'] == 'stop':
-        return
-    if action['action'] == 'features':
-        return
-    if (action['action'] == 'pipeline' and action['code'] != user.get('base_code')
-            and any(s.get('step') not in {'target_transform', 'shifted_log1p', 'numeric_interactions'}
-                    for s in action['feature_steps'])):
-        return
-    from agent.errors import AgentError
-    raise AgentError('FEATURE_RESEARCH_REQUIRED', 'This rotating assignment funds a new feature representation. '
-        'Return features, a changed custom feature pipeline, or stop with a reason; parameter-only tuning is not admitted.')
+    """Compatibility hook. Attention hints never impose feature quotas."""
+    return None

@@ -85,10 +85,10 @@ def bootstrap(config, started, task_path, run_id, root, log):
         validation = bus.call("C05", {"task_spec_id": spec["task_spec_id"], "dataset_id": spec["dataset_id"], "proposal": proposal}, evaluator.create_protocol)["data"]
         submission = Submission(spec, artifacts, store, log)
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log,
-                                feature_columns=profile['summary']['train_columns'])
+                                feature_columns=artifacts.read_json(profile['profile_artifact_id'])['train_columns'])
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,
                                   evaluator=evaluator, submission=submission, researcher=researcher, spec=spec,
-                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=profile["summary"], log=log, demo=demo, task_root=task["task_root"])
+                                  validation=validation, catalog=catalog, task_text=task["task_text"], profile=artifacts.read_json(profile["profile_artifact_id"]), log=log, demo=demo, task_root=task["task_root"])
         try:
             controller.run()
         except Exception as exc:

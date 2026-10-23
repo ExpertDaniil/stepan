@@ -15,11 +15,9 @@ class FeatureSearchTests(unittest.TestCase):
         self.assertTrue(focus_for_round(0, 0, 1))
         self.assertFalse(focus_for_round(1, 0, 1))
 
-    def test_feature_assignment_rejects_model_only_search(self):
+    def test_feature_attention_permits_model_search(self):
         user = {'profile_summary': {'feature_focus': True}, 'base_code': 'old'}
-        with self.assertRaises(AgentError) as error:
-            validate_focus({'action': 'tune'}, user)
-        self.assertEqual(error.exception.code, 'FEATURE_RESEARCH_REQUIRED')
+        self.assertIsNone(validate_focus({'action': 'tune'}, user))
         validate_focus({'action': 'features'}, user)
         validate_focus({'action': 'stop'}, user)
         validate_focus({'action': 'pipeline', 'code': 'new', 'feature_steps': [{'step': 'group_statistics'}]}, user)

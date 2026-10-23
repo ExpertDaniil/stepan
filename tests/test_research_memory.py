@@ -74,7 +74,7 @@ class ResearchMemoryTests(unittest.TestCase):
         ticket = self.h.issue()
         body = self.g.artifacts.read_json(ticket['work_order']['context_id'])
         carried = json.loads(body['messages'][1]['content'])['profile_summary']['research_memory']
-        self.assertEqual(carried, compact_memory(memory))
+        self.assertEqual(carried, compact_memory(memory, base_experiment_id=json.loads(body['messages'][1]['content'])['base_experiment_id']))
 
     def test_stop_keeps_alternatives_without_fabricating_an_experiment(self):
         ticket = self.h.issue()

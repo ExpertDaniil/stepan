@@ -30,55 +30,86 @@ def score_predictions(spec, truth, prediction):
         average='macro' if key == 'f1_macro' else 'weighted', labels=spec['allowed_labels'], zero_division=0))
 
 
-def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction):
-    """Bounded aggregates from the fixed holdout; never expose row-level labels."""
+def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction, columns=None, *, max_groups=4):
+    """Selection-only aggregates. Column groups overlap; never add their shares."""
     import numpy as np
     import pandas as pd
-    regression = task["task_kind"] == "regression"
+    from sklearn.metrics import precision_recall_fscore_support
+    regression = task['task_kind'] == 'regression'
     truth = np.asarray(y, dtype=float if regression else str)
     predicted = np.asarray(prediction, dtype=float if regression else str)
+    if regression and truth.ndim != predicted.ndim:
+        predicted = predicted.reshape(truth.shape)
     error = np.abs(truth-predicted) if regression else (truth != predicted).astype(float)
-    result = {}
-    if not regression:
-        counts = pd.Series(truth).value_counts()
-        # No N-by-N confusion matrix and no unbounded per-class dump.
-        labels = counts.iloc[:32].index.tolist()
-        classes = []
-        for label in labels:
-            mask = truth == label
-            classes.append({"label": str(label)[:80], "rows": int(mask.sum()), "recall": float(np.mean(predicted[mask] == truth[mask]))})
-        result["class_summary"] = {"class_count": len(counts), "worst_classes": sorted(classes, key=lambda c: (c["recall"], -c["rows"]))[:6],
-                                   "omitted_classes": max(0, len(counts)-len(labels))}
-    groups, used = [], 0
-    excluded = set(task["excluded_features"]) | set(targets(task))
-    for column in data:
-        if column in excluded or used >= 4:
+    squared = (truth-predicted)**2 if regression else None
+    row_error = error.mean(axis=1) if error.ndim > 1 else error
+    row_sse = squared.sum(axis=1) if regression and squared.ndim > 1 else squared
+    total_sse = float(np.sum(squared)) if regression else None
+    result = {'scope': 'selection_validation_aggregates', 'rows': len(truth),
+              'groups_overlap': True, 'aggregation': 'different feature partitions overlap; shares are not additive across features'}
+    if regression:
+        result.update(sse=total_sse, rmse=float(np.sqrt(np.mean(squared))) if len(truth) else None,
+                      target_count=truth.shape[1] if truth.ndim > 1 else 1)
+        if len(truth):
+            ordered = np.sort(row_sse)[::-1]
+            result['error_concentration'] = [{'worst_fraction': f, 'rows': max(1, int(np.ceil(len(truth)*f))),
+                'sse_fraction': float(ordered[:max(1, int(np.ceil(len(truth)*f)))].sum()/total_sse) if total_sse else 0.0}
+                for f in (.01, .05, .1)]
+    else:
+        labels = task.get('allowed_labels') or sorted(set(truth) | set(predicted))
+        precision, recall, f1, support = precision_recall_fscore_support(truth, predicted, labels=labels, zero_division=0)
+        classes = [{'label': str(label)[:80], 'rows': int(n), 'precision': float(p), 'recall': float(r), 'f1': float(f)}
+                   for label, p, r, f, n in zip(labels, precision, recall, f1, support)]
+        result['class_summary'] = {'class_count': len(labels), 'macro_f1': float(np.mean(f1)),
+            'worst_classes': sorted(classes, key=lambda c: (c['f1'], -c['rows']))[:6],
+            'omitted_classes': max(0, len(labels)-6)}
+    excluded = set(task['excluded_features']) | set(targets(task))
+    candidates = list(columns) if columns is not None else [c for c in data if c not in excluded]
+    if columns is None:
+        def priority(column):
+            fit, valid = data[column].iloc[fit_indices], data[column].iloc[valid_indices]
+            missing_shift = abs(float(fit.isna().mean())-float(valid.isna().mean()))
+            categorical = not pd.api.types.is_numeric_dtype(fit)
+            new = (float((~valid.astype(str).isin(set(fit.dropna().astype(str)))).mean()) if categorical else 0.0)
+            return (-missing_shift-new, 0 if categorical and 2 <= fit.nunique() <= 32 else 1, str(column))
+        candidates.sort(key=priority)
+    groups = []
+    for column in candidates[:12 if columns is not None else 6]:
+        if column in targets(task) or column not in data:
             continue
         fit, valid = data[column].iloc[fit_indices], data[column].iloc[valid_indices]
+        missing = valid.isna().to_numpy()
+        masks = [('missing', missing)]
         if pd.api.types.is_numeric_dtype(fit) and not pd.api.types.is_bool_dtype(fit):
-            finite = pd.to_numeric(fit, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-            if finite.nunique() < 3:
-                continue
-            cuts = sorted(set(map(float, finite.quantile([1/3, 2/3]).tolist())))
-            bucket = np.searchsorted(cuts, pd.to_numeric(valid, errors="coerce").to_numpy(dtype=float), side="right")
-            masks = [("bin_"+str(i), bucket == i) for i in range(len(cuts)+1)]
+            finite = pd.to_numeric(fit, errors='coerce').replace([np.inf, -np.inf], np.nan).dropna()
+            cuts = sorted(set(map(float, finite.quantile([1/3, 2/3]).dropna().tolist())))
+            vals = pd.to_numeric(valid, errors='coerce').to_numpy(dtype=float)
+            buckets = np.searchsorted(cuts, vals, side='right')
+            masks += [('bin_'+str(i), (buckets == i) & np.isfinite(vals)) for i in range(len(cuts)+1)]
         else:
-            values = fit.fillna("__MISSING__").astype(str)
-            if not 2 <= values.nunique() <= 20:
-                continue
-            labels = values.value_counts().index[:4]
-            actual = valid.fillna("__MISSING__").astype(str).to_numpy()
-            masks = [(str(label)[:80], actual == label) for label in labels]
-        used += 1
+            actual = valid.fillna('__MISSING__').astype(str).to_numpy()
+            known = set(fit.dropna().astype(str))
+            top = fit.dropna().astype(str).value_counts().index[:8]
+            masks += [(str(label)[:80], (actual == label) & ~missing) for label in top]
+            masks += [('unseen_in_fit', ~np.isin(actual, list(known)) & ~missing)]
         for label, mask in masks:
             count = int(mask.sum())
-            if count < max(5, int(len(truth)*.02)):
+            if count < 5:
                 continue
-            record = {"feature": str(column)[:80], "group": label, "rows": count, "mean_error": float(error[mask].mean())}
+            record = {'feature': str(column)[:80], 'group': label, 'rows': count,
+                      'support_fraction': float(count/max(1, len(truth))), 'mean_error': float(row_error[mask].mean())}
             if regression:
-                record.update(rmse=float(np.sqrt(np.mean((truth[mask]-predicted[mask])**2))), bias=float(np.mean(predicted[mask]-truth[mask])))
+                contribution = float(np.sum(squared[mask]))
+                record.update(rmse=float(np.sqrt(np.mean(squared[mask]))), sse=contribution,
+                    sse_fraction=contribution/total_sse if total_sse else 0.0,
+                    bias=float(np.mean(predicted[mask]-truth[mask])))
+            else:
+                _, _, f1, _ = precision_recall_fscore_support(truth[mask], predicted[mask], labels=labels, zero_division=0)
+                record.update(misclassification_rate=float(row_error[mask].mean()), macro_f1=float(np.mean(f1)))
             groups.append(record)
-    result["hard_groups"] = sorted(groups, key=lambda g: g["mean_error"], reverse=True)[:4]
+    result['hard_groups'] = sorted(groups, key=lambda g: g.get('sse', g['mean_error']), reverse=True)[:max_groups]
+    result['omitted_groups'] = max(0, len(groups)-max_groups)
+    result['minimum_group_support'] = 5
     return result
 
 
@@ -87,6 +118,9 @@ class Evaluator:
         self.spec, self.artifacts, self.store, self.log = spec, artifacts, store, log
         self.protocols = {}
         self.baseline_value = None
+        self.diagnostic_sources = {}
+        import threading
+        self.diagnostic_lock = threading.RLock()
 
     def create_protocol(self, payload):
         import numpy as np
@@ -222,13 +256,103 @@ class Evaluator:
             diagnostics['prediction_behavior'] = {'constant_like': len(values) == 1,
                 'predicted_class_count': len(values), 'largest_predicted_class_fraction': float(counts.max()/len(prediction))}
         diagnostics.update(error_diagnostics(data, self.spec, protocol["train_indices"], selection, y, prediction))
+        feature_path = path.with_name('features.json')
+        with self.artifacts.lock:
+            feature_art = next((entry['meta'] for entry in self.artifacts.entries.values()
+                if entry['meta']['kind'] == 'feature_execution' and entry['path'] == str(feature_path)), None)
+        if feature_art:
+            diagnostics['feature_execution_artifact_id'] = feature_art['artifact_id']
+            diagnostics['execution_report_scope'] = 'same_job_as_evaluated_predictions; custom semantics unverified'
         diag = self.artifacts.write_json("diagnostics/" + payload["experiment_id"] + ".json", diagnostics, "diagnostics")
         record = {"evaluation_id": "eval-" + uuid.uuid4().hex[:12], "experiment_id": payload["experiment_id"], "valid": True,
                   "primary_metric": {"metric_id": key, "direction": self.spec["metric"]["direction"], "value": float(value),
                                      "validation_id": payload["validation_id"], "dataset_id": payload["dataset_id"], "fidelity": payload["fidelity"]},
                   "diagnostics_artifact_id": diag["artifact_id"], "violations": []}
+        with self.diagnostic_lock:
+            self.diagnostic_sources[payload['experiment_id']] = {
+                'predictions_artifact_id': payload['predictions_artifact_id'],
+                'validation_id': payload['validation_id'], 'diagnostics_artifact_id': diag['artifact_id'],
+                'selection_sse': diagnostics.get('sse'),
+                'predictions_sha256': self.artifacts.meta(payload['predictions_artifact_id'])['sha256']}
         self.store.save_evaluation(record)
         self.log.event("experiment.evaluated", experiment_id=payload["experiment_id"], recipe_id=experiment["plan"]["recipe_id"],
                        hyperparameters=experiment["plan"]["model"]["hyperparameters"], validation_id=payload["validation_id"],
                        diagnostics_artifact_id=diag["artifact_id"], **diagnostics)
         return {"evaluation": record}
+
+    def diagnose(self, query, check_time):
+        """No SQLite, raw labels, confirmation rows, source edits or model execution."""
+        import numpy as np
+        import pandas as pd
+        from tools.analysis import apply_filters, filter_columns
+        with self.diagnostic_lock:
+            source = dict(self.diagnostic_sources.get(query['experiment_id'], {}))
+        if not source:
+            raise AgentError('INVALID_ANALYSIS', 'No trusted evaluated predictions for experiment_id')
+        protocol = self.protocols[source['validation_id']]
+        selection = protocol.get('selection_indices', protocol['valid_indices'])
+        requested = list(query['columns'])
+        derived = query.get('derived', [])
+        generated = {s['name'] for s in derived}
+        needed = list(dict.fromkeys([*requested, *filter_columns(query.get('filter'), query.get('filters')),
+            *(c for step in derived for c in step['columns'])]))
+        needed = [c for c in needed if c not in generated]
+        if not requested:
+            raise AgentError('INVALID_ANALYSIS', 'Error diagnostics need explicit feature columns')
+        check_time()
+        full = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec,
+            columns=list(dict.fromkeys([*needed, *targets(self.spec)])))
+        if int(full.memory_usage(deep=True).sum()) > 256*1024*1024:
+            raise AgentError('ANALYSIS_MEMORY_LIMIT', 'Diagnostic projection exceeds 256 MiB; select fewer columns')
+        # Feature bin definitions use fit only. Derived operators are stateless.
+        if derived:
+            from agent.feature_engineering import FeatureProgram
+            for step in derived:
+                check_time()
+                full[step['name']] = FeatureProgram._apply(full, step, {})
+        selected = full.iloc[selection]
+        mask = apply_filters(selected, query.get('filter'), query.get('filters')).to_numpy()
+        positions = np.flatnonzero(mask)
+        population = len(positions)
+        if population > 20000:
+            positions = np.sort(np.random.default_rng(42).choice(positions, 20000, replace=False))
+        rows = np.asarray(selection)[positions].tolist()
+        if len(rows) < 5:
+            return {'scope': 'selection_validation_aggregates', 'validation_id': source['validation_id'],
+                'matched_selection_rows': population, 'insufficient_group_support': True, 'minimum_group_support': 5}
+        columns = validation_columns(self.spec)
+        kind = self.spec['metric']['prediction_kind']
+        from agent.artifacts import file_sha256
+        prediction_path = self.artifacts.resolve(source['predictions_artifact_id'])
+        expected_sha = source.get('predictions_sha256', self.artifacts.meta(source['predictions_artifact_id'])['sha256'])
+        if file_sha256(prediction_path) != expected_sha:
+            raise AgentError('INVALID_PREDICTIONS', 'Trusted saved predictions changed after evaluation')
+        predictions = pd.read_csv(prediction_path,
+            dtype={c: str for c in columns} if kind == 'labels' else None, keep_default_na=False)
+        prediction = predictions.set_index('__row_index').loc[rows, columns].to_numpy()
+        truth = full[targets(self.spec) if len(targets(self.spec)) > 1 else targets(self.spec)[0]].iloc[rows]
+        try:
+            metric = score_predictions(self.spec, truth, prediction)
+        except ValueError:
+            metric = None  # E.g. ROC AUC is undefined for a one-class slice.
+        if self.spec['task_kind'] != 'regression':
+            prediction = (np.asarray(self.spec['allowed_labels'])[prediction.argmax(axis=1)]
+                          if kind == 'probabilities' else prediction.reshape(-1).astype(str))
+        elif len(targets(self.spec)) == 1:
+            prediction = prediction.reshape(-1)
+        check_time()
+        result = error_diagnostics(full, self.spec, protocol['train_indices'], rows, truth, prediction, requested, max_groups=12)
+        result.update(experiment_id=query['experiment_id'], evidence_ids=[source['diagnostics_artifact_id']],
+            validation_id=source['validation_id'], query=query, metric_id=self.spec['metric']['metric_id'],
+            slice_metric=float(metric) if metric is not None and math.isfinite(metric) else None,
+            selection_rows=len(selection), matched_selection_rows=population, analyzed_rows=len(rows),
+            sampled=population > len(rows), sample_rule='uniform_after_feature_filter',
+            sse_denominator='analyzed_filtered_rows; not a population estimate',
+            confirmation_labels_used=False)
+        if source.get('selection_sse') is not None:
+            denominator = source['selection_sse']
+            result['full_selection_sse'] = denominator
+            result['sse_fraction_of_full_selection'] = result['sse']/denominator if denominator else 0.0
+            for group in result['hard_groups']:
+                group['full_selection_sse_fraction'] = group['sse']/denominator if denominator else 0.0
+        return result

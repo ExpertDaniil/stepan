@@ -228,7 +228,7 @@ class WorkService:
             if p["action"] == "transfer":
                 assignment = "exploit_incumbent"
             observed_recipes = [self.store.get(eid)["plan"]["recipe_id"] for eid in self.visible_history(branch["branch_id"])]
-            graph_input = {"binding": {"work_order_id": order_id, "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
+            graph_input = {"validation_id": self.validation["validation_id"], "binding": {"work_order_id": order_id, "branch_id": branch["branch_id"], "branch_revision": branch["branch_revision"],
                                         "head_revision": head["head_revision"], "capsule_artifact_id": capsule_id},
                            "task_contract": task_contract, "head": head, "base_code": base_code, "constraints": branch["constraints"],
                            "phase": 'refine' if self.refinement() else 'search',
@@ -237,6 +237,7 @@ class WorkService:
                            "search_memory": self.search_memory(branch['branch_id'], head),
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
             if self.config.research_mode == 'adaptive':
+                graph_input['visibility'] = {'branch_cuts': dict(self.lineage_cuts(branch['branch_id']))}
                 graph_input['research_memory'] = self.research_memory(branch['branch_id'], binding['allowed_donor_experiment_ids'])
                 graph_input['visible_experiment_ids'] = list(dict.fromkeys([
                     *self.visible_history(branch['branch_id']), *binding['allowed_donor_experiment_ids']]))

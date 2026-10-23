@@ -45,7 +45,7 @@ class ToolSemanticsTests(unittest.TestCase):
         try:
             requests, executions = [], []
             class Analysis:
-                def analyze(self, args):
+                def analyze(self, args, context=None):
                     executions.append(deepcopy(args))
                     return {'artifact_id': 'analysis-unit', 'report': {'scope': 'fit_only'}}
             class Transport:

@@ -29,6 +29,9 @@ class GraphHarness:
         validation = evaluator.create_protocol({"dataset_id": h.spec["dataset_id"], "task_spec_id": h.spec["task_spec_id"],
             "proposal": {"strategy": "random_holdout" if kind == "regression" else "stratified_holdout", "parameters": {"valid_fraction": .2}, "seed": 42, "reason": "Synthetic graph state fixture"}})
         context = ContextBuilder(h.spec, h.task.read_text(), h.profile["summary"], catalog, h.artifacts, h.log, demo_metadata(h.task.read_text()))
+        context.validation_id = validation["validation_id"]
+        context.validation_sha256 = validation["protocol_sha256"]
+        context.store = h.store
         controller = SimpleNamespace(config=cfg, bus=h.bus, budget=budget, artifacts=h.artifacts, store=h.store,
             runner=SimpleNamespace(active=lambda: [], jobs={}), evaluator=evaluator, catalog=catalog,
             spec=h.spec, validation=validation, log=h.log, context=context)

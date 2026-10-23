@@ -27,10 +27,37 @@ class OpenAITransport:
             from openai import OpenAI
         except ImportError as exc:
             raise AgentError("LLM_UNAVAILABLE", "Install requirements.txt to use the provided API") from exc
-        self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], base_url=os.environ["OPENAI_BASE_URL"], max_retries=0)
+        import httpx
+        self.wire_context = threading.local()
+        self.log = None
+        http_client = httpx.Client(event_hooks={'request': [self._check_wire_request]})
+        self.client = OpenAI(http_client=http_client, api_key=os.environ["OPENAI_API_KEY"], base_url=os.environ["OPENAI_BASE_URL"], max_retries=0)
+
+    def _check_wire_request(self, outgoing):
+        limit = getattr(self.wire_context, 'limit', None)
+        size = len(outgoing.content)
+        if limit is not None and size > limit:
+            raise AgentError('CONTEXT_TOO_LARGE', 'Serialized HTTP JSON exceeds the effective budget',
+                             details={'wire_request_bytes': size, 'limit_bytes': limit})
+        if self.log is not None:
+            self.log.event('llm.wire_request_budget_checked', wire_request_bytes=size,
+                           limit_bytes=limit, tokenizer_estimate=False)
 
     def complete(self, request, timeout, context):
-        return self.client.chat.completions.create(**request, timeout=timeout).model_dump(exclude_none=True)
+        self.wire_context.limit = context.get('_request_byte_limit')
+        try:
+            return self.client.chat.completions.create(**request, timeout=timeout).model_dump(exclude_none=True)
+        except Exception as error:
+            cause = error
+            for _ in range(5):
+                if isinstance(cause, AgentError):
+                    raise cause
+                cause = cause.__cause__
+                if cause is None:
+                    break
+            raise
+        finally:
+            self.wire_context.limit = None
 
     def close(self):
         self.client.close()
@@ -135,6 +162,16 @@ class Gateway:
             scope = context['metadata'].get('graph_binding', {}).get('branch_id', 'legacy')
             delivered = self.feedback.latest(scope)
             if delivered:
+                frozen_scope = context['metadata'].get('detail_scope', {})
+                if (frozen_scope and (delivered.get('dataset_id') != frozen_scope.get('dataset_id')
+                        or delivered.get('task_spec_id') != frozen_scope.get('task_spec_id')
+                        or delivered.get('validation_id') != frozen_scope.get('validation_id'))):
+                    raise AgentError('MEMORY_SCOPE_DENIED', 'Feedback identity differs from issued task/validation')
+                context['metadata'].setdefault('authorized_feedback_ids', []).append(delivered['artifact_id'])
+                from agent.research_feedback import compact_updates
+                delivered = compact_updates(delivered)
+                context['metadata'].setdefault('delivered_experiment_ids', []).extend(r['experiment_id'] for r in delivered['results'])
+            if delivered:
                 request['messages'].append({'role': 'user', 'content': json.dumps(
                     {'research_updates': delivered}, ensure_ascii=False)})
         if self.config.llm_reasoning_protocol == 'qwen_chat_template':
@@ -144,22 +181,22 @@ class Gateway:
             if self.config.llm_reasoning_effort:
                 request['extra_body']['reasoning_effort'] = self.config.llm_reasoning_effort
         self._bound_reasoning_history(request['messages'])
-        request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8"))
-        byte_limit = min(self.config.llm_request_max_bytes,
-                         self.config.llm_context_window_tokens-request['max_tokens']-1024)
-        if self.config.research_mode != 'adaptive':
-            byte_limit = min(byte_limit, self.config.max_context_tokens * 3)
-        if self.config.research_mode != 'adaptive' and context["metadata"].get("graph_binding"):
-            user = json.loads(context["messages"][1]["content"])
-            byte_limit = min(byte_limit, self.config.graph_context_bytes, user["profile_summary"]["context_budget"]["max_api_request_bytes"])
-        if byte_limit is not None and request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
+        from agent.context_budget import effective_limit, request_bytes as measure_request
+        byte_limit, budget_limits = effective_limit(self.config, context['metadata'], request['max_tokens'])
+        request_bytes = measure_request(request)
+        if request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
             self._compact_research_request(request, byte_limit)
-            request_bytes = len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
-        if byte_limit is not None and request_bytes > byte_limit:
-            raise AgentError("CONTEXT_TOO_LARGE", "Complete API request including schema/tools/repair exceeds the byte budget",
-                             details={"request_bytes": request_bytes, "limit_bytes": byte_limit})
-        self.log.event("llm.request_budget_checked", level="DEBUG", request_bytes=request_bytes, limit_bytes=byte_limit,
-                       input_limit_owner='client_bytes_and_provider', tokenizer_estimate=False)
+            request_bytes = measure_request(request)
+        if request_bytes > byte_limit:
+            raise AgentError('CONTEXT_TOO_LARGE', 'Complete JSON request cannot fit without removing protected contract/base/latest results',
+                details={'request_bytes': request_bytes, 'limit_bytes': byte_limit, 'limits': budget_limits,
+                         'section_bytes': self._section_bytes(request)})
+        context['_request_byte_limit'] = byte_limit
+        if isinstance(self.transport, OpenAITransport):
+            self.transport.log = self.log
+        self.log.event('llm.request_budget_checked', request_bytes=request_bytes, limit_bytes=byte_limit,
+            limits=budget_limits, section_bytes=self._section_bytes(request),
+            tokenizer_estimate=False, provider_safety_proxy='one_input_byte_per_estimated_token')
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
@@ -319,8 +356,13 @@ class Gateway:
             if self.analysis is None:
                 raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
-                'description': 'Read-only fit summary/association/group, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. columns contains input features only, never the target: use include_target=true for target summaries. For group, group_by must be one of columns. At most 12 columns; [] selects defaults.',
+                'description': 'Read-only fit summary/association/group, stateless derived expressions and composite filters, errors for a visible experiment_id, unlabelled test comparison, dictionary, or saved report via report_id. No holdout labels. columns contains input features only, never the target: use include_target=true for target summaries. For group, group_by names one to three selected columns. errors returns selection-only aggregates; include_target=false. At most 12 columns; [] selects defaults.',
                 'parameters': ANALYSIS_SCHEMA}})
+        if 'read_memory' in payload['tool_schema_ids']:
+            from agent.context_details import READ_SCHEMA
+            tools.append({'type': 'function', 'function': {'name': 'read_memory',
+                'description': 'Read frozen branch/task/validation-scoped details using detail_index.reference_id and section. Follow next_offset in UTF-8 bytes; list sections support section/index. Does not open arbitrary artifacts or files.',
+                'parameters': READ_SCHEMA}})
         if 'search_knowledge' in payload['tool_schema_ids']:
             from tools.knowledge import KNOWLEDGE_SCHEMA
             if self.knowledge is None:
@@ -464,6 +506,8 @@ class Gateway:
                             for field in ('artifact_id', 'error'):
                                 if field in previous:
                                     result[field] = previous[field]
+                            if name == 'read_memory' and 'text' in previous:
+                                result.update({k: deepcopy(v) for k, v in previous.items() if k not in {'reused', 'original_tool_call_id'}})
                             if name == 'analyze_data' and 'report' in previous:
                                 # The original reply can have been compacted in the
                                 # actual API request; retain the requested report now.
@@ -481,9 +525,23 @@ class Gateway:
                         elif name == 'write_code':
                             result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
                             trace = {"call_id": call["id"], "name": name, "request_id": result["request_id"]}
+                        elif name == 'read_memory':
+                            from agent.context_details import read_details
+                            try:
+                                result = read_details(args, context, self.artifacts, self.log)
+                                if args['reference_id'] in context['metadata'].get('authorized_feedback_ids', []):
+                                    updates = self.artifacts.read_json(args['reference_id'])
+                                    measured = {r['experiment_id'] for r in updates.get('results', [])}
+                                    context['metadata'].setdefault('delivered_experiment_ids', []).extend(
+                                        measured.intersection(result.get('evidence_ids', [])))
+                            except AgentError as error:
+                                result = {'error': error.as_dict()}
+                            trace = {'call_id': call['id'], 'name': name,
+                                     'evidence_ids': result.get('evidence_ids', []),
+                                     'idea_ids': result.get('idea_ids', [])}
                         elif name == 'analyze_data':
                             try:
-                                result = self.analysis.analyze(args)
+                                result = self.analysis.analyze(args, context=context)
                             except AgentError as error:
                                 result = {'error': error.as_dict()}
                             trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')}
@@ -597,13 +655,21 @@ class Gateway:
             def refresh():
                 message['content'] = json.dumps(user, ensure_ascii=False)
             data = profile.get('data', user.get('profile', {}))
+            if profile.get('research_memory'):
+                from agent.research_feedback import compact_memory
+                profile['research_memory'] = compact_memory(profile['research_memory'],
+                    base_experiment_id=user.get('base_experiment_id'), max_bytes=8000)
+                omissions.append('bounded_research_memory');refresh()
             for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
                 if size() <= limit:
                     break
                 if field in data:
                     data.pop(field);omissions.append(field);refresh()
-            while size() > limit and user.get('facts'):
-                fact = user['facts'].pop()
+            protected = {user.get('base_experiment_id'), *user.get('allowed_donor_experiment_ids', [])}
+            protected.update(f['source_id'] for f in user.get('facts', [])[:3])
+            while size() > limit and any(f.get('source_id') not in protected for f in user.get('facts', [])):
+                pos = next(i for i in range(len(user['facts'])-1, -1, -1) if user['facts'][i].get('source_id') not in protected)
+                fact = user['facts'].pop(pos)
                 user.setdefault('compacted_fact_source_ids', []).append(fact['source_id'])
                 omissions.append('older_fact_details');refresh()
             memory = profile.get('measured_search', {})
@@ -621,6 +687,10 @@ class Gateway:
                 omissions.append('older_comparison_details');refresh()
         # Older reports remain retrievable by artifact_id. Preserve the latest tool
         # result and every assistant/tool-call pair so the API dialogue stays valid.
+        for message in request['messages']:
+            if size() > limit and message.get('role') == 'assistant' and message.get('tool_calls') and message.get('content'):
+                message['content'] = 'Earlier tool request; use its paired results and immutable output artifact.'
+                omissions.append('older_assistant_tool_prose')
         tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']
         for message in tool_messages[:-1]:
             if size() <= limit:
@@ -640,6 +710,13 @@ class Gateway:
         self.log.event('llm.context_compacted', previous_bytes=previous_size, request_bytes=size(),
                        limit_bytes=limit, omitted_fields=omissions, retained_tool_call_ids=[
                            m.get('tool_call_id') for m in request['messages'] if m.get('role') == 'tool'])
+
+    @staticmethod
+    def _section_bytes(request):
+        from agent.context_budget import request_bytes
+        return {'messages': request_bytes(request.get('messages', [])),
+                'tools': request_bytes(request.get('tools', [])),
+                'other_fields': request_bytes({k: v for k, v in request.items() if k not in {'messages', 'tools'}})}
 
     @staticmethod
     def _digest(value):

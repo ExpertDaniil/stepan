@@ -78,5 +78,17 @@
     "contract_id": "C10",
     "file": "examples/research-action-features.json",
     "schema": "ResearchAction"
+  },
+  {
+    "file": "examples/analysis-composition.json",
+    "schema": "AnalysisQuery"
+  },
+  {
+    "file": "examples/memory-read.json",
+    "schema": "MemoryRead"
+  },
+  {
+    "file": "examples/research-action-semantics.json",
+    "schema": "ResearchAction"
   }
 ]

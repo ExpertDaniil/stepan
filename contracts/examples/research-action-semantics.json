@@ -1,0 +1,46 @@
+{
+  "action": "catalog",
+  "recipe_id": "hist-gradient-regressor-v1",
+  "hyperparameters": {},
+  "hypothesis": "Establish a measured gradient boosting reference.",
+  "expected_effect": "Measure the complete default pipeline on the fixed validation.",
+  "feature_steps": [],
+  "code": null,
+  "tuning": null,
+  "evidence_ids": [],
+  "knowledge_ids": [],
+  "research_notes": {
+    "idea_id": null,
+    "question": "How well does the default owned boosting pipeline perform?",
+    "mechanism": "Nonlinear splits can model relationships absent from a constant predictor.",
+    "decision_reason": "A cheap measured baseline will make later feature proposals comparable.",
+    "previous_result_interpretation": "No feature effect has been established.",
+    "alternatives": [
+      {
+        "idea_id": null,
+        "question": "Can category prevalence improve prediction?",
+        "mechanism": "Fit-only frequency features may describe category structure.",
+        "next_test": "Add fit-only frequency mappings inside an otherwise affordable pipeline.",
+        "why_deferred": "First obtain the baseline needed to interpret its full-pipeline score.",
+        "evidence_ids": [],
+        "knowledge_ids": []
+      }
+    ]
+  },
+  "semantic_updates": [
+    {
+      "topic": "observation scale",
+      "kind": "hypothesis",
+      "statement": "The unit and period mapping are unknown.",
+      "columns": [
+        "coded_period"
+      ],
+      "evidence_ids": [],
+      "properties": {
+        "units": "unknown",
+        "scale": "anonymous code",
+        "unknowns": "Calendar mapping is not supplied."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "kind": "group",
+  "columns": [
+    "region",
+    "mode",
+    "interval"
+  ],
+  "group_by": [
+    "region",
+    "mode"
+  ],
+  "include_target": false,
+  "derived": [
+    {
+      "op": "difference",
+      "name": "interval",
+      "columns": [
+        "counter_u",
+        "counter_v"
+      ]
+    }
+  ],
+  "filters": {
+    "mode": "all",
+    "clauses": [
+      {
+        "column": "interval",
+        "op": "gte",
+        "value": 0
+      },
+      {
+        "column": "region",
+        "op": "not_missing"
+      }
+    ]
+  }
+}

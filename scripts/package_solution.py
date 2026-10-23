@@ -29,6 +29,11 @@ RESOURCE_FILES = (
     "prompts/researcher-catalog.md",
     "prompts/researcher-adaptive.md",
     "prompts/TOOLS.md",
+    "docs/research/notebooks/index.json",
+    "docs/research/notebooks/osic-artkulak/provenance.json",
+    "docs/research/notebooks/osic-artkulak/LICENSE",
+    "docs/research/notebooks/osic-artkulak/simple-logreg.ipynb",
+    "docs/research/notebooks/osic-artkulak/inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
 )
 
 

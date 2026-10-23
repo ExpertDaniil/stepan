@@ -22,9 +22,12 @@ class Researcher:
         adaptive = self.config.research_mode == 'adaptive'
         catalog_mode = self.config.research_mode == "catalog"
         context = self.artifacts.read_json(payload["context_id"])
+        tool_names = ['analyze_data'] if adaptive else [] if catalog_mode else ['write_code']
+        if adaptive and getattr(getattr(self.gateway, 'tools', None), 'notebooks', None) is not None:
+            tool_names.append('consult_notebook')
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
-                                        "tool_schema_ids": ['analyze_data'] if adaptive else [] if catalog_mode else ["write_code"],
+                                        "tool_schema_ids": tool_names,
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds, "attempt_limit": 8 if adaptive else 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
@@ -37,7 +40,9 @@ class Researcher:
             evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
             evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
             evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
-            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id'))
+            # Source examples are useful study material, never measured task evidence.
+            evidence.update(call['artifact_id'] for call in answer['tool_calls']
+                            if call.get('artifact_id') and call['name'] == 'analyze_data')
             if not set(proposed['evidence_ids']) <= evidence:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
             if proposed['action'] == 'stop':

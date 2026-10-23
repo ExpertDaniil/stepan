@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_id": "OSIC-1",
+  "repository": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression",
+  "commit": "cd6dfa56c012e3c0eb81ed15534f436b3ba16d19",
+  "author": "Art Kulakov / artkulak",
+  "license": "Unlicense",
+  "license_source": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression/blob/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/LICENSE",
+  "downloaded_at_utc": "2026-10-22T20:02:01.082711+00:00",
+  "read_method": "Author GitHub pages via browser tools; pinned raw files and LICENSE via HTTPS",
+  "verification": "Parsed notebook JSON and read selected source cells; no notebook code executed",
+  "download_scope": "Only LICENSE and the two listed notebook files; no separate datasets, weights or packages",
+  "result_status": "Original author outputs are historical evidence, not reproduced results",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e",
+      "size_bytes": 1211,
+      "source_url": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression/blob/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/LICENSE",
+      "download_url": "https://raw.githubusercontent.com/artkulak/osic-pulmonary-fibrosis-progression/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/LICENSE",
+      "modifications": "none; byte-identical original"
+    },
+    {
+      "path": "simple-logreg.ipynb",
+      "sha256": "d0e43404fd00bc4cd899af218dabc2584ac61d9c822c31fb18e4d4fc3dcc2b99",
+      "size_bytes": 9409,
+      "source_url": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression/blob/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/simple-logreg.ipynb",
+      "download_url": "https://raw.githubusercontent.com/artkulak/osic-pulmonary-fibrosis-progression/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/simple-logreg.ipynb",
+      "modifications": "none; byte-identical original"
+    },
+    {
+      "path": "inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
+      "sha256": "244bc0e66d7f947a4942d4f4e4e28c45ecc7f497fab64c858d036a143cd9edbc",
+      "size_bytes": 175182,
+      "source_url": "https://github.com/artkulak/osic-pulmonary-fibrosis-progression/blob/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
+      "download_url": "https://raw.githubusercontent.com/artkulak/osic-pulmonary-fibrosis-progression/cd6dfa56c012e3c0eb81ed15534f436b3ba16d19/inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
+      "modifications": "none; byte-identical original"
+    }
+  ]
+}

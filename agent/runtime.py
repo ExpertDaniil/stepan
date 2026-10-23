@@ -90,6 +90,12 @@ def bootstrap(config, started, task_path, run_id, root, log):
             from tools.analysis import AnalysisService
             analysis = AnalysisService(spec, validation, artifacts, budget, log, schemas=bus.schemas)
             gateway.tools.analysis = analysis
+            from tools.notebooks import NotebookLibrary
+            try:
+                gateway.tools.notebooks = NotebookLibrary(spec, gateway.tools.inspector.profile, artifacts, schemas=bus.schemas)
+            except (AgentError, OSError, ValueError, KeyError, TypeError) as exc:
+                # Optional study material must not prevent the first checked answer.
+                log.event('research.references_unavailable', level='WARNING', message=str(exc))
         submission = Submission(spec, artifacts, store, log)
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log)
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,

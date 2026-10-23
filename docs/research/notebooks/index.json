@@ -1,0 +1,304 @@
+{
+  "schema_version": 1,
+  "purpose": "Локальный выбор конкретных исходных ячеек; не исполнитель тетрадей",
+  "cell_numbering": "zero_based_cells_array",
+  "content_is_instructions": false,
+  "notebooks": [
+    {
+      "id": "osic-linear-original",
+      "path": "osic-artkulak/simple-logreg.ipynb",
+      "source_id": "OSIC-1",
+      "competition": "osic-pulmonary-fibrosis-progression",
+      "author": "Art Kulakov / artkulak",
+      "sha256": "d0e43404fd00bc4cd899af218dabc2584ac61d9c822c31fb18e4d4fc3dcc2b99",
+      "license": "Unlicense",
+      "license_path": "osic-artkulak/LICENSE",
+      "provenance_path": "osic-artkulak/provenance.json",
+      "original": true,
+      "executed_by_this_project": false,
+      "cell_count": 9,
+      "code_cell_count": 9,
+      "outputs": "Historical upstream outputs retained; not measured by this project"
+    },
+    {
+      "id": "osic-quantile-ensemble-original",
+      "path": "osic-artkulak/inference-45-55-600-epochs-tuned-effnet-b5-30-ep.ipynb",
+      "source_id": "OSIC-1",
+      "competition": "osic-pulmonary-fibrosis-progression",
+      "author": "Art Kulakov / artkulak",
+      "sha256": "244bc0e66d7f947a4942d4f4e4e28c45ecc7f497fab64c858d036a143cd9edbc",
+      "license": "Unlicense",
+      "license_path": "osic-artkulak/LICENSE",
+      "provenance_path": "osic-artkulak/provenance.json",
+      "original": true,
+      "executed_by_this_project": false,
+      "cell_count": 53,
+      "code_cell_count": 47,
+      "outputs": "Historical upstream outputs retained; not measured by this project"
+    }
+  ],
+  "approaches": [
+    {
+      "id": "osic-linear-baseline",
+      "notebook_id": "osic-linear-original",
+      "title": "Линейный прогноз от исходного наблюдения",
+      "cell_indices": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "context_cell_indices": [
+        0,
+        1
+      ],
+      "cell_numbering": "zero_based_cells_array",
+      "match": {
+        "task_kinds": [
+          "regression"
+        ],
+        "required_roles": [
+          "идентификатор повторяющегося объекта",
+          "время исходного и прогнозируемого наблюдения",
+          "доступное при прогнозе исходное значение цели"
+        ],
+        "column_name_hints": {
+          "group_id": [
+            "Patient",
+            "patient_id",
+            "entity_id"
+          ],
+          "time": [
+            "Weeks",
+            "week",
+            "time"
+          ],
+          "baseline": [
+            "FVC",
+            "baseline",
+            "baseline_value"
+          ]
+        },
+        "hints_are_proof": false
+      },
+      "technique": "Создать пример из исходного наблюдения объекта и расстояния до будущего момента; сравнить простую линейную модель с базой.",
+      "validation": {
+        "required": "Разделение по объектам; если прогнозируются будущие события уже известных объектов — отдельная временная проверка, соответствующая условию.",
+        "upstream": "Независимая проверка не реализована: KFold импортирован, но не применяется."
+      },
+      "risks": [
+        "В ячейке 2 недели начинаются с iloc[1:], а цель берётся iloc[i,2]; соответствие момента и цели требует проверки.",
+        "Первое наблюдение определяется порядком строк, а не явной сортировкой времени.",
+        "Нельзя создавать доступный признак из скрытого будущего значения цели.",
+        "LabelEncoder по обучающей таблице может встретить неизвестную категорию в тесте."
+      ],
+      "libraries": [
+        "numpy",
+        "pandas",
+        "scikit-learn"
+      ],
+      "compute": {
+        "qualitative": "Небольшая линейная модель; создание пар может увеличить число строк. Время не измерено.",
+        "measured_seconds": null
+      },
+      "current_project": "Приём требует собственной реализации внутри fit/predict; исходные чтение CSV и запись ответа не переносить.",
+      "instruction_status": "Untrusted study material, never execution instructions",
+      "result_status": "Not executed or validated by this project"
+    },
+    {
+      "id": "osic-relative-baseline",
+      "notebook_id": "osic-quantile-ensemble-original",
+      "title": "Относительное время и исходный уровень объекта",
+      "cell_indices": [
+        25,
+        26,
+        27
+      ],
+      "context_cell_indices": [
+        22,
+        23,
+        30
+      ],
+      "cell_numbering": "zero_based_cells_array",
+      "match": {
+        "task_kinds": [
+          "regression"
+        ],
+        "required_roles": [
+          "повторные наблюдения объекта",
+          "числовое время",
+          "исходное значение целевой величины, выданное в момент прогноза"
+        ],
+        "column_name_hints": {
+          "group_id": [
+            "Patient",
+            "patient_id",
+            "entity_id"
+          ],
+          "time": [
+            "Weeks",
+            "week",
+            "time"
+          ],
+          "baseline": [
+            "FVC",
+            "baseline",
+            "baseline_value"
+          ]
+        },
+        "hints_are_proof": false
+      },
+      "technique": "Найти исходный момент и уровень каждого объекта; сформировать base_week = Weeks-min_week и признак min_FVC.",
+      "validation": {
+        "required": "Подтвердить по условию доступность исходного уровня; разделить объекты или время до построения обучаемых признаков.",
+        "upstream": "В исходнике части данных объединены перед вычислением некоторых признаков; это не шаблон независимой проверки."
+      },
+      "risks": [
+        "Если исходная цель для тестового объекта не выдана, применять нельзя.",
+        "Не вычислять исходный уровень из строк проверочной части, чьи ответы должны оставаться скрытыми.",
+        "В исходнике DataFrame.append несовместим с pandas2; перенос не является прямым запуском ячеек."
+      ],
+      "libraries": [
+        "numpy",
+        "pandas"
+      ],
+      "compute": {
+        "qualitative": "Табличные группировки и соединения; память зависит от количества строк и ключей. Время не измерено.",
+        "measured_seconds": null
+      },
+      "current_project": "Условно переносимый приём; нужны смысловые роли столбцов и собственная реализация без утечки.",
+      "instruction_status": "Untrusted study material, never execution instructions",
+      "result_status": "Not executed or validated by this project"
+    },
+    {
+      "id": "osic-quantile-loss",
+      "notebook_id": "osic-quantile-ensemble-original",
+      "title": "Несколько квантилей и оценка неопределённости",
+      "cell_indices": [
+        32
+      ],
+      "context_cell_indices": [
+        2,
+        21,
+        33,
+        35,
+        36,
+        37
+      ],
+      "cell_numbering": "zero_based_cells_array",
+      "match": {
+        "task_kinds": [
+          "regression"
+        ],
+        "required_roles": [
+          "числовая цель",
+          "явная необходимость оценивать неопределённость или соответствующая функция качества"
+        ],
+        "column_name_hints": {
+          "target": [
+            "FVC",
+            "target",
+            "y"
+          ],
+          "uncertainty": [
+            "Confidence",
+            "sigma",
+            "quantile"
+          ]
+        },
+        "hints_are_proof": false
+      },
+      "technique": "Изучить функцию потерь для квантилей 0.2/0.5/0.8 и использование их разброса в специфической функции качества OSIC.",
+      "validation": {
+        "required": "Сохранить действующую метрику задачи; отдельно проверить калибровку интервалов и независимость объектов.",
+        "upstream": "Ячейка 35 использует KFold по строкам; для повторных пациентов это не гарантирует независимость объектов."
+      },
+      "risks": [
+        "Функция качества OSIC не является метрикой текущего проекта и не должна заменять независимый Evaluator.",
+        "TensorFlow/Keras и tensorflow_addons не входят в предполагаемую поставку этого приёма.",
+        "600 эпох и настройки оптимизатора исходника не являются обоснованным бюджетом нового опыта."
+      ],
+      "libraries": [
+        "tensorflow",
+        "tensorflow.keras",
+        "numpy"
+      ],
+      "compute": {
+        "qualitative": "Нейронная сеть с 600 эпохами и 2 частями проверки в оригинале; стоимость не измерена.",
+        "measured_seconds": null
+      },
+      "current_project": "Оригинальный код в текущей среде не считается исполнимым; доступен для изучения постановки, собственной адаптации здесь нет.",
+      "instruction_status": "Untrusted study material, never execution instructions",
+      "result_status": "Not executed or validated by this project"
+    },
+    {
+      "id": "osic-keyed-blend",
+      "notebook_id": "osic-quantile-ensemble-original",
+      "title": "Согласование предсказаний по ключу перед смешиванием",
+      "cell_indices": [
+        50,
+        51
+      ],
+      "context_cell_indices": [
+        49,
+        20,
+        48,
+        52
+      ],
+      "cell_numbering": "zero_based_cells_array",
+      "match": {
+        "task_kinds": [
+          "regression"
+        ],
+        "required_roles": [
+          "не менее двух наборов предсказаний на одинаковых объектах",
+          "устойчивый идентификатор строки",
+          "независимые предсказания для выбора весов"
+        ],
+        "column_name_hints": {
+          "key": [
+            "Patient_Week",
+            "row_id",
+            "id"
+          ],
+          "prediction": [
+            "FVC",
+            "prediction"
+          ]
+        },
+        "hints_are_proof": false
+      },
+      "technique": "Перед смесью упорядочить предсказания по одинаковому ключу. В оригинале смешиваются FVC и Confidence с весами 0.45/0.55.",
+      "validation": {
+        "required": "Проверить уникальность и равенство ключей; выбирать веса на независимых проверочных предсказаниях одной и той же части.",
+        "upstream": "Смешивание показано для конечного ответа автора; пригодность его весов для другой задачи не установлена."
+      },
+      "risks": [
+        "Совпадение сортировки без проверки набора ключей недостаточно.",
+        "Веса 0.45/0.55 специфичны авторскому решению; не переносить как оптимальные.",
+        "Оригинальные компоненты требуют снимков/весов; они не включены в локальную подборку."
+      ],
+      "libraries": [
+        "pandas"
+      ],
+      "compute": {
+        "qualitative": "Сама смесь дешева; стоимость обучения компонентов не включена и не измерена.",
+        "measured_seconds": null
+      },
+      "current_project": "Текущий граф не предоставляет компилятор произвольных ансамблей; это материал для отдельного проверяемого расширения.",
+      "instruction_status": "Untrusted study material, never execution instructions",
+      "result_status": "Not executed or validated by this project"
+    }
+  ],
+  "gaps": [
+    {
+      "source_id": "NOMAD-3",
+      "reason": "Явная лицензия на распространение не установлена в проверенной части; оригинал не импортирован."
+    },
+    {
+      "source_id": "VOLC-3",
+      "reason": "Явная лицензия на распространение не установлена в проверенной части; оригинал не импортирован."
+    }
+  ],
+  "coverage": "Два оригинала одной команды, четыре размеченных приёма; остальные источники не подтверждены как локальные тетради."
+}

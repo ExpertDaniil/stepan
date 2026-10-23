@@ -3,6 +3,20 @@
   "$id": "urn:alfa-hack:automl:contracts:0.1.0",
   "title": "AutoML internal message contracts v0.1.0",
   "$defs": {
+    "NotebookQuery": {
+      "type": "object",
+      "properties": {
+        "kind": {"enum": ["search", "read"]},
+        "keywords": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 80}, "maxItems": 8},
+        "approach_id": {"type": "string", "minLength": 1, "maxLength": 100},
+        "cell_index": {"type": "integer", "minimum": 0},
+        "offset": {"type": "integer", "minimum": 0},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 2},
+        "max_chars": {"type": "integer", "minimum": 1, "maximum": 5000}
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
     "ArtifactRef": {
       "type": "object",
       "properties": {

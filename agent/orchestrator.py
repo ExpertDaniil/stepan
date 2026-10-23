@@ -45,6 +45,11 @@ class Orchestrator:
         self.research_feedback = []
         self.context.research_feedback = self.research_feedback
         self.failed_refits = set()
+        from agent.research_feedback import FeedbackMailbox
+        self.researcher.gateway.feedback = FeedbackMailbox(artifacts)
+        self.fallback_started_at = None
+        self.fallback_seconds = 0.0
+        self.research_stalls = {}
         self.degraded = False
         self.graph = None
         if config.graph_enabled:
@@ -91,13 +96,66 @@ class Orchestrator:
             return False
         return self.budget.snapshot()["search_allowed"]
 
-
     def llm_unavailable_reason(self, pending=0):
         try:
             self.researcher.gateway.check_availability()
         except AgentError as error:
             return error.code.lower()
         return self.budget.llm_unavailable_reason(pending)
+
+    def set_fallback(self, reason=None):
+        if reason is not None and self.fallback_started_at is None:
+            self.fallback_started_at = time.monotonic()
+            self.log.event('search.fallback_started', reason=reason, budget=self.budget.snapshot(),
+                           token_budget=self.budget.token_snapshot())
+        elif reason is None and self.fallback_started_at is not None:
+            seconds = time.monotonic()-self.fallback_started_at
+            self.fallback_seconds += seconds
+            self.fallback_started_at = None
+            self.log.event('search.fallback_finished', duration_seconds=seconds, total_seconds=self.fallback_seconds)
+
+    def publish_research_updates(self):
+        """Publish only this branch's visible results, after evaluation and Optuna tell."""
+        if self.config.research_mode != 'adaptive':
+            return
+        self.store._writer()
+        mailbox = self.researcher.gateway.feedback
+        scopes = ([r[0] for r in self.store.db.execute(
+            "SELECT branch_id FROM g_branches WHERE run_id=? AND state='active'", (self.store.run_id,))]
+            if self.graph else ['legacy'])
+        for scope in scopes:
+            ids = (list(reversed(self.graph.visible_history(scope))) if self.graph else [r[0] for r in self.store.db.execute(
+                'SELECT experiment_id FROM experiments WHERE run_id=? ORDER BY rowid', (self.store.run_id,))])
+            measured = []
+            for eid in ids:
+                ev = self.store.experiment_evaluation(eid)
+                if ev and ev['valid'] and not ev['violations']:
+                    exp = self.store.get(eid)
+                    measured.append({'experiment_id': eid, 'evaluation_id': ev['evaluation_id'],
+                        'primary_metric': ev['primary_metric'], 'diagnostics_artifact_id': ev['diagnostics_artifact_id'],
+                        'plan_id': exp['plan']['plan_id'], 'recipe_id': exp['plan']['recipe_id'],
+                        'effective_parameters': exp['plan']['model']['hyperparameters']})
+            memory = self.graph.research_memory(scope, []) if self.graph else None
+            if memory is None:
+                from agent.research_memory import build_research_memory
+                memory = build_research_memory(self.store, self.artifacts, ids)
+            series = [s for d in memory['decisions'] for s in d.get('tuning_series', [])]
+            latest = measured[-8:]
+            best = self.store.best()
+            incumbent = next((v for v in measured if v['experiment_id'] == best), None)
+            if incumbent and incumbent not in latest:
+                latest.insert(0, incumbent)
+            for result in latest[:-2]:
+                result.pop('effective_parameters')
+                result['parameter_details'] = 'Stored plan_id '+result['plan_id']
+            summaries = []
+            for s in series[-4:]:
+                summaries.append({k: v for k, v in s.items() if k != 'trials'})
+            mailbox.publish(scope, {'branch_id': scope, 'validation_id': self.validation['validation_id'],
+                'results': latest, 'omitted_result_count': len(measured)-len(latest),
+                'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
+                'instruction': 'New controller measurements available at request dispatch. Compare only compatible protocols. '
+                    'The immutable assignment base remains unchanged; cite these results when choosing the next action.'})
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
         optimizer = getattr(self.local_search, 'optuna', None)
@@ -285,6 +343,7 @@ class Orchestrator:
             optimizer = getattr(getattr(self, 'local_search', None), 'optuna', None)
             if optimizer is not None:
                 optimizer.sync()
+            self.publish_research_updates()
 
     def _run_training(self, plans, tickets=None):
         if getattr(self, "graph", None):
@@ -465,6 +524,7 @@ class Orchestrator:
                 "published_champion_present": self.store.champion() is not None,
                 "active_job_ids": [job.job_id for job in self.runner.active()]}
 
+
     def run(self):
         if self.graph:
             from agent.graph.controller import run
@@ -497,7 +557,11 @@ class Orchestrator:
                 researcher_id = "researcher-" + str(index + 1)
                 base_id = self.store.best()
                 base = self.store.get(base_id)["plan"] if base_id else None
-                if self.local_search.has_series(researcher_id, "legacy") or not self.llm_available(len(requests)):
+                authorized = self.local_search.has_series(researcher_id, 'legacy')
+                api_available = self.llm_available(len(requests))
+                if authorized or not api_available:
+                    if not authorized and not api_available:
+                        self.set_fallback(self.llm_unavailable_reason(len(requests)))
                     plan = self.local_plan(researcher_id, base=base)
                     if plan:
                         plans.append(plan)
@@ -505,6 +569,7 @@ class Orchestrator:
                     if self.config.research_mode != 'adaptive' or not self.llm_available(len(requests)):
                         continue
                 assignment = "exploit_incumbent" if index == 0 else "explore_alternative"
+                self.set_fallback()
                 context = self.call("C08", {"task_spec_id": self.spec["task_spec_id"], "snapshot_id": snapshot["snapshot_id"],
                                             "tools_catalog_version": "tools-v1", "researcher_id": researcher_id,
                                             "assignment": assignment, "max_input_tokens": self.config.max_context_tokens}, lambda p: self.context.build(p, snapshot))
@@ -564,9 +629,10 @@ class Orchestrator:
                 self.log.exception("research.round_failed", exc)
                 if not self.budget.snapshot()["search_allowed"]:
                     break
+        self.set_fallback()
         self.finalize_best()
         self.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted,
-                       budget=self.budget.snapshot())
+                       fallback_seconds=self.fallback_seconds, budget=self.budget.snapshot(), token_budget=self.budget.token_snapshot())
         self.call("C22", {"action": "stop_search", "reason": stop_reason,
                            "wall_seconds_remaining": int(self.budget.remaining()), "cancel_job_ids": []}, self.control)
         self.cleanup()

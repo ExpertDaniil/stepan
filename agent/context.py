@@ -48,6 +48,8 @@ class ContextBuilder:
                 from agent.research_memory import build_research_memory
                 ids = [row[0] for row in self.store.db.execute('SELECT experiment_id FROM experiments WHERE run_id=?', (self.store.run_id,))]
                 user['research_memory'] = build_research_memory(self.store, self.artifacts, ids)
+                from agent.research_feedback import compact_memory
+                user['research_memory'] = compact_memory(user['research_memory'])
             user['recipes'] = self.catalog.branch_recipes(allowed, {'required_capability_ids': [], 'forbidden_capability_ids': []})
             user['research_feedback'] = list(getattr(self, 'research_feedback', []))
             if getattr(self, 'analysis', None):
@@ -58,7 +60,7 @@ class ContextBuilder:
                 user['knowledge'] = self.knowledge.seed(base, focus=knowledge_focus(user.get('research_memory', {})))
         messages = [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(user, ensure_ascii=False)}]
         # Conservative byte heuristic, not a claim about the provider tokenizer.
-        limit = float('inf') if self.catalog.config.research_mode == 'adaptive' else payload["max_input_tokens"] * 3
+        limit = self.catalog.config.llm_request_max_bytes * .7 if self.catalog.config.research_mode == 'adaptive' else payload["max_input_tokens"] * 3
         while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and recent:
             recent.pop()
             user["recent_experiments"] = recent
@@ -138,12 +140,15 @@ class ContextBuilder:
             user['profile_summary']['research_feedback'] = [r for r in getattr(self, 'research_feedback', [])
                                                            if r['branch_id'] == user['branch_id']]
             user['profile_summary']['context_budget'] = {
-                'client_input_limit_enforced': False, 'input_limit_owner': 'provider',
+                'client_input_limit_enforced': True, 'input_limit_owner': 'client_bytes_and_provider',
+                'max_api_request_bytes': self.catalog.config.llm_request_max_bytes,
                 'provider_context_window_tokens': graph['policy']['context'].get('provider_context_window_tokens'),
                 'max_output_tokens': self.catalog.config.llm_max_output_tokens}
             user['profile_summary']['current_pipeline_facts'] = self.catalog.pipeline_facts(user.get('base_result'))
             user['profile_summary']['optimizer_facts'] = optimizer_facts()
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
+            from agent.research_feedback import compact_memory
+            user['profile_summary']['research_memory'] = compact_memory(user['profile_summary']['research_memory'])
             if getattr(self, 'knowledge', None):
                 user['profile_summary']['knowledge'] = self.knowledge.seed(user.get('base_result'),
                     focus=knowledge_focus(user['profile_summary']['research_memory']))
@@ -156,9 +161,8 @@ class ContextBuilder:
             return len(json.dumps(messages, ensure_ascii=False).encode("utf-8"))
         byte_cap = graph["policy"]["context"]["max_api_request_bytes"]
         reserve = min(byte_cap//4, graph["policy"]["context"]["safety_tokens"]*3)
-        # Adaptive input is limited by the actual provider, never a byte/token
-        # heuristic or stale MAX_CONTEXT_TOKENS / GRAPH_CONTEXT_BYTES env values.
-        limit = float('inf') if adaptive else min(payload["max_input_tokens"]*3, byte_cap-reserve)
+        # Leave room for schema, tools, feedback and the bounded dialogue transcript.
+        limit = self.catalog.config.llm_request_max_bytes * .7 if adaptive else min(payload["max_input_tokens"]*3, byte_cap-reserve)
         # Measured memory is more useful than duplicate table metadata. Protect the base and explicit donors.
         omitted = []
         for field in ("test_missing_fraction", "test_dtypes", "train_missing_fraction", "train_dtypes", "data_dictionary"):

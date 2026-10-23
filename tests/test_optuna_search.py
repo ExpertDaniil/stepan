@@ -15,6 +15,7 @@ from agent.tuning_space import normalize_space
 from tests.graph_helpers import GraphHarness
 from tests.test_adaptive_research import action, SOURCE
 from tests.test_research_memory import notes
+from tools.code import write_code
 
 
 def request(space, max_trials=3):
@@ -80,6 +81,20 @@ class OptunaSearchTests(unittest.TestCase):
         self.assertEqual(candidate['feature_steps'], plan['feature_steps'])
         self.assertEqual(candidate['model']['family'], 'custom')
         self.assertEqual(self.g.artifacts.resolve(candidate['code_artifact_id']).read_text(), SOURCE)
+
+    def test_study_identity_changes_with_fixed_parameters_source_features_and_split(self):
+        _, plan = self.anchor('python-pipeline-v1', {'alpha': 1.0, 'fixed': 2}, SOURCE)
+        space = {'alpha': {'type': 'float', 'low': .01, 'high': 3.0, 'log': True}}
+        original = self.opt._scope(plan, space, self.h.root)
+        variants = []
+        changed = deepcopy(plan);changed['validation_id'] += '-different';variants.append(changed)
+        changed = deepcopy(plan);changed['feature_steps'] = [{'step': 'different_joint_features'}];variants.append(changed)
+        changed = deepcopy(plan);changed['model']['hyperparameters']['fixed'] = 3;variants.append(changed)
+        code = write_code({'researcher_id': 'researcher-1', 'filename': 'variant.py', 'content': SOURCE+'\n# distinct implementation\n',
+                           'declared_entrypoint': 'make_pipeline'}, self.g.artifacts)['artifact']
+        changed = deepcopy(plan);changed['code_artifact_id'] = code['artifact_id'];variants.append(changed)
+        for candidate in variants:
+            self.assertNotEqual(self.opt._scope(candidate, space, self.h.root), original)
 
     def test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code(self):
         ticket, plan = self.anchor('python-pipeline-v1', {'alpha': 1.0}, SOURCE)

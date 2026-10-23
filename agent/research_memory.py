@@ -110,6 +110,14 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
             item = ideas[selected]
             item['tested_experiment_ids'] = list(dict.fromkeys([*item['tested_experiment_ids'],
                 *(o['experiment_id'] for o in observations if o['primary_metric'] is not None)]))
+            item['status'] = ('measured' if item['tested_experiment_ids'] else
+                              'running' if any(o['state'] in {'queued', 'running', 'trained'} for o in observations) or
+                              any(s['status'] == 'running' for s in tuning_series) else
+                              'failed' if observations and all(o['state'] in {'failed', 'invalid', 'timed_out', 'cancelled'} for o in observations) else 'proposed')
+        for candidate in notes['alternatives']:
+            key = candidate.get('idea_id') or idea_id(candidate['question'], candidate['mechanism'])
+            if not ideas[key]['tested_experiment_ids'] and ideas[key].get('status') not in {'running', 'measured'}:
+                ideas[key]['status'] = 'deferred'
         decisions.append({'decision_artifact_id': ident, 'action': record['action'], 'idea_id': selected,
             'question': notes['question'], 'decision_reason': notes['decision_reason'],
             'model_interpretation': notes['previous_result_interpretation'],

@@ -262,6 +262,10 @@ def advance_authorized_tuning(controller, futures, branch_ids):
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     """Keep all SQL on the dispatcher while overlapping serial training with other peers' API work."""
     graph = controller.graph
+    if (controller.config.research_mode == 'adaptive' and graph.policy['max_train_workers'] == 1
+            and hasattr(controller, 'research_stalls')):
+        from agent.graph.research_scheduler import research_batch as rolling_batch
+        return rolling_batch(controller, trusted_plans, trusted_tickets, llm_tickets)
     plans, tickets = list(trusted_plans), list(trusted_tickets)
     accepted = 0
     activity = False
@@ -464,7 +468,11 @@ def search(controller):
                     controller.record_research_feedback(peer, branch_id, 'context_unavailable',
                         str(exc)+' '+json.dumps(exc.details), code=exc.code)
                     continue
-                if controller.local_search.has_series(peer, branch_id) or not controller.llm_available(len(llm_tickets)):
+                authorized = controller.local_search.has_series(peer, branch_id)
+                api_available = controller.llm_available(len(llm_tickets))
+                if authorized or not api_available:
+                    if not authorized and not api_available:
+                        controller.set_fallback(controller.llm_unavailable_reason(len(llm_tickets)))
                     plan = local_for_ticket(controller, ticket)
                     if plan:
                         trusted_plans.append(plan);trusted_tickets.append(ticket)
@@ -475,6 +483,7 @@ def search(controller):
                     else:
                         stop_ticket(controller, ticket, "No affordable untried catalogue candidate")
                 else:
+                    controller.set_fallback()
                     llm_tickets.append(ticket)
             else:
                 break
@@ -484,6 +493,7 @@ def search(controller):
             outcomes = getattr(controller, 'research_round_outcomes', [])
             reason = ('context_unavailable' if context_failures else
                       'researchers_stopped' if outcomes and all(o == 'stop' for o in outcomes) else
+                      'no_new_information' if 'stalled' in outcomes or 'duplicate' in outcomes else
                       'research_unavailable' if 'failed' in outcomes else 'no_affordable_candidates')
             controller.no_fit_reasons[branch_id] = reason
             decision = graph.invoke("G14", {"checkpoint_id": cp["checkpoint_id"], "budget": controller.budget.snapshot(), "plateau_assessment_id": None})["decision"]
@@ -503,8 +513,10 @@ def search(controller):
 
 def finish(controller, stop_reason, accepted):
     graph = controller.graph
+    controller.set_fallback()
     controller.finalize_best()
-    controller.log.event("search.finished", stop_reason=stop_reason, phase='refine' if graph.refinement() else 'search', attempted_experiments=accepted, budget=controller.budget.snapshot())
+    controller.log.event("search.finished", stop_reason=stop_reason, phase='refine' if graph.refinement() else 'search', attempted_experiments=accepted,
+                         fallback_seconds=controller.fallback_seconds, budget=controller.budget.snapshot(), token_budget=controller.budget.token_snapshot())
     controller.call("C22", {"action": "stop_search", "reason": stop_reason, "wall_seconds_remaining": int(controller.budget.remaining()), "cancel_job_ids": []}, controller.control)
     controller.cleanup()
     graph.invoke("G11", {"task_spec_id": controller.spec["task_spec_id"], "validation_id": controller.validation["validation_id"], "selection_policy_id": "same-protocol-primary-v1", "scope": "final"}, key="final-export")

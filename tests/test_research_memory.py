@@ -8,6 +8,7 @@ from agent.errors import AgentError
 from agent.research_actions import ACTION_SCHEMA, validate_research_notes
 from agent.research_memory import build_research_memory, idea_id
 from agent.researcher import Researcher
+from agent.research_feedback import compact_memory
 from tests.graph_helpers import GraphHarness
 from tests.test_adaptive_research import action
 
@@ -53,7 +54,7 @@ class ResearchMemoryTests(unittest.TestCase):
         _, payload, reply = self.measured_decision(notes())
         memory = self.g.research_memory(self.h.root, [])
         self.assertEqual(len(memory['open_ideas']), 2)
-        self.assertTrue(all(item['status'] == 'open' for item in memory['open_ideas']))
+        self.assertEqual({item['status'] for item in memory['open_ideas']}, {'measured', 'deferred'})
         decision = memory['decisions'][0]
         self.assertEqual(decision['observations'][0]['experiment_id'], reply['lead_submission']['experiment_id'])
         self.assertEqual(decision['observations'][0]['primary_metric']['value'], 55)
@@ -73,7 +74,7 @@ class ResearchMemoryTests(unittest.TestCase):
         ticket = self.h.issue()
         body = self.g.artifacts.read_json(ticket['work_order']['context_id'])
         carried = json.loads(body['messages'][1]['content'])['profile_summary']['research_memory']
-        self.assertEqual(carried, memory)
+        self.assertEqual(carried, compact_memory(memory))
 
     def test_stop_keeps_alternatives_without_fabricating_an_experiment(self):
         ticket = self.h.issue()

@@ -13,6 +13,12 @@ feature/model work and bounded tuning when new evidence changes their priority. 
 fixed phase order and no observable proof that all feature ideas or a family are exhausted.
 After a tuning segment, use its actual candidates, costs and gains in research_memory before
 renewing it or deferring other ideas. A completed budget is not evidence of a quality ceiling.
+Controller research_updates may arrive on a later tool turn. They contain newly completed
+evaluations/series with the same provenance rules; cite their artifact/experiment IDs when used.
+The assignment's frozen base is unchanged by an update. A pending or failed trial has no score.
+Memory status measured means a configuration was tested, not that its mechanism was proved.
+Counts of omitted older decisions/trials are explicit; do not invent their detailed outcomes.
+Confirmation labels are withheld until research is closed. Never infer a confirmation score.
 
 Use analyze_data when a concrete unanswered data question could change the next action.
 It reports fit-only aggregates, unlabelled test feature comparisons and the feature dictionary;

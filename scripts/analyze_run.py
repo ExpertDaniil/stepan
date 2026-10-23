@@ -84,6 +84,14 @@ def inspect_run(source):
                             "uncensored_output_median":statistics.median(valid_outputs) if valid_outputs else None,
                             "suggested_initial_output_tokens":initial,"suggested_output_ceiling":min(131072,initial*2),
                             "budget_note":"Client-side starting estimate, not a verified provider maximum or a RUB conversion. Truncated samples are censored; exact token need is unknown.",
+                            "research_decisions":sum(e.get('event') == 'research.decision_saved' for e in events),
+                            "feedback_deliveries":sum(e.get('event') == 'research.feedback_delivered' for e in events),
+                            "rolling_peer_resumptions":sum(e.get('event') == 'research.peer_resumed_while_waiting' for e in events),
+                            "search_stop_reason":next((e.get('stop_reason') for e in reversed(events) if e.get('event') == 'search.finished'), None),
+                            "fallback_seconds":next((e.get('fallback_seconds') for e in reversed(events) if e.get('event') == 'search.finished'), None),
+                            "final_confirmation":next((e for e in reversed(events) if e.get('event') == 'validation.finalists_confirmed'), None),
+                            "published_pipeline":next(({'experiment_id': e.get('experiment_id'), 'selection_basis': e.get('selection_basis'),
+                                'confirmation_artifact_id': e.get('confirmation_artifact_id')} for e in reversed(events) if e.get('event') == 'submission.published'), None),
                             "storage":storage, "calls":rows})
         return results
     finally:
@@ -104,6 +112,8 @@ def main():
             print(f"{report['run']} state={report['state']} attempts={report['api_attempts']} responses={report['responses']}")
             print(f"Output reported={report['reported_output_tokens']}; input={report['reported_input_tokens']}; cached input={report['reported_cached_input_tokens']}; truncated={report['truncated_responses']}")
             print('Storage: '+json.dumps(report['storage'], ensure_ascii=False))
+            print('Research: '+json.dumps({k: report[k] for k in ('research_decisions', 'feedback_deliveries',
+                'rolling_peer_resumptions', 'search_stop_reason', 'fallback_seconds', 'published_pipeline')}, ensure_ascii=False))
             for row in report['calls']:
                 print('  '+json.dumps(row,ensure_ascii=False))
             print(f"Suggested initial/ceiling: {report['suggested_initial_output_tokens']}/{report['suggested_output_ceiling']}")

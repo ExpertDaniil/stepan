@@ -1,0 +1,21 @@
+{
+  "validation": "static_only; no agent imports, regression execution, fitting or API calls",
+  "python_files_parsed": 127,
+  "runtime_modules": 67,
+  "runtime_resources": 19,
+  "schema_declaration_equality": true,
+  "resolved_schema_references": 170,
+  "new_json_examples_checked": 4,
+  "original_contract_examples_checked": 86,
+  "flat_module_names_unique": true,
+  "official_requirements_equal": true,
+  "schema_sha256": "1d3b457194ca4b27bc907dfae57986c8d0ee6239221d10c52eaceed8720294b7",
+  "new_regression_methods_written": 26,
+  "json_files_parsed": 183,
+  "adaptive_prompt_bytes": 12167,
+  "research_action_schema_bytes": 7948,
+  "analysis_tool_schema_bytes": 4692,
+  "dynamic_regressions": "written_not_run",
+  "agent_runs": "not_run",
+  "quality_comparison": "not_run"
+}

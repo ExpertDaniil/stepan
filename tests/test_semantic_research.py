@@ -225,7 +225,7 @@ class FrozenContextTests(unittest.TestCase):
             raise AgentError('ANALYSIS_RESOURCES_BUSY', 'Synthetic active train leases')
         controller = self.h.controller
         controller.graph = g
-        controller.config = replace(g.config, feature_research_enabled=True)
+        controller.config = replace(g.config, feature_research_enabled=True, feature_seed_budget_fraction=.15)
         controller.context.analysis = SimpleNamespace(feature_frame=busy)
         engine = FeatureSearch(controller)
         self.assertIsNone(engine.next_plan('researcher-1', self.h.root))

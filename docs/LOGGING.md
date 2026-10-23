@@ -1,5 +1,14 @@
 > Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
 
+Смысловое планирование: [SEMANTIC-PLANNING.md](SEMANTIC-PLANNING.md).
+`research.task_model_built` связывает модель задачи с артефактом и количеством
+величин/отношений; проверка цитаты отделена от неподтверждённой интерпретации.
+`research.semantic_context_selected` показывает ID выбранного подграфа и размер.
+`research.investigation_saved` связывает вопрос, исходные ID, входы, проверку
+согласованности и plan_id. `research.analysis_completed` для kind=check ведёт
+к полному отчёту с точными нарушениями и evaluable/missing counts. Это события
+проверки вычислений/происхождения, не доказательство физического механизма.
+
 # Наблюдаемость
 
 `data.cache_prepared` показывает source artifact, строки/столбцы, размер и время

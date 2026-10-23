@@ -1,3 +1,4 @@
+> Планирование по смыслу задачи: [SEMANTIC-PLANNING.md](SEMANTIC-PLANNING.md).
 > Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
 
 > Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).

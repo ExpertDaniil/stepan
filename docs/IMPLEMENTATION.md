@@ -1,4 +1,9 @@
-> Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).
+> Действующее введение: [PROJECT_GUIDE.md](PROJECT_GUIDE.md).
+> Новая проверка архитектуры и интеграция разрешённых библиотек:
+> [LIBRARY_REVIEW.md](LIBRARY_REVIEW.md). `jsonschema` заменяет собственный
+> интерпретатор схем; LightGBM/XGBoost добавлены в общий путь моделей,
+> ресурсов, независимой оценки и замороженного воспроизведения.
+> Предыдущие изменения контрактов: [MASTER-UPDATE.md](MASTER-UPDATE.md).
 > Feature-research update: [FEATURE-RESEARCH.md](FEATURE-RESEARCH.md),
 > [VALIDATION-FEATURE-RESEARCH.md](VALIDATION-FEATURE-RESEARCH.md). The adaptive action set
 > includes features. Feature programs, rotating attention, active-search admission review

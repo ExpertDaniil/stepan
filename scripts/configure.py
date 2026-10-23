@@ -21,7 +21,7 @@ def recommended_settings(profile="standard"):
             "llm_max_output_tokens", "llm_max_output_tokens_limit", "llm_max_total_output_tokens", "llm_progress_seconds",
             "graph_plateau_window", "graph_plateau_seconds", "graph_plateau_absolute_epsilon", "graph_plateau_relative_epsilon", "graph_exploit_steps", "graph_search_fraction",
             "model_snapshot_max_bytes", "model_snapshot_total_bytes", "worker_log_max_bytes")
-    settings = {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":"human", "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
+    settings = {**{key.upper():str(getattr(config,key)) for key in keys}, "CONSOLE_LOG_FORMAT":config.console_format, "LOG_LEVEL":"INFO", "LOG_MODEL_IO":"1"}
     settings['GRAPH_REFINEMENT_ENABLED'] = '1'
     if profile == "extended":
         settings.update(LLM_MAX_CALLS="96")

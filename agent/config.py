@@ -58,7 +58,7 @@ class Config:
     max_context_tokens: int = 16000
     log_level: str = "INFO"
     log_model_io: bool = True
-    console_format: str = "human"
+    console_format: str = "concise"
     work_dir: Path = Path("runs")
     seed: int = 42
     graph_enabled: bool = True
@@ -108,7 +108,7 @@ class Config:
             max_context_tokens=integer("MAX_CONTEXT_TOKENS", 16000, 1000, 32768),
             log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
             log_model_io=boolean("LOG_MODEL_IO", True),
-            console_format=os.environ.get("CONSOLE_LOG_FORMAT", "human"),
+            console_format=os.environ.get("CONSOLE_LOG_FORMAT", "concise"),
             work_dir=Path(work_dir or os.environ.get("WORK_DIR", "runs")).resolve(),
             seed=integer("SEED", 42, 0, 2**31 - 1),
             graph_enabled=boolean("GRAPH_ENABLED", True),
@@ -133,7 +133,7 @@ class Config:
         )
         if cfg.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
-        if cfg.research_mode not in {"adaptive", "catalog", "code"} or cfg.console_format not in {"human", "json"}:
+        if cfg.research_mode not in {"adaptive", "catalog", "code"} or cfg.console_format not in {"concise", "human", "json"}:
             raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
         if cfg.graph_peers > cfg.max_workers or cfg.graph_train_workers > cfg.max_workers:
             raise AgentError("INVALID_CONFIG", "GRAPH_PEERS/GRAPH_TRAIN_WORKERS must not exceed MAX_WORKERS")

@@ -1,6 +1,7 @@
 """Exercise authority boundaries with real generated workers and issued leases."""
 from copy import deepcopy
 from pathlib import Path
+import io
 import json
 import subprocess
 import sys
@@ -12,6 +13,7 @@ from agent.budget import Budget
 from agent.config import ROOT
 from agent.errors import AgentError
 from agent.orchestrator import Orchestrator
+from agent.observability.console import ConciseConsole
 from agent.runner import Runner
 from agent.submission import Submission
 from tests.helpers import Harness
@@ -60,8 +62,38 @@ def make_pipeline(task_spec, params):
         self.assertEqual(result['model_snapshot']['status'], 'disabled_generated')
         self.assertIsNone(result['model_path'])
         self.assertFalse(Path(marker).exists())
+        ready = next(json.loads(line[len('AUTOML_WORKER '):]) for line in completed.stdout.splitlines()
+                     if line.startswith('AUTOML_WORKER ') and json.loads(line[len('AUTOML_WORKER '):])['stage'] == 'model_ready')
+        self.assertEqual(ready['model_type'], 'generated_boundary.Model')
+        self.assertEqual(ready['estimator_type'], ready['model_type'])
         import pandas as pd
         self.assertEqual(list(pd.read_csv(prediction)), self.h.spec['output']['columns'])
+
+    def test_model_ready_reports_actual_pipeline_and_estimator_through_runner(self):
+        source = '''from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import Ridge
+def make_pipeline(task_spec, params):
+    features = ColumnTransformer([("numeric", SimpleImputer(), ["x_numeric", "z_numeric"])])
+    return Pipeline([("features", features), ("model", Ridge())])
+'''
+        completed, result, prediction = self.worker(source)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        budget = Budget(self.h.config, time.monotonic(), self.h.log)
+        runner = Runner(self.h.artifacts, self.h.config, budget, self.h.log)
+        # Reuse the real worker stream and Runner's production event bridge.
+        directory = self.h.run/'exp-observed'/'job-observed';directory.mkdir(parents=True)
+        runner._drain(io.StringIO(completed.stdout), directory/'stdout.log')
+        events = [json.loads(line) for line in (self.h.run/'events.jsonl').read_text().splitlines()]
+        ready = next(e for e in events if e['event'] == 'worker.model_ready')
+        self.assertEqual(ready['model_type'], 'sklearn.pipeline.Pipeline')
+        self.assertEqual(ready['estimator_type'], 'sklearn.linear_model._ridge.Ridge')
+        self.assertEqual(ready['experiment_id'], 'exp-observed')
+        text = ConciseConsole().render(ready)
+        self.assertIn('exp-observed', text)
+        self.assertIn('sklearn.linear_model._ridge.Ridge', text)
+        self.assertNotIn('—', text)
 
     def test_custom_constructor_cannot_mutate_trusted_output_schema(self):
         source = '''import numpy as np

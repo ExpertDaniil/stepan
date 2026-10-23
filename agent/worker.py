@@ -133,6 +133,10 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     model = validate_estimator(enforce_threads(module.make_pipeline(deepcopy(task), params), job["cpu_threads"]))
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
+    # Inspect the constructed object while the generated-code guard is active:
+    # properties and metaclasses can execute code. Never call repr(model).
+    print("AUTOML_WORKER "+json.dumps({"stage": "model_ready", "phase": job["phase"],
+                                      **describe_model(model)}), flush=True)
     started = time.monotonic()
     print("AUTOML_WORKER "+json.dumps({"stage": "fit_started", "phase": job["phase"], "cpu_threads": job["cpu_threads"]}),flush=True)
     with limits:
@@ -177,6 +181,20 @@ def prediction_values(model, frame, task):
     import numpy as np
     values = np.asarray(model.predict(frame)).reshape(-1)
     return values.astype(float if task["task_kind"] == "regression" else str)
+
+
+def describe_model(model):
+    """Report actual constructed types, without inferring semantics from source."""
+    from sklearn.pipeline import Pipeline
+    estimator = model
+    for _ in range(8):
+        if not isinstance(estimator, Pipeline) or not estimator.steps:
+            break
+        estimator = estimator.steps[-1][1]
+    def name(value):
+        cls = type(value)
+        return (cls.__module__ + "." + cls.__qualname__)[:200]
+    return {"model_type": name(model), "estimator_type": name(estimator)}
 
 
 def main():

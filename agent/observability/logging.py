@@ -45,6 +45,8 @@ class RunLogger:
         self.level = level
         self.log_model_io = log_model_io
         self.console_format = console_format
+        from agent.observability.console import ConciseConsole
+        self.concise = ConciseConsole()
         self.redactor = Redactor(secrets)
         self.lock = threading.RLock()
         self.handle = (self.root / "events.jsonl").open("a", encoding="utf-8", buffering=1)
@@ -60,6 +62,10 @@ class RunLogger:
             if ranks.get(level, 20) >= ranks.get(self.level, 20):
                 if self.console_format == "json":
                     print(line, file=sys.stderr, flush=True)
+                elif self.console_format == "concise":
+                    message = self.concise.render(record)
+                    if message:
+                        print(message, file=sys.stderr, flush=True)
                 else:
                     omitted = {"timestamp", "level", "run_id", "event", "trace_id", "span_id", "parent_span_id", "traceback"}
                     parts = []

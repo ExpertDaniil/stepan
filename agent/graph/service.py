@@ -238,7 +238,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         self.policy = deepcopy(p["policy"])
         policy_art = self.artifacts.write_json("graph/policy.json", self.policy, "graph_policy")
         task = {"task_spec": self.spec, "validation_id": p["validation_id"], "protocol_sha256": p["protocol_sha256"],
-                "evaluator_implementation_id": "sklearn-metrics-v1", "selection_policy_id": "same-protocol-primary-v1",
+                "evaluator_implementation_id": "sklearn-metrics-v2", "selection_policy_id": "same-protocol-primary-v1",
                 "train_rows_artifact_id": self.validation["train_rows_artifact_id"], "valid_rows_artifact_id": self.validation["valid_rows_artifact_id"],
                 "labels_visibility": "evaluator_only"}
         self.schemas.validate(task, "GTaskContract")

@@ -32,3 +32,8 @@ ML fit для проверки нескольких целей; последни
 [MASTER-UPDATE.md](MASTER-UPDATE.md#локальная-проверка-в-существующей-подготовленной-среде).
 Эффект на test score, качество гипотез, native estimator/API совместимость и фактическое применение
 reasoning-параметров прокси остаются неподтверждёнными.
+
+При финальной ревизии отдельно согласованы RProtocol selection/confirmation fields и
+версия evaluator в graph task contract, сохранена совместимость минимального legacy dispatcher,
+добавлен явный cooldown после ошибок транспорта. Transcript regression проверяет совпадение
+нормализованных assistant/tool IDs, а не равенство исходным provider IDs.

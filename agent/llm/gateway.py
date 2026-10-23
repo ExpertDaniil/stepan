@@ -92,6 +92,8 @@ class Gateway:
         self.knowledge = None
         self.feedback = None
         self.cancelled = threading.Event()
+        self.availability_lock = threading.RLock()
+        self.cooldown_until = 0.0
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
@@ -105,6 +107,11 @@ class Gateway:
                              "the team's daily balance and reset time are unknown.",
                              details={"scope": "upstream_provider", "team_daily_budget_status": "unknown", "reset_time_msk": None})
         self.check_daily_budget()
+        with self.availability_lock:
+            left = self.cooldown_until-time.monotonic()
+        if left > 0:
+            raise AgentError('LLM_COOLDOWN', 'Provider transport is unavailable; retain results and use fallback until retry is allowed',
+                             details={'retry_after_seconds': round(left, 1)})
 
     def _progress(self, done, call_no, purpose, started, timeout):
         while not done.wait(self.config.llm_progress_seconds):
@@ -176,6 +183,11 @@ class Gateway:
                     series_ids=[s['series_id'] for s in delivered['series']])
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
+            with self.availability_lock:
+                recovered = self.cooldown_until > time.monotonic()
+                self.cooldown_until = 0.0
+            if recovered:
+                self.log.event('llm.transport_recovered', call_no=call_no, reason='another_inflight_request_succeeded')
             if payload['purpose'] == 'research_proposal':
                 self.budget.observe_llm(time.monotonic()-started)
             token_data = response.get("usage") or {}
@@ -313,6 +325,14 @@ class Gateway:
         try:
             return self._complete_dialogue(payload, context, messages, expected, tools, deadline, phase_limited,
                                            token_limit, dialogue_id, slots)
+        except AgentError as error:
+            if error.code in {'LLM_UNAVAILABLE', 'LLM_RATE_LIMIT'}:
+                until = min(self.budget.deadline, time.monotonic()+60) if error.retryable else self.budget.deadline
+                with self.availability_lock:
+                    self.cooldown_until = max(self.cooldown_until, until)
+                self.log.event('llm.transport_cooldown', reason=error.code, retryable=error.retryable,
+                               retry_after_seconds=max(0, until-time.monotonic()))
+            raise
         finally:
             if dialogue_id is not None:
                 unused = self.budget.release_dialogue(dialogue_id)

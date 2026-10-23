@@ -11696,6 +11696,66 @@
         "evaluator_version": {
           "type": "string",
           "minLength": 1
+        },
+        "selection_indices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 1
+        },
+        "confirmation_indices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 0
+        },
+        "confirmation_unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prediction_contract": {
+          "type": "object",
+          "properties": {
+            "target_columns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "allowed_labels": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "prediction_kind": {
+              "enum": [
+                "labels",
+                "values",
+                "probabilities"
+              ]
+            }
+          },
+          "required": [
+            "target_columns",
+            "allowed_labels",
+            "prediction_kind"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

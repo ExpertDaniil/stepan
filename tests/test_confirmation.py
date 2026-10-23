@@ -24,6 +24,7 @@ class FinalConfirmationTests(unittest.TestCase):
             split = evaluator.create_protocol({'task_spec_id': h.spec['task_spec_id'], 'dataset_id': h.spec['dataset_id'],
                 'proposal': {'strategy': 'random_holdout', 'parameters': {'valid_fraction': .5}, 'seed': 42, 'reason': 'Synthetic final comparison'}})
             protocol = evaluator.protocols[split['validation_id']]
+            h.schemas.validate(protocol, 'RProtocol')
             self.assertTrue(protocol['confirmation_indices'])
             self.assertFalse(set(protocol['selection_indices']) & set(protocol['confirmation_indices']))
             self.assertEqual(set(protocol['selection_indices']) | set(protocol['confirmation_indices']), set(protocol['valid_indices']))

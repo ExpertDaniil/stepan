@@ -114,7 +114,10 @@ class ActualRequestTests(unittest.TestCase):
         self.assertEqual(result['attempts_used'], 9)
         self.assertNotIn('tools', transport.requests[-1])
         history = transport.requests[-1]['messages']
-        self.assertEqual([m['tool_call_id'] for m in history if m['role'] == 'tool'], ['inspect-'+str(i) for i in range(1, 9)])
+        tool_ids = [m['tool_call_id'] for m in history if m['role'] == 'tool']
+        declared_ids = [call['id'] for m in history if m['role'] == 'assistant' for call in m.get('tool_calls', [])]
+        self.assertEqual(len(set(tool_ids)), 8)
+        self.assertEqual(tool_ids, declared_ids)
         self.assertTrue(any(m.get('content') == 'Visible observation 1' for m in history))
         self.assertFalse(any('reasoning_content' in m for m in history))
         self.assertNotIn('extra_body', transport.requests[0])
@@ -171,6 +174,20 @@ class ActualRequestTests(unittest.TestCase):
         self.assertEqual(self.h.g.budget.output_tokens_charged, 123)
         self.assertFalse(self.h.g.budget.llm_dialogues)
         self.assertEqual(self.h.g.store.db.execute('SELECT count(*) FROM experiments').fetchone()[0], 0)
+
+    def test_nonretryable_provider_failure_enters_explicit_fallback_cooldown(self):
+        class Transport:
+            def complete(self, request, timeout, context):
+                error = RuntimeError('Synthetic unauthorized endpoint')
+                error.status_code = 401
+                raise error
+        transport = Transport()
+        with self.assertRaises(AgentError):
+            self.complete(transport)
+        with self.assertRaises(AgentError) as caught:
+            transport.gateway.check_availability()
+        self.assertEqual(caught.exception.code, 'LLM_COOLDOWN')
+        self.assertEqual(self.h.g.budget.calls, 1)
 
 
 class RollingDispatcherTests(unittest.TestCase):

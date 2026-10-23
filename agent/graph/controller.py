@@ -262,8 +262,8 @@ def advance_authorized_tuning(controller, futures, branch_ids):
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     """Keep all SQL on the dispatcher while overlapping serial training with other peers' API work."""
     graph = controller.graph
-    if (controller.config.research_mode == 'adaptive' and graph.policy['max_train_workers'] == 1
-            and hasattr(controller, 'research_stalls')):
+    if (hasattr(controller, 'research_stalls') and controller.config.research_mode == 'adaptive'
+            and graph.policy['max_train_workers'] == 1):
         from agent.graph.research_scheduler import research_batch as rolling_batch
         return rolling_batch(controller, trusted_plans, trusted_tickets, llm_tickets)
     plans, tickets = list(trusted_plans), list(trusted_tickets)

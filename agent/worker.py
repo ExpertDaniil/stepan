@@ -116,7 +116,7 @@ def execute(job):
     guard = None
     if job.get('guard_generated'):
         from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
-        prepare_pipeline_imports(job['code_path'])
+        prepare_pipeline_imports(job['code_path'], job['hyperparameters'].get('base_recipe_id'))
         guard = PipelineGuard(job['code_path'])
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))

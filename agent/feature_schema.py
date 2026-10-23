@@ -40,7 +40,8 @@ def validate_program(program, columns=None, excluded=()):
         if op not in {'sum', 'product', 'difference', 'ratio', 'cross'} and len(inputs) != 1:
             raise ValueError(op+' needs exactly one input')
         group = step.get('group_by')
-        if (op in GROUP_OPS) != (isinstance(group, str) and bool(group)):
+        if ((op in GROUP_OPS and not (isinstance(group, str) and group))
+                or (op not in GROUP_OPS and 'group_by' in step)):
             raise ValueError('group_by is required only for grouped numeric operations')
         dependencies = inputs + ([group] if group is not None else [])
         if any(c in excluded or (available is not None and c not in available) for c in dependencies):

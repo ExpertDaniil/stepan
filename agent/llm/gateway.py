@@ -464,6 +464,10 @@ class Gateway:
                             for field in ('artifact_id', 'error'):
                                 if field in previous:
                                     result[field] = previous[field]
+                            if name == 'analyze_data' and 'report' in previous:
+                                # The original reply can have been compacted in the
+                                # actual API request; retain the requested report now.
+                                result['report'] = deepcopy(previous['report'])
                             messages.append({'role': 'tool', 'tool_call_id': call['id'],
                                              'content': json.dumps(result, ensure_ascii=False)})
                             self.log.event('llm.tool_result_reused', call_no=call_no, tool=name,
@@ -589,7 +593,7 @@ class Gateway:
                 continue
             if not isinstance(user, dict) or not ('profile_summary' in user or 'profile' in user):
                 continue
-            profile = user.get('profile_summary', {})
+            profile = user.get('profile_summary', user)
             def refresh():
                 message['content'] = json.dumps(user, ensure_ascii=False)
             data = profile.get('data', user.get('profile', {}))
@@ -605,6 +609,16 @@ class Gateway:
             memory = profile.get('measured_search', {})
             while size() > limit and len(memory.get('entries', [])) > 4:
                 memory['entries'].pop();memory['omitted_count'] = memory.get('omitted_count', 0)+1;refresh()
+            archive = profile.get('feature_memory', {})
+            while size() > limit and len(archive.get('representations', [])) > 1:
+                archive['representations'].pop()
+                archive['omitted_representation_count'] = archive.get('omitted_representation_count', 0)+1
+                omissions.append('older_feature_program_details');refresh()
+            comparisons = profile.get('comparison_evidence', {})
+            while size() > limit and len(comparisons.get('comparisons', [])) > 1:
+                comparisons['comparisons'].pop()
+                comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
+                omissions.append('older_comparison_details');refresh()
         # Older reports remain retrievable by artifact_id. Preserve the latest tool
         # result and every assistant/tool-call pair so the API dialogue stays valid.
         tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']

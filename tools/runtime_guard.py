@@ -7,7 +7,7 @@ import sysconfig
 import threading
 
 
-def prepare_pipeline_imports(code_path):
+def prepare_pipeline_imports(code_path, base_recipe_id=None):
     """Initialize declared allowed libraries before sealing generated execution.
 
     Only package imports run here, never the generated module or its functions.
@@ -24,6 +24,13 @@ def prepare_pipeline_imports(code_path):
             modules.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             modules.add(node.module)
+    if isinstance(base_recipe_id, str):
+        if base_recipe_id.startswith('catboost-'):
+            modules.add('catboost')
+        elif base_recipe_id.startswith('linear-'):
+            modules.add('sklearn.linear_model')
+        elif base_recipe_id.startswith(('hist-gradient-', 'random-forest-', 'extra-trees-')):
+            modules.add('sklearn.ensemble')
     for name in sorted(modules):
         try:
             importlib.import_module(name)

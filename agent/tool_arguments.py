@@ -10,7 +10,7 @@ def normalize_tool_arguments(name, args):
         ids = value.get('ids', [])
         limit = value.get('max_results', 3)
         known = {'query', 'ids', 'tags', 'offset', 'max_results'}
-        if (not set(value) <= known or not isinstance(ids, list) or any(not isinstance(i, str) for i in ids)
+        if (not set(value) <= known or not isinstance(ids, list) or len(ids) > 3 or any(not isinstance(i, str) for i in ids)
                 or not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 3
                 or not isinstance(value.get('query', ''), str)
                 or not isinstance(value.get('tags', []), list)

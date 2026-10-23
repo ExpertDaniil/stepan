@@ -6,13 +6,28 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 
-from agent.feature_engineering import FeatureProgram
+from agent.feature_engineering import FeatureProgram, make_feature_pipeline
 from agent.feature_schema import validate_program
 from agent.research_actions import ACTION_SCHEMA
 from agent.contracts import Schemas
 
 
 class FeatureProgramTests(unittest.TestCase):
+    def test_custom_tuning_override_preserves_the_feature_program_and_input_parameters(self):
+        params = {'base_recipe_id': 'linear-regressor-v1', 'model_parameters': {'alpha': 1.},
+                  'feature_program': [{'op': 'missing', 'name': 'm', 'columns': ['a']}], 'model__alpha': 4.}
+        original = deepcopy(params)
+        pipeline = make_feature_pipeline({'task_kind': 'regression', 'target_column': 'y', 'excluded_features': []}, params)
+        self.assertEqual(pipeline.named_steps['model'].named_steps['model'].alpha, 4.)
+        self.assertEqual(pipeline.named_steps['features'].program, params['feature_program'])
+        self.assertEqual(params, original)
+
+    def test_numeric_group_keys_survive_csv_dtype_changes(self):
+        model = FeatureProgram([{'op': 'group_mean', 'name': 'm', 'columns': ['x'], 'group_by': 'g'}])
+        model.fit(pd.DataFrame({'g': [1., 1., 2.], 'x': [2., 6., 10.]}))
+        result = model.transform(pd.DataFrame({'g': [1, 2], 'x': [100, 200]}))
+        self.assertEqual(result['m'].tolist(), [4., 10.])
+
     def test_group_statistics_are_inductive_and_batch_invariant(self):
         fit = pd.DataFrame({'kind': ['a', 'a', 'b'], 'size': [2., 6., 10.]})
         program = [{'op': 'group_mean', 'name': 'mean_size', 'columns': ['size'], 'group_by': 'kind'},

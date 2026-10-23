@@ -7,7 +7,9 @@
     "recipes/catalog.json",
     "recipes/components.json",
     "agent/predictions.py",
-    "agent/worker.py"
+    "agent/worker.py",
+    "agent/feature_engineering.py",
+    "agent/feature_schema.py"
   ],
   "features": {
     "feature.class_weight": {

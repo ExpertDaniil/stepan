@@ -80,6 +80,11 @@ class ContextBuilder:
                 compact_profile.pop(field)
                 omitted_profile.append(field)
                 messages[1]["content"] = json.dumps(user, ensure_ascii=False)
+        feature_memory = user.get('feature_memory', {})
+        while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and len(feature_memory.get('representations', [])) > 1:
+            feature_memory['representations'].pop()
+            feature_memory['omitted_representation_count'] += 1
+            messages[1]['content'] = json.dumps(user, ensure_ascii=False)
         if len(json.dumps(messages, ensure_ascii=False).encode()) > limit:
             raise AgentError("CONTEXT_TOO_LARGE", "Task and mandatory context exceed the configured limit")
         metadata = {"schema_id": research_schema(self.catalog.config.research_mode), "researcher_id": payload["researcher_id"],
@@ -206,6 +211,14 @@ class ContextBuilder:
         while size() > limit and len(memory.get('entries', [])) > 8:
             memory['entries'].pop()
             memory['omitted_count'] += 1
+        feature_memory = user['profile_summary'].get('feature_memory', {})
+        while size() > limit and len(feature_memory.get('representations', [])) > 1:
+            feature_memory['representations'].pop()
+            feature_memory['omitted_representation_count'] += 1
+        comparisons = user['profile_summary'].get('comparison_evidence', {})
+        while size() > limit and len(comparisons.get('comparisons', [])) > 1:
+            comparisons['comparisons'].pop()
+            comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
         if size() > limit:
             raise AgentError("CONTEXT_TOO_LARGE", "Mandatory branch identity, measured base/history, code, recipe and task contract do not fit",
                              details={'context_bytes': size(), 'limit_bytes': limit})

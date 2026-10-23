@@ -27,7 +27,8 @@ def frozen_execution(artifacts, experiment, task_spec, phase):
     core = Store.fingerprint_core(experiment['plan'], actual_code_hash)
     if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
         raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
-    runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py']
+    runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py',
+               'agent/feature_engineering.py', 'agent/feature_schema.py', 'tools/runtime_guard.py']
     value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
              'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
     path = artifacts.safe_path('experiments/'+experiment['experiment_id']+'/execution.json')

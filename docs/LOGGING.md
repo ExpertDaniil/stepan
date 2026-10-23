@@ -185,3 +185,10 @@ by_category и десять крупнейших файлов, читая тол
 graph.plateau_assessed и GPlateau включают peer_trials_since_progress; причина продолжения показывает, когда одному peer ещё не хватает разных завершённых проверок. search.admission включает phase_seconds_remaining. search.phase_changed.reason может быть next_research_batch_would_cross_phase_boundary: допуск очередной партии учитывает прогноз LLM и fit.
 
 Компактная память находится в контексте profile_summary.measured_search: base_experiment_id, entries с измеренными score и изменениями относительно базы, omitted_count. Старые запросы LLM имеют приоритет над свежими локальными соседями. Текстовые предположения остаются гипотезами; authoritative метрика — только оценщик.
+Feature-research events: `features.seed_proposed` distinguishes controller seeds from
+LLM actions; worker `features_fitted` reports actual fitted operators. `research.dialogue_summary`
+and `llm.tool_phase_closed` expose decision latency. `research.feedback_delivered.active_series_ids`
+records active work actually shown to the provider. `research.admission_reconsidered` and
+`research.overlap_acknowledged` distinguish stale/unjustified overlap from deliberate work.
+`llm.tool_result_reused` links semantic reads to their original reply. `research.evidence_assessed`
+links model claims to controller-computed scope without declaring model prose verified.

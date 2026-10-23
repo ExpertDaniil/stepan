@@ -11,13 +11,20 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from agent.feature_schema import GROUP_OPS, validate_program
 
-
-
-
-
 def _keys(values):
-    # Prefix values by their type and length; missing and literal sentinels differ.
-    return values.map(lambda v: 'M' if pd.isna(v) else type(v).__name__+':'+str(len(str(v)))+':'+str(v))
+    def key(value):
+        if pd.isna(value):
+            return 'M'
+        if isinstance(value, (bool, np.bool_)):
+            return 'B:'+str(bool(value))
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            if not np.isfinite(value):
+                return 'M'
+            # CSV inference may yield int in one batch and float in another.
+            return 'N:'+str(int(value)) if value == int(value) else 'N:'+repr(float(value))
+        text = str(value)
+        return 'S:'+str(len(text))+':'+text
+    return values.map(key)
 
 
 def _number(values):
@@ -80,6 +87,8 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
                 result = result.str.len().astype(str)+':'+result+part.str.len().astype(str)+':'+part
             return result
         if op in {'month', 'dayofweek', 'hour'}:
+            if pd.api.types.is_numeric_dtype(raw):
+                raise ValueError('Numeric time needs explicit units in a custom pipeline; datetime operators expect strings/datetimes')
             dates = pd.to_datetime(raw, errors='coerce', utc=True)
             return getattr(dates.dt, op).astype(float)
         values = [_number(frame[c]) for c in columns]
@@ -128,6 +137,9 @@ def make_feature_pipeline(task_spec, params):
     for key in ('_cpu_threads', '_seed'):
         if key in options:
             model[key] = options.pop(key)
+    for key in list(options):
+        if key.startswith('model__') and key[7:] and not key[7:].startswith('_'):
+            model[key[7:]] = options.pop(key)
     if options or base.startswith(('python-', 'dummy-')):
         raise ValueError('Feature programs require one owned learned base recipe')
     return Pipeline([('features', FeatureProgram(program)), ('model', build_pipeline(base, task_spec, model))])

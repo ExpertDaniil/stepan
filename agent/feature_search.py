@@ -5,8 +5,6 @@ All measurements still pass through normal graph tickets, Runner and Evaluator.
 """
 from collections import deque
 from copy import deepcopy
-import hashlib
-import time
 import uuid
 
 from agent.contracts import canonical
@@ -77,6 +75,8 @@ class FeatureSearch:
                 or not c.budget.snapshot()['search_allowed']
                 or self.spent_seconds >= c.config.time_budget_seconds*c.config.feature_seed_budget_fraction
                 or (c.graph and c.graph.refinement())):
+            return None
+        if constraints and not c.catalog.allows_constraints('python-pipeline-v1', constraints):
             return None
         ids = c.graph.visible_history(branch) if c.graph else [r[0] for r in c.store.db.execute(
             'SELECT experiment_id FROM experiments WHERE run_id=?', (c.store.run_id,))]

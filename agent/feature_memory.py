@@ -1,9 +1,9 @@
 """Dispatcher-owned, branch-visible archive of measured feature representations."""
 from copy import deepcopy
 import hashlib
-import json
 
 from agent.contracts import canonical
+from agent.feature_schema import FACTORY_SOURCE
 
 
 def archive(store, artifacts, experiment_ids, limit=4):
@@ -25,7 +25,8 @@ def archive(store, artifacts, experiment_ids, limit=4):
             'experiment_id': eid, 'validation_id': plan['validation_id'],
             'primary_metric': deepcopy(ev['primary_metric']), 'code_artifact_id': plan['code_artifact_id'],
             'feature_steps': deepcopy(plan['feature_steps']), 'parameters': deepcopy(params),
-            'implementation': 'owned_program' if program else 'custom_source_declared_features',
+            'implementation': ('owned_program' if program and code == hashlib.sha256(FACTORY_SOURCE.encode()).hexdigest()
+                               else 'custom_source_declared_features'),
             'claim_scope': 'Complete configuration measured; feature/component causality not established.'}
         old = representations.get(identity)
         better = old is None or (score < old['primary_metric']['value'] if ev['primary_metric']['direction'] == 'minimize'
@@ -46,6 +47,9 @@ def archive(store, artifacts, experiment_ids, limit=4):
     for record in selected:
         if len(canonical(record).encode()) > 6000:
             record.pop('parameters')
+            if len(canonical(record).encode()) > 6000:
+                record['feature_steps'] = [{'step': str(s.get('step', 'custom'))[:100]}
+                                           for s in record['feature_steps'][:8]]
             record['details'] = 'Exact program/model in the frozen execution artifact for experiment_id.'
             omitted_details += 1
     return {'representations': selected, 'omitted_representation_count': len(records)-len(selected),

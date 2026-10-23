@@ -223,7 +223,8 @@ class Orchestrator:
             self.local_search.clear_series(plan['researcher_id'], branch)
         self.log.event('research.action_admitted', plan_id=plan['plan_id'], action=intent['action'],
                        branch_id=branch, tuning=intent['tuning'], effective_tuning=request, evidence_ids=intent['evidence_ids'])
-        self.publish_research_updates()
+        if hasattr(self, 'publish_research_updates'):
+            self.publish_research_updates()
         return intent
 
     def record_research_feedback(self, peer, branch, status, message, *, code=None):
@@ -396,8 +397,9 @@ class Orchestrator:
         try:
             return self._run_training(plans, tickets)
         finally:
-            if any(p['plan_id'] in self.feature_search.plan_ids for p in plans):
-                self.feature_search.spent_seconds += time.monotonic()-started
+            features = getattr(self, 'feature_search', None)
+            if features is not None and any(p['plan_id'] in features.plan_ids for p in plans):
+                features.spent_seconds += time.monotonic()-started
             optimizer = getattr(getattr(self, 'local_search', None), 'optuna', None)
             if optimizer is not None:
                 optimizer.sync()

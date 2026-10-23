@@ -9,6 +9,20 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def data_value(node, bindings):
+    """Interpret data literals/references only, never execute project code."""
+    if isinstance(node, ast.Name):
+        return bindings[node.id]
+    if isinstance(node, ast.Dict):
+        return {data_value(k, bindings): data_value(v, bindings) for k, v in zip(node.keys, node.values)}
+    if isinstance(node, (ast.List, ast.Tuple)):
+        values = [data_value(v, bindings) for v in node.elts]
+        return tuple(values) if isinstance(node, ast.Tuple) else values
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'list' and len(node.args) == 1 and not node.keywords:
+        return list(data_value(node.args[0], bindings))
+    return ast.literal_eval(node)
+
+
 def audit(root, official_archive=None):
     root = Path(root)
     files = [root/'solution.py']
@@ -72,6 +86,24 @@ def audit(root, official_archive=None):
             if isinstance(value.get(key), dict):
                 schema_structure(value[key])
     schema_structure(schema)
+    declarations = {}
+    for module in ('agent/feature_schema.py', 'agent/research_actions.py'):
+        for node in trees[module].body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        declarations[target.id] = data_value(node.value, declarations)
+    for module, name, definition in [('agent/research_actions.py', 'ACTION_SCHEMA', 'ResearchAction'),
+                                      ('tools/knowledge.py', 'KNOWLEDGE_SCHEMA', 'KnowledgeQuery'),
+                                      ('tools/analysis.py', 'ANALYSIS_SCHEMA', 'AnalysisQuery')]:
+        node = next(n for n in trees[module].body if isinstance(n, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
+        if data_value(node.value, declarations) != schema['$defs'][definition]:
+            raise ValueError('Runtime/contract schema declarations differ: '+definition)
+    frozen = next(n for n in ast.walk(trees['agent/runner.py']) if isinstance(n, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == 'runtime' for t in n.targets))
+    if not {'agent/feature_engineering.py', 'agent/feature_schema.py', 'tools/runtime_guard.py'} <= set(ast.literal_eval(frozen.value)):
+        raise ValueError('Feature execution dependencies missing from the frozen runtime')
     json_count = 0
     for directory in ('contracts', 'recipes'):
         for path in (root/directory).rglob('*.json'):
@@ -84,6 +116,8 @@ def audit(root, official_archive=None):
     return {'audit': 'static_source_and_package_inputs', 'python_files_parsed': len(trees),
         'owned_runtime_modules': len(modules), 'allowlisted_text_resources': len(resources),
         'json_files_parsed': json_count, 'schema_vocabulary_and_refs': 'checked_without_importing_project_modules',
+        'runtime_contract_schema_declarations': 'byte-independent_data_equality_checked',
+        'feature_execution_dependencies': 'included_in_frozen_runtime',
         'official_requirements_byte_equal': official_equal,
         'requirements_sha256': hashlib.sha256(requirements).hexdigest(),
         'knowledge_manifest': 'all_file_hashes_equal',

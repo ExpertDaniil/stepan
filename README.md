@@ -1,5 +1,13 @@
 # AutoML Agent · Adaptive Research
 
+Feature research now has executable composable programs, fit-only grouped statistics,
+a measured representation archive, rotating assignments and a small background seed bank.
+Details: [FEATURE-RESEARCH.md](docs/FEATURE-RESEARCH.md). Separate fixes cover
+[dialogue latency](docs/RESEARCH-LATENCY.md), [active-work coordination](docs/RESEARCH-COORDINATION.md),
+[semantic tool caching](docs/TOOL-SEMANTICS.md) and [evidence scopes](docs/EVIDENCE-SCOPES.md).
+The new defaults are enabled by the platform CLI. Static validation and remaining run
+checks are recorded in [VALIDATION-FEATURE-RESEARCH.md](docs/VALIDATION-FEATURE-RESEARCH.md).
+
 Актуальный апдейт исследовательского цикла: [MASTER-UPDATE.md](docs/MASTER-UPDATE.md).
 CLI по умолчанию использует platform без числовых квот разработки; `.env.example` явно
 выбирает development. Реализованы rolling dispatch, передача свежих оценок в API,

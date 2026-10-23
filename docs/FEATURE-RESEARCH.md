@@ -9,6 +9,9 @@ an owned base recipe and its parameters. The controller validates inputs against
 feature columns and compiles a frozen `python-pipeline-v1` plan. Original inputs remain;
 operations can consume earlier generated columns. Multiple changes are permitted.
 Custom Python `pipeline` and explicit custom tuning remain available.
+To tune a compiled feature pipeline, keep its complete program/model_parameters and
+add scalar `model__<parameter>` overrides in a custom `tune` space. They override only
+the named base-model values; features and fit statistics remain fixed by the source.
 
 Feature-focused assignments rotate between existing peers/rounds. They admit `features`,
 a changed declared custom input-feature pipeline, or `stop`; model-only tuning does not
@@ -32,6 +35,10 @@ Frequencies and grouped reference distributions fit without targets on fit rows 
 Validation/test batches never recompute these statistics. Unknown groups return missing;
 unseen frequency is zero; unsafe divisions/nonfinite values become missing. No clipping
 or removal of rows is implicit. Output names cannot overwrite original/excluded columns.
+Numeric group keys are stable across integer/float CSV inference. Numeric datetime
+columns require a custom conversion with explicit units. Worker telemetry records the
+actual fitted operator report. Feature modules and the runtime guard are included in
+the frozen execution hashes checked before refit.
 
 `feature_memory` is built by the dispatcher from visible, trusted evaluations. It includes
 diverse program identities, complete parameters, scores and immutable source references,

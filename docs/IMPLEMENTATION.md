@@ -1,4 +1,8 @@
 > Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).
+> Feature-research update: [FEATURE-RESEARCH.md](FEATURE-RESEARCH.md),
+> [VALIDATION-FEATURE-RESEARCH.md](VALIDATION-FEATURE-RESEARCH.md). The adaptive action set
+> includes features. Feature programs, rotating attention, active-search admission review
+> and computed comparison scopes are authoritative over the historical descriptions below.
 > Описания прежних defaults/отключённого byte cap ниже относятся к истории изменений.
 
 # Реализация и соответствие ТЗ

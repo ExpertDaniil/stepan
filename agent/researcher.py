@@ -146,6 +146,7 @@ class Researcher:
                  'knowledge_ids': proposed.get('knowledge_ids', []),
                  'research_notes': proposed.get('research_notes'),
                  'coordination': proposed.get('coordination', {}),
+                 'claims': proposed.get('claims', []), 'visible_evidence_ids': sorted(evidence),
                  'delivered_feedback': [c for c in answer.get('tool_calls', []) if c.get('name') == 'research_updates'],
                  'knowledge_retrieval_artifact_ids': list(dict.fromkeys(
                     ([knowledge['artifact_id']] if knowledge.get('artifact_id') else [])+
@@ -178,6 +179,8 @@ class Researcher:
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)
         record['delivered_feedback'] = [call for call in answer.get('tool_calls', []) if call.get('name') == 'research_updates']
         record['coordination'] = proposed.get('coordination', {})
+        record['claims'] = proposed.get('claims', [])
+        record['model_interpretations_verified'] = False
         art = self.artifacts.write_json('research/decision-'+uuid.uuid4().hex[:16]+'.json', record, 'research_decision')
         self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
             action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,

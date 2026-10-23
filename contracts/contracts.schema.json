@@ -14311,6 +14311,54 @@
             "reason"
           ],
           "additionalProperties": false
+        },
+        "claims": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "enum": [
+                  "hypothesis",
+                  "configuration",
+                  "component",
+                  "family"
+                ]
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 4
+              },
+              "component": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "scope",
+              "statement",
+              "evidence_ids",
+              "component"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [

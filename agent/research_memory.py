@@ -121,6 +121,7 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
         decisions.append({'decision_artifact_id': ident, 'action': record['action'], 'idea_id': selected,
             'question': notes['question'], 'decision_reason': notes['decision_reason'],
             'model_interpretation': notes['previous_result_interpretation'],
+            'model_interpretations_verified': False, 'model_claims': record.get('claims', []),
             'notes_supplied': record.get('research_notes') is not None,
             'evidence_ids': record['evidence_ids'], 'configuration': deepcopy(configuration),
             'requested_tuning': record.get('tuning'), 'tuning_series': tuning_series,

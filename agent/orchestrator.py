@@ -174,7 +174,9 @@ class Orchestrator:
                     pending_experiments.append({'experiment_id': eid, 'state': exp['state'],
                         'researcher_id': exp['plan']['researcher_id'], 'recipe_id': exp['plan']['recipe_id'],
                         'plan_id': exp['plan']['plan_id']})
+            from agent.evidence import comparison_context
             mailbox.publish(scope, {'branch_id': scope, 'validation_id': self.validation['validation_id'],
+                'comparison_evidence': comparison_context(self.store, self.artifacts, ids),
                 'measurement_generation': generation, 'activity': activity,
                 'pending_experiments': pending_experiments[-4:],
                 'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
@@ -237,6 +239,20 @@ class Orchestrator:
     def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
         """Authorize an action before deduplicating its optional starting fit."""
         candidate_intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        from agent.evidence import assess_claims
+        assessed = assess_claims(self.store, self.artifacts, candidate_intent.get('claims', []),
+                                 candidate_intent.get('visible_evidence_ids', []))
+        assessment = self.artifacts.write_json('research/evidence-'+uuid.uuid4().hex[:16]+'.json',
+            {'plan_id': plan['plan_id'], 'branch_id': branch, 'assessments': assessed,
+             'model_prose_verified': False, 'scope': 'Only controller-computed measurements/contrasts are authoritative.'},
+            'evidence_assessment')
+        unsupported = sum(a['status'] == 'unverified' and a['model_claim']['scope'] != 'hypothesis' for a in assessed)
+        self.log.event('research.evidence_assessed', plan_id=plan['plan_id'], artifact_id=assessment['artifact_id'],
+                       claims=len(assessed), unsupported_claims=unsupported, model_prose_verified=False)
+        if unsupported:
+            self.record_research_feedback(plan['researcher_id'], branch, 'unsupported_claim_scope',
+                'The complete experiment can proceed, but '+str(unsupported)+' claims exceed the available evidence. '
+                'Read controller comparison_evidence; component mechanisms and family ceilings remain unresolved.')
         coordinator = getattr(self, 'coordination', None)
         conflict = coordinator.review(plan, candidate_intent, branch) if coordinator is not None else None
         if conflict is not None:

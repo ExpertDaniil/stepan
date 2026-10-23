@@ -57,6 +57,8 @@ class ContextBuilder:
                 from agent.research_feedback import compact_memory
                 user['research_memory'] = compact_memory(user['research_memory'])
                 user['feature_memory'] = archive(self.store, self.artifacts, ids)
+                from agent.evidence import comparison_context
+                user['comparison_evidence'] = comparison_context(self.store, self.artifacts, ids)
             user['recipes'] = self.catalog.branch_recipes(allowed, {'required_capability_ids': [], 'forbidden_capability_ids': []})
             user['research_feedback'] = list(getattr(self, 'research_feedback', []))
             if getattr(self, 'analysis', None):
@@ -167,6 +169,9 @@ class ContextBuilder:
                     'parameter-only tuning/catalog actions will be rejected. Stop with a reason if none is useful.')
             if getattr(self, 'store', None):
                 user['profile_summary']['feature_memory'] = archive(self.store, self.artifacts,
+                    graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
+                from agent.evidence import comparison_context
+                user['profile_summary']['comparison_evidence'] = comparison_context(self.store, self.artifacts,
                     graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
             from agent.research_feedback import compact_memory

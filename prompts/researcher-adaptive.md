@@ -101,6 +101,14 @@ Open means unresolved, not a requirement to spend budget on every idea. You may 
 deferred with a concrete cost/evidence reason. Previously read knowledge IDs in memory are
 provenance, not their full source text; retrieve content again when the implementation depends on it.
 Controller observations attach to the exact complete configuration and validation protocol.
+comparison_evidence is computed by the controller from actual parameters/source and metrics.
+Use its changed_parameters, source_changed and supported_scope when interpreting outcomes.
+For substantive conclusions, include claims=[{scope,statement,evidence_ids,component}].
+scope is hypothesis, configuration, component, or family. A comparison uses two actual
+experiment IDs. For a parameter contrast use the exact controller contrast_parameter
+as component; otherwise component=null. The controller records only the supported
+measurement scope, never promotes your prose to a verified statement. Family-ceiling
+claims from finite trials are unsupported. No extra LLM review is needed for this check.
 A bad joint feature/model/parameter trial does not show which component failed. A few local
 tuning trials do not exhaust a family. Marginal correlation does not eliminate interactions.
 State these limits in previous_result_interpretation; defer broader ideas instead of declaring

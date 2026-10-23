@@ -49,6 +49,13 @@ ACTION_SCHEMA = {
             'related_series_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 4},
             'reason': {'type': 'string', 'minLength': 12, 'maxLength': 1000}},
             'required': ['related_series_ids', 'reason'], 'additionalProperties': False},
+        'claims': {'type': 'array', 'maxItems': 6, 'items': {
+            'type': 'object', 'properties': {
+                'scope': {'enum': ['hypothesis', 'configuration', 'component', 'family']},
+                'statement': {'type': 'string', 'minLength': 1, 'maxLength': 1000},
+                'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 4},
+                'component': {'anyOf': [{'type': 'string', 'minLength': 1}, {'type': 'null'}]}},
+            'required': ['scope', 'statement', 'evidence_ids', 'component'], 'additionalProperties': False}},
         'recipe_id': {'type': 'string', 'minLength': 1},
         'hyperparameters': {'type': 'object'},
         'hypothesis': {'type': 'string', 'minLength': 1},

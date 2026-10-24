@@ -16,6 +16,14 @@ worker JobSpec получил optional `input_tables` с path/hash manifests. О
 
 # Реализация и соответствие ТЗ
 
+Научный цикл: [SCIENTIFIC-RESEARCH.md](SCIENTIFIC-RESEARCH.md).
+`ScientificResearch` строит dispatcher-owned проекцию эпизода и preflight;
+`FitDiagnostics` создаёт отдельные bounded jobs через Runner. Их результаты
+не проходят C15/C16 и не меняют состояние/score кандидата. C00–C24 сохраняются;
+ResearchAction поддерживает optional `research_notes.test_plan` для совместимости
+старых артефактов, а новые `scientific-v1` контексты требуют его в API-схеме и
+приёмщике Researcher. Producer, consumer и сохранённая schema обновлены вместе.
+
 Завершение диалогов и продвижение разрешённых серий во время API-ожидания:
 [DIALOGUE-PROGRESS.md](DIALOGUE-PROGRESS.md). Budget атомарно защищает финальные запросы
 и output tokens; Gateway освобождает неизрасходованные резервы в finally. Graph controller

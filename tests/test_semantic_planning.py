@@ -19,7 +19,8 @@ from agent.semantic_planning import (build_task_model, unknown_model, semantic_v
     effective_model, relation_checks, validate_investigation, check_declared_semantics, load_task_model)
 from tests.graph_helpers import GraphHarness
 from tests.test_adaptive_research import action
-from tests.test_analysis_access import AnalysisAccessTests, query
+from tests import test_analysis_access as analysis_fixture
+from tests.test_analysis_access import query
 
 
 def fixture():
@@ -192,7 +193,7 @@ class CyclicFeatureTests(unittest.TestCase):
             validate_program([{'op': 'square', 'name': 's', 'columns': ['a'], 'period': 360}])
 
 
-class ExactSemanticChecks(AnalysisAccessTests):
+class ExactSemanticChecks(analysis_fixture.AnalysisAccessTests):
     def test_rare_violation_is_counted_over_all_fit_rows_and_missing_support_is_explicit(self):
         train = pd.DataFrame({'x': [float(i) for i in range(30000)], 'group': ['a']*30000, 'target': [999999]*30000})
         train.loc[1, 'x'] = np.nan
@@ -205,7 +206,13 @@ class ExactSemanticChecks(AnalysisAccessTests):
         self.assertEqual(report['checks'][0]['evaluable_rows'], 29998)
         self.assertEqual(report['checks'][0]['missing_rows'], 1)
         self.assertEqual(report['checks'][1]['violation_rows'], 0)
-        self.assertNotIn('999999', canonical(report))
+        def numeric_values(value):
+            if isinstance(value, dict):
+                return [v for item in value.values() for v in numeric_values(item)]
+            if isinstance(value, list):
+                return [v for item in value for v in numeric_values(item)]
+            return [value] if isinstance(value, (int, float)) else []
+        self.assertNotIn(999999, numeric_values(report))
 
     def test_check_filters_before_counting_and_supports_named_derived_expression(self):
         report = self.service().analyze(query('check', columns=['delta'],

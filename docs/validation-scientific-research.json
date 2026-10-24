@@ -1,0 +1,190 @@
+{
+  "branch": "feat/final-data-research",
+  "base_remote_commit": "dd4b95e755257945d32c07eb243f60871002efe6",
+  "original_implementation_base": "75087993062e30ea7ce48242bd428c0d35b323f5",
+  "date": "2026-10-24",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.8.0",
+    "joblib": "1.5.3",
+    "official_pinned_environment": false
+  },
+  "focused": {
+    "command": "python3 -m unittest tests.test_scientific_research tests.test_semantic_planning tests.test_semantic_research tests.test_research_memory tests.test_tool_semantics tests.test_feature_programs tests.test_adaptive_research.AdaptiveIntegrationTests -q",
+    "tests": 106,
+    "passed": 106,
+    "seconds": 34.602
+  },
+  "new_scientific_tests": {
+    "tests": 10,
+    "passed": 10,
+    "included_in_focused_and_full": true
+  },
+  "static": {
+    "validation": "static_only; no agent imports, regression execution, fitting or API calls",
+    "python_files_parsed": 130,
+    "runtime_modules": 69,
+    "runtime_resources": 19,
+    "schema_declaration_equality": true,
+    "resolved_schema_references": 170,
+    "new_json_examples_checked": 4,
+    "original_contract_examples_checked": 86,
+    "flat_module_names_unique": true,
+    "official_requirements_equal": true,
+    "schema_sha256": "5f5ba97e70535f79bf511002cc390bfbddd854d03a2289607d0227d21813b14e",
+    "new_regression_methods_written": 26,
+    "json_files_parsed": 184,
+    "adaptive_prompt_bytes": 14596,
+    "research_action_schema_bytes": 8853,
+    "analysis_tool_schema_bytes": 4692,
+    "scope_note": "This command executes static checks only; dynamic results are recorded separately."
+  },
+  "package": {
+    "runtime_files": 89,
+    "bytes": 593993,
+    "sha256": "94956be2a846e365797817621f2a6e514e6ea8bc4ac3571500738dbbd094bb3c",
+    "flat_root_files": 72,
+    "all_runtime_modules_byte_identical": true,
+    "byte_identical_modules": 69,
+    "byte_identical_resources": 19,
+    "official_requirements_unchanged": true,
+    "isolated_execution_tests_passed": [
+      "tests.test_end_to_end.EndToEndTests.test_flat_platform_copy_runs_research_without_repository_path",
+      "tests.test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression"
+    ]
+  },
+  "demonstrations": [
+    {
+      "kind": "regression",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 4,
+      "evaluated_owned_feature_programs": 1,
+      "analyses": 1,
+      "unfinished_jobs": 0,
+      "scripted_llm": true,
+      "scientific_research": {
+        "test_plans": 3,
+        "followups": 1,
+        "oof_reports": 1,
+        "oof_unavailable": 0,
+        "preflight_deferrals": 0,
+        "extended_dialogues": 0,
+        "reported_reasoning_tokens": 0,
+        "calls_without_reasoning_usage": 6,
+        "calls_with_reasoning_field": 0,
+        "provider_thinking_application": "unverified; request flags and reported usage do not measure decision quality"
+      },
+      "oof_details": [
+        {
+          "sampled_fit_rows": 384,
+          "complete_fit_rows": 384,
+          "predicted_rows": 384,
+          "scanned_columns": 3,
+          "folds": 3,
+          "split_strategy": "random_holdout",
+          "sampled": false,
+          "score_authoritative": false
+        }
+      ]
+    },
+    {
+      "kind": "classification",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 4,
+      "evaluated_owned_feature_programs": 1,
+      "analyses": 1,
+      "unfinished_jobs": 0,
+      "scripted_llm": true,
+      "scientific_research": {
+        "test_plans": 3,
+        "followups": 1,
+        "oof_reports": 1,
+        "oof_unavailable": 0,
+        "preflight_deferrals": 0,
+        "extended_dialogues": 0,
+        "reported_reasoning_tokens": 0,
+        "calls_without_reasoning_usage": 6,
+        "calls_with_reasoning_field": 0,
+        "provider_thinking_application": "unverified; request flags and reported usage do not measure decision quality"
+      },
+      "oof_details": [
+        {
+          "sampled_fit_rows": 384,
+          "complete_fit_rows": 384,
+          "predicted_rows": 384,
+          "scanned_columns": 3,
+          "folds": 3,
+          "split_strategy": "stratified_holdout",
+          "sampled": false,
+          "score_authoritative": false
+        }
+      ]
+    }
+  ],
+  "integration": {
+    "remote_changed_blobs_verified": 59,
+    "three_way_merged_files": 14,
+    "fixed": [
+      "GResearchContext metadata schema accepts actual immutable details and semantic binding",
+      "Full research memory frozen before compaction and episode accounting",
+      "Duplicate imported TestCase discovery removed",
+      "Target sentinel comparison uses numeric values, not substrings of duration",
+      "Bounded scientific hints retain scoped full records; repeated prompt prose shortened",
+      "Preserve feature-input validation before semantic interpretation checks",
+      "Feature execution reports support legacy direct jobs without result_path",
+      "Only fitted owned transformer instances are reported, including target-transform estimator clones",
+      "SDK wiring test explicitly mocks httpx and verifies request hook"
+    ]
+  },
+  "full_suite": {
+    "command": "python3 scripts/check.py --jobs 3",
+    "tests": 438,
+    "passed": 426,
+    "unique_nonpassing": 12,
+    "framework_errors": 10,
+    "framework_failed_subtests": 3,
+    "seconds": 465.949,
+    "nonpassing_ids": [
+      "tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_expired_tuning_authorization_does_not_poison_catalogue_fallback",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tuning_rebase_preserves_axes_that_were_not_authorized",
+      "tests.test_adaptive_research.AdaptiveResearchTests.test_local_tuning_requires_authorization_and_respects_axes_count_and_time",
+      "tests.test_dialogue_progress.TuningProgressTests.test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning",
+      "tests.test_optuna_search.OptunaSearchTests.test_completed_trial_reaches_optuna_and_research_memory",
+      "tests.test_optuna_search.OptunaSearchTests.test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory",
+      "tests.test_optuna_search.OptunaSearchTests.test_declared_increase_region_is_sampled_jointly_and_anchor_is_unchanged",
+      "tests.test_optuna_search.OptunaSearchTests.test_expired_authorization_proposes_no_new_work",
+      "tests.test_optuna_search.OptunaSearchTests.test_optimizer_tell_failure_preserves_the_committed_evaluation",
+      "tests.test_optuna_search.OptunaSearchTests.test_pending_duplicate_does_not_release_another_trials_claim",
+      "tests.test_optuna_search.OptunaSearchTests.test_verified_history_warms_only_the_same_fixed_pipeline_and_resumes_study"
+    ],
+    "new_nonpassing_vs_previous_dependency_limits": [],
+    "cause": "Optuna absent: ten direct load errors and two dependent integration scenarios; no package installation, skips or substitutes."
+  },
+  "limits": [
+    "Scripted LLM demonstrations verify execution, not live idea quality or competition improvement",
+    "No live API credentials were available; provider thinking application and live A/B not verified",
+    "Official pinned container and native CatBoost not verified",
+    "Optuna absent; no dependency installation, optimizer skips or substitutes",
+    "No causal conclusion, family ceiling or private reasoning is inferred from measured configurations"
+  ],
+  "post_integration_regressions": {
+    "command": "python3 -m unittest tests.test_time_search.ContinuedSearchTests.test_legacy_controller_also_uses_time_and_local_trials tests.test_data_transport tests.test_prediction_contracts tests.test_gateway_logging tests.test_feature_admission tests.test_scientific_research -q",
+    "tests": 52,
+    "passed": 52,
+    "seconds": 82.133
+  },
+  "feature_admission_regressions": {
+    "command": "python3 -m unittest tests.test_feature_admission tests.test_semantic_planning tests.test_scientific_research tests.test_adaptive_research.AdaptiveIntegrationTests -q",
+    "tests": 57,
+    "passed": 57,
+    "seconds": 26.029
+  },
+  "additional_observation": {
+    "concurrent_scripted_run": "One run had a completed summary and published feature candidate but events.jsonl ended during OOF; event-based demonstration assertion failed. A fresh repeat passed all assertions for both task types. Cause not established; no live-quality inference."
+  }
+}

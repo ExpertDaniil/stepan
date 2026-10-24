@@ -108,6 +108,8 @@ class MockTransport:
                     column = next(c for c in data['train_columns'] if c in data['test_columns'] and c != 'id')
                     payload.update(action='features', feature_program=[
                         {'op': 'missing', 'name': '__mock_missing_'+str(round_no), 'columns': [column]}])
+                from agent.scientific_research import synthetic_notes
+                payload['research_notes'] = synthetic_notes(payload, user)
                 payload['investigation'] = {
                     'question': 'Does this complete synthetic configuration improve the measured base?',
                     'basis_ids': [], 'columns': [column] if payload['action'] == 'features' else [],
@@ -225,6 +227,7 @@ class Gateway:
                            destination=self._destination(), token_budget=self.budget.token_snapshot())
             if delivered:
                 evidence_ids = [delivered['artifact_id']]
+                evidence_ids.extend(r['artifact_id'] for r in delivered.get('fit_diagnostics', []))
                 for result in delivered['results']:
                     evidence_ids.extend(result[k] for k in ('experiment_id', 'evaluation_id', 'diagnostics_artifact_id'))
                 evidence_ids.extend(s['artifact_id'] for s in delivered['series'])
@@ -327,6 +330,12 @@ class Gateway:
         context = self.artifacts.read_json(payload["context_artifact_id"])
         messages = deepcopy(context["messages"])
         expected = deepcopy(self.output_schemas[payload["response_schema_id"]])
+        user = json.loads(context['messages'][1]['content']) if payload['response_schema_id'] == 'ResearchAction-v1' else {}
+        scientific = user.get('profile_summary', user).get('scientific_protocol', {}) if isinstance(user, dict) else {}
+        if payload['response_schema_id'] == 'ResearchAction-v1' and scientific.get('version') == 'scientific-v1':
+            expected['required'] = list(dict.fromkeys([*expected['required'], 'research_notes']))
+            notes = expected['properties']['research_notes']
+            notes['required'] = list(dict.fromkeys([*notes['required'], 'test_plan']))
         if payload['response_schema_id'] == 'TaskDraft-v1':
             for variant in expected['oneOf']:
                 if 'target_column' in variant.get('properties', {}):
@@ -342,8 +351,18 @@ class Gateway:
         messages.insert(1, {"role": "system", "content": "Final output JSON schema:\n" + json.dumps(expanded(expected), ensure_ascii=False)})
         reserve = self.budget.reserve_seconds() + 1 if payload["purpose"] == "research_proposal" else .5
         deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
+        extended = bool(scientific.get('deliberation', {}).get('extended_requested'))
+        deep_tokens = min(payload['max_output_tokens']*2, self.config.llm_max_output_tokens_limit)
+        funded_deep = (payload['response_schema_id'] == 'ResearchAction-v1' and extended
+                       and self.budget.token_snapshot()['output_available'] >= 2*deep_tokens
+                       and deadline-dialogue_started >= self.config.llm_research_dialogue_seconds)
         if payload['response_schema_id'] == 'ResearchAction-v1':
-            deadline = min(deadline, dialogue_started+self.config.llm_research_dialogue_seconds)
+            seconds = max(self.config.llm_research_dialogue_seconds, self.config.research_deep_dialogue_seconds) if funded_deep else self.config.llm_research_dialogue_seconds
+            deadline = min(deadline, dialogue_started+seconds)
+            self.log.event('llm.deliberation_budget', context_id=payload['context_artifact_id'],
+                extended_requested=extended, extended_funded=funded_deep,
+                dialogue_seconds=seconds, output_tokens=deep_tokens if funded_deep else payload['max_output_tokens'],
+                provider_thinking_application='unverified')
         phase_limited = False
         if payload['purpose'] == 'research_proposal' and self.budget.phase_deadline:
             # This is a response deadline only. A received proposal can wait in
@@ -384,7 +403,7 @@ class Gateway:
             tools.append({'type': 'function', 'function': {'name': 'search_knowledge',
                 'description': 'Search offline Kaggle experience and complete project-authored pipeline examples. Returns content, source IDs and current-pipeline cautions, not just links. Use ids to read a known item. External experience is not current-task evidence; cite its IDs only in knowledge_ids. No network.',
                 'parameters': KNOWLEDGE_SCHEMA}})
-        token_limit = min(payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
+        token_limit = min(deep_tokens if funded_deep else payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
         dialogue_id, slots = None, 0
         if payload['response_schema_id'] == 'ResearchAction-v1':
             dialogue_id, slots = self.budget.reserve_dialogue(token_limit, repair=payload['attempt_limit'] > 1)
@@ -692,6 +711,10 @@ class Gateway:
                 profile['research_memory'] = compact_memory(profile['research_memory'],
                     base_experiment_id=user.get('base_experiment_id'), max_bytes=8000)
                 omissions.append('bounded_research_memory');refresh()
+            if size() > limit and profile.get('scientific_protocol'):
+                from agent.scientific_research import compact_protocol
+                profile['scientific_protocol'] = compact_protocol(profile['scientific_protocol'])
+                omissions.append('scientific_hints_with_scoped_details');refresh()
             for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
                 if size() <= limit:
                     break

@@ -88,6 +88,7 @@ def execute(job, trusted_thread=None):
             raise ValueError('Pipeline code changed between job admission and worker execution')
     task = job["task_spec"]
     from agent.data_transport import worker_inputs
+    from agent.fit_diagnostics import execute_oof
     data_started = time.monotonic()
     train_rows, fit_x, fit_y, predict_x = worker_inputs(job)
     data_seconds = time.monotonic()-data_started
@@ -130,6 +131,9 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
     from agent.ml import enforce_threads, validate_estimator
     from agent.predictions import predict, targets, validation_columns
     module_spec.loader.exec_module(module)
+    if job.get('diagnostic'):
+        from agent.fit_diagnostics import execute_oof
+        return execute_oof(module, task, params, fit_x, fit_y, job, guard, limits)
     print("AUTOML_WORKER "+json.dumps({"stage": "constructing", "phase": job["phase"], "rows": train_rows, "features": len(fit_x.columns)}),flush=True)
     model = validate_estimator(enforce_threads(module.make_pipeline(task, params), job["cpu_threads"]))
     if len(targets(task)) > 1:
@@ -177,13 +181,21 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             if id(transformer) in seen:
                 continue
             seen.add(id(transformer))
-            if isinstance(transformer, (FeatureProgram, NumericInteractions)):
+            # Target-transform wrappers retain both their constructor template
+            # and a fitted clone. Only the clone proves feature execution.
+            for field in ('estimator_', 'regressor_', 'best_estimator_'):
+                fitted_child = getattr(transformer, '__dict__', {}).get(field)
+                if fitted_child is not None:
+                    objects.append(fitted_child)
+                    if hasattr(fitted_child, 'get_params'):
+                        objects.extend(fitted_child.get_params(deep=True).values())
+            if isinstance(transformer, (FeatureProgram, NumericInteractions)) and hasattr(transformer, 'report_'):
                 item = {'target_index': target_index, 'report': transformer.report_,
                         'verification': 'owned_transformer_executed', 'units': 'not_inferred'}
                 execution.append(item)
                 print('AUTOML_WORKER '+json.dumps({'stage': 'features_fitted', **item}, allow_nan=False), flush=True)
     # Declarations for arbitrary custom code are never promoted to execution proof.
-    Path(job['result_path']).with_name('features.json').write_text(json.dumps({
+    Path(job.get('result_path', job['prediction_path'])).with_name('features.json').write_text(json.dumps({
         'owned_transformers': execution, 'custom_semantics_verified': False}, allow_nan=False), encoding='utf-8')
     output = Path(job["prediction_path"])
     print("AUTOML_WORKER "+json.dumps({"stage": "prediction_completed", "phase": job["phase"], "fit_seconds": fit_seconds, "prediction_rows": len(frame)}),flush=True)

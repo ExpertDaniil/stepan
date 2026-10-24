@@ -126,6 +126,9 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
             if not ideas[key]['tested_experiment_ids'] and ideas[key].get('status') not in {'running', 'measured'}:
                 ideas[key]['status'] = 'deferred'
         decisions.append({'decision_artifact_id': ident, 'action': record['action'], 'idea_id': selected,
+            'researcher_id': record.get('researcher_id'), 'test_plan': deepcopy(notes.get('test_plan')),
+            'knowledge_ids': record.get('knowledge_ids', []),
+            'created_monotonic': record.get('created_monotonic'),
             'question': notes['question'], 'decision_reason': notes['decision_reason'],
             'model_interpretation': notes['previous_result_interpretation'],
             'model_interpretations_verified': False, 'model_claims': record.get('claims', []),

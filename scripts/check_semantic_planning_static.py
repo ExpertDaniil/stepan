@@ -25,7 +25,13 @@ def expression(node, env):
         values = [expression(x, env) for x in node.elts]
         return tuple(values) if isinstance(node, ast.Tuple) else set(values) if isinstance(node, ast.Set) else values
     if isinstance(node, ast.Dict):
-        return {expression(k, env): expression(v, env) for k, v in zip(node.keys, node.values)}
+        result = {}
+        for key, value in zip(node.keys, node.values):
+            if key is None:
+                result.update(expression(value, env))
+            else:
+                result[expression(key, env)] = expression(value, env)
+        return result
     if isinstance(node, ast.Subscript):
         return expression(node.value, env)[expression(node.slice, env)]
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
@@ -68,6 +74,12 @@ def synchronized(schema, values):
     defs['Investigation'] = values['INVESTIGATION_SCHEMA']
     defs['ResearchAction'] = values['ACTION_SCHEMA']
     defs['AnalysisQuery'] = values['ANALYSIS_SCHEMA']
+    if 'GResearchContext' in defs:
+        defs['GResearchContext']['properties']['metadata']['properties'].update(
+            graph_request_max_bytes={'type': 'integer', 'minimum': 1},
+            detail_artifact_id={'type': 'string', 'minLength': 1},
+            detail_scope={'type': 'object', 'additionalProperties': True},
+            semantic_contract={'const': 'semantic-planning-1'})
     defs['TaskSpec']['properties'].update(semantic_model_artifact_id={'type': 'string', 'minLength': 1},
                                          semantic_model_id={'type': 'string', 'minLength': 1})
     draft = defs['C02_Response']['oneOf'][0]['properties']['data']['properties']['draft']

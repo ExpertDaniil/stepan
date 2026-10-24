@@ -69,6 +69,11 @@ class Orchestrator:
             recovery = self.graph.invoke("G12", {"mode": "inspect", "trusted_wall_seconds_remaining": int(budget.remaining())})
             if recovery["state"] == "blocked":
                 raise AgentError("GRAPH_RECOVERY_BLOCKED", "; ".join(recovery["blocking_reasons"]))
+        self.science = None
+        if config.research_mode == 'adaptive' and config.scientific_research_enabled:
+            from agent.scientific_research import ScientificResearch
+            self.science = ScientificResearch(self)
+            self.context.science = self.science
 
     def call(self, cid, payload, handler, key=None):
         return self.bus.call(cid, payload, handler, key=key)["data"]
@@ -81,7 +86,7 @@ class Orchestrator:
     def release(self, job):
         if self.runner.poll(job) is None:
             raise AgentError("PROCESS_STOP_FAILED", "Refusing to release a running process tree")
-        self.call("C13", {"operation": "release", "owner_id": job.experiment_id if job.phase == "train" else job.submission_job_id,
+        self.call("C13", {"operation": "release", "owner_id": getattr(job, 'lease_owner_id', None) or (job.experiment_id if job.phase == "train" else job.submission_job_id),
                            "phase": job.phase, "requested": self.resources(job.lease["timeout_seconds"]),
                            "lease_id": job.lease["lease_id"], "fencing_token": job.lease["fencing_token"]}, self.budget.lease,
                   key="release/" + job.lease["lease_id"])
@@ -161,10 +166,12 @@ class Orchestrator:
             for s in series[-4:]:
                 summaries.append({k: v for k, v in s.items() if k != 'trials'})
             activity = self.coordination.snapshot(scope)
+            fit_diagnostics = self.science.diagnostics.visible(ids) if getattr(self, 'science', None) else []
             terminal_states = [(eid, self.store.get(eid)['state']) for eid in ids
                                if self.store.get(eid)['state'] in {'failed', 'invalid', 'timed_out', 'cancelled'}]
             generation = hashlib.sha256(json.dumps([
-                [(r['experiment_id'], r['primary_metric']) for r in measured], terminal_states],
+                [(r['experiment_id'], r['primary_metric']) for r in measured], terminal_states,
+                [r['artifact_id'] for r in fit_diagnostics]],
                 sort_keys=True, allow_nan=False).encode()).hexdigest()
             pending_experiments = []
             pending_ids = ([r[0] for r in self.store.db.execute(
@@ -185,6 +192,7 @@ class Orchestrator:
                 'pending_experiments': pending_experiments[-4:],
                 'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
                 'results': latest, 'omitted_result_count': len(measured)-len(latest),
+                'fit_diagnostics': fit_diagnostics,
                 'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
                 'instruction': 'New controller measurements available at request dispatch. Compare only compatible protocols. '
                     'The immutable assignment base remains unchanged; cite these results when choosing the next action.'})
@@ -220,6 +228,9 @@ class Orchestrator:
         request = None
         if intent['action'] == 'tune':
             request = dict(intent['tuning'])
+            science = getattr(self, 'science', None)
+            if science is not None and plan['plan_id'] in science.funding:
+                request['budget_seconds'] = min(request['budget_seconds'], science.funding[plan['plan_id']])
             request['budget_seconds'] = min(request['budget_seconds'], max(0, int(min(
                 self.budget.phase_remaining(), self.budget.remaining()-self.budget.reserve_seconds()))))
             self.local_search.start_series(plan['researcher_id'], branch, plan, request=request)
@@ -244,6 +255,10 @@ class Orchestrator:
     def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
         """Authorize an action before deduplicating its optional starting fit."""
         candidate_intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        science = getattr(self, 'science', None)
+        if science is not None and science.review(plan, candidate_intent, branch):
+            self.publish_research_updates()
+            return None
         from agent.evidence import assess_claims
         assessed = assess_claims(self.store, self.artifacts, candidate_intent.get('claims', []),
                                  candidate_intent.get('visible_evidence_ids', []))
@@ -352,7 +367,7 @@ class Orchestrator:
             self.log.event("job.progress", job_id=job.job_id, experiment_id=job.experiment_id, phase=job.phase,
                            elapsed_seconds=round(elapsed, 1), timeout_seconds=job.lease["timeout_seconds"],
                            peak_memory_mb=round(job.peak_memory_mb, 1), run_seconds_remaining=round(self.budget.remaining(), 1))
-            self.call("C13", {"operation": "renew", "owner_id": job.experiment_id if job.phase == "train" else job.submission_job_id,
+            self.call("C13", {"operation": "renew", "owner_id": getattr(job, 'lease_owner_id', None) or (job.experiment_id if job.phase == "train" else job.submission_job_id),
                                "phase": job.phase, "requested": self.resources(job.lease["timeout_seconds"]),
                                "lease_id": job.lease["lease_id"], "fencing_token": job.lease["fencing_token"]}, self.budget.lease)
             job.last_heartbeat = now
@@ -367,6 +382,14 @@ class Orchestrator:
                     self._heartbeat_and_limits(job)
                     event = self.runner.poll(job)
                 if event is None:
+                    continue
+                if getattr(job, 'diagnostic', False):
+                    # Diagnostic predictions are discovery evidence, never a
+                    # candidate state transition, score, or duration observation.
+                    self.release(job)
+                    job.reported = True
+                    results[job.job_id] = event
+                    pending.remove(job)
                     continue
                 if getattr(self, "graph", None):
                     try:

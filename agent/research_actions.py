@@ -17,6 +17,16 @@ IDEA_SCHEMA = {
     'additionalProperties': False}
 RESEARCH_NOTES_SCHEMA = {
     'type': 'object', 'properties': {
+        'test_plan': {'type': 'object', 'properties': {
+            **{key: {'type': 'string', 'minLength': 12, 'maxLength': 1000} for key in
+               ('observation', 'prediction', 'falsifier', 'cheap_check', 'counterargument')},
+            'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
+            'continuation': {'enum': ['new', 'followup', 'reconsider', 'stop']},
+            'switch_reason': {'type': 'string', 'maxLength': 1000},
+            'alternatives_unavailable_reason': {'type': 'string', 'maxLength': 1000}},
+            'required': ['observation', 'prediction', 'falsifier', 'cheap_check', 'counterargument',
+                         'evidence_ids', 'continuation', 'switch_reason', 'alternatives_unavailable_reason'],
+            'additionalProperties': False},
         'idea_id': {'anyOf': [{'type': 'string', 'minLength': 1}, {'type': 'null'}]},
         'question': {'type': 'string', 'minLength': 1, 'maxLength': 1000},
         'mechanism': {'type': 'string', 'minLength': 1, 'maxLength': 1000},
@@ -100,6 +110,8 @@ def validate_research_notes(notes, memory, evidence, knowledge):
     """Check reference provenance, not the truth of model-authored interpretations."""
     if notes is None:
         return
+    if not set(notes.get('test_plan', {}).get('evidence_ids', [])) <= evidence:
+        raise AgentError('INVALID_RESEARCH_ACTION', 'Test plan evidence must reference visible completed evidence')
     visible = {idea['idea_id'] for idea in memory.get('open_ideas', [])}
     for idea in [notes, *notes['alternatives']]:
         if idea['idea_id'] is not None and idea['idea_id'] not in visible:
@@ -108,6 +120,30 @@ def validate_research_notes(notes, memory, evidence, knowledge):
             raise AgentError('INVALID_RESEARCH_ACTION', 'Alternative evidence_ids must reference visible measured results/analyses')
         if not set(idea.get('knowledge_ids', [])) <= knowledge:
             raise AgentError('INVALID_RESEARCH_ACTION', 'Alternative knowledge_ids must reference content actually read')
+
+
+def validate_test_plan(action, protocol):
+    """New contexts require an explicit, falsifiable record; old artifacts stay readable.
+
+    This validates structure/provenance, never the scientific truth of LLM prose.
+    """
+    if protocol.get('version') != 'scientific-v1':
+        return
+    notes = action.get('research_notes')
+    if not notes or not notes.get('test_plan'):
+        raise AgentError('RESEARCH_DESIGN_REQUIRED', 'Provide research_notes and test_plan: observation, prediction, falsifier, cheap_check, counterargument and continuation. Use actual evidence IDs; no private reasoning is requested.')
+    test = notes['test_plan']
+    if test['prediction'].casefold().strip() == test['falsifier'].casefold().strip():
+        raise AgentError('INVALID_RESEARCH_DESIGN', 'Prediction and falsifier must describe different observable outcomes')
+    episode = protocol.get('episode')
+    if test['continuation'] == 'followup' and (not episode or notes['idea_id'] != episode['idea_id']):
+        raise AgentError('INVALID_RESEARCH_DESIGN', 'A followup must reuse the assigned episode idea_id')
+    if test['continuation'] == 'new' and episode and len(test['switch_reason'].strip()) < 12:
+        raise AgentError('INVALID_RESEARCH_DESIGN', 'Explain why switching from the existing research question is useful')
+    if test['continuation'] == 'reconsider' and len(test['switch_reason'].strip()) < 12:
+        raise AgentError('INVALID_RESEARCH_DESIGN', 'Reconsideration needs an explicit cost/new-evidence reason')
+    if action['action'] != 'stop' and not notes['alternatives'] and len(test['alternatives_unavailable_reason'].strip()) < 12:
+        raise AgentError('INVALID_RESEARCH_DESIGN', 'Compare a concrete alternative explanation, or state why none is useful; do not invent alternatives')
 
 
 def validate_action(action, catalog):

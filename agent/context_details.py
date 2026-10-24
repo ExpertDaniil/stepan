@@ -113,6 +113,11 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'knowledge': profile.get('knowledge', {}),
         'representations': profile.get('feature_memory', {}), 'comparisons': profile.get('comparison_evidence', {}),
         'analyses': profile.get('analysis_history', user.get('analysis_history', []))}
+    if profile.get('scientific_protocol'):
+        sections['scientific_protocol'] = deepcopy(profile['scientific_protocol'])
+        sections['fit_diagnostics'] = deepcopy(profile['scientific_protocol'].get('fit_diagnostics', []))
+        for index, record in enumerate(sections['fit_diagnostics']):
+            sections['fit_diagnostics/'+str(index)] = record
     if model is not None:
         sections.update(semantic_model=model, quantities=model['quantities'], relations=model['relations'])
     sections['analyses'] = [{**r, 'report': artifacts.read_json(r['artifact_id'])}

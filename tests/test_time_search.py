@@ -291,7 +291,7 @@ class ContinuedSearchTests(unittest.TestCase):
             if fail_once:
                 self.assertEqual(len(failures), 1)
             if not fail_once:
-                self.assertEqual(events[-1]["state"], "completed")
+                self.assertEqual(events[-1]["state"], "completed", stderr.getvalue()[-4000:])
 
     def test_more_than_twelve_real_fits_continue_after_llm_quota(self):
         self.run_case(True, 2)

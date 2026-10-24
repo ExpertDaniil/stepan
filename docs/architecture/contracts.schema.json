@@ -6108,6 +6108,72 @@
         "research_notes": {
           "type": "object",
           "properties": {
+            "test_plan": {
+              "type": "object",
+              "properties": {
+                "observation": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 1000
+                },
+                "prediction": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 1000
+                },
+                "falsifier": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 1000
+                },
+                "cheap_check": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 1000
+                },
+                "counterargument": {
+                  "type": "string",
+                  "minLength": 12,
+                  "maxLength": 1000
+                },
+                "evidence_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "maxItems": 12
+                },
+                "continuation": {
+                  "enum": [
+                    "new",
+                    "followup",
+                    "reconsider",
+                    "stop"
+                  ]
+                },
+                "switch_reason": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "alternatives_unavailable_reason": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              },
+              "required": [
+                "observation",
+                "prediction",
+                "falsifier",
+                "cheap_check",
+                "counterargument",
+                "evidence_ids",
+                "continuation",
+                "switch_reason",
+                "alternatives_unavailable_reason"
+              ],
+              "additionalProperties": false
+            },
             "idea_id": {
               "anyOf": [
                 {

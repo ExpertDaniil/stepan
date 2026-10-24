@@ -104,10 +104,14 @@ class GatewayTests(unittest.TestCase):
     def test_live_transport_needs_no_model_and_uses_only_env_endpoint(self):
         calls = []
         fake = SimpleNamespace(OpenAI=lambda **kwargs: calls.append(kwargs) or SimpleNamespace(close=lambda: None))
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-placeholder", "OPENAI_BASE_URL": "https://provided.invalid/v1", "OPENAI_MODEL": ""}), patch.dict("sys.modules", {"openai": fake}):
+        clients = []
+        http_client = object()
+        fake_httpx = SimpleNamespace(Client=lambda **kwargs: clients.append(kwargs) or http_client)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-placeholder", "OPENAI_BASE_URL": "https://provided.invalid/v1", "OPENAI_MODEL": ""}), patch.dict("sys.modules", {"openai": fake, "httpx": fake_httpx}):
             transport = OpenAITransport()
             transport.close()
-        self.assertEqual(calls, [{"api_key": "test-placeholder", "base_url": "https://provided.invalid/v1", "max_retries": 0}])
+        self.assertEqual(calls, [{"http_client": http_client, "api_key": "test-placeholder", "base_url": "https://provided.invalid/v1", "max_retries": 0}])
+        self.assertEqual(clients, [{'event_hooks': {'request': [transport._check_wire_request]}}])
 
     def test_daily_key_budget_stops_retry_and_followup_calls(self):
         for status, body_in_exception in [(429, False), (403, True)]:

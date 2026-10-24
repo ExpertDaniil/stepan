@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 import uuid
 
 from agent.contracts import canonical
@@ -7,7 +8,7 @@ from agent.catalog import factory_source
 from agent.errors import AgentError
 from tools.code import write_code
 from agent.context import research_schema
-from agent.research_actions import validate_action, validate_research_notes
+from agent.research_actions import validate_action, validate_research_notes, validate_test_plan
 
 
 class Researcher:
@@ -36,6 +37,18 @@ class Researcher:
             user = json.loads(context['messages'][1]['content'])
             from agent.feature_search import validate_focus
             validate_focus(proposed, user)
+            if proposed['action'] == 'features':
+                from agent.feature_schema import validate_program
+                from agent.predictions import targets
+                profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
+                excluded = [*targets(self.spec), *self.spec['excluded_features']]
+                try:
+                    program = validate_program(proposed['feature_program'],
+                        ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
+                         else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
+                         else None), excluded)
+                except (ValueError, KeyError) as error:
+                    raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
             memory = user.get('profile_summary', user).get('research_memory', {})
             evidence = {f['source_id'] for f in user.get('facts', [])}
             for fact in user.get('facts', []):
@@ -51,6 +64,14 @@ class Researcher:
                 if delivery.get('name') == 'research_updates':
                     evidence.update(delivery['evidence_ids'])
             projection = user.get('profile_summary', user)
+            protocol = projection.get('scientific_protocol', {})
+            for report in protocol.get('fit_diagnostics', []):
+                evidence.add(report['artifact_id'])
+            episode = protocol.get('episode')
+            if episode:
+                evidence.update(episode['evidence_ids'])
+                evidence.update(episode['measured_experiment_ids'])
+                memory = {**memory, 'open_ideas': [*memory.get('open_ideas', []), episode]}
             semantic_task = projection.get('semantic_task', {})
             if semantic_task.get('model_id'):
                 evidence.add(semantic_task['model_id'])
@@ -105,6 +126,7 @@ class Researcher:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'Unseen knowledge_ids: '+', '.join(sorted(set(proposed.get('knowledge_ids', []))-visible_knowledge))+
                                  '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
             validate_research_notes(proposed.get('research_notes'), memory, evidence, visible_knowledge)
+            validate_test_plan(proposed, protocol)
             if proposed['action'] == 'stop':
                 self.save_decision(proposed, None, payload, context, answer, investigation_check=investigation_check)
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
@@ -143,17 +165,7 @@ class Researcher:
             raise AgentError('INVALID_INVESTIGATION', 'The effective inherited parameters still enable automatic numeric_interactions; use explicit named operations or an exploratory interpretation')
         feature_manifest = None
         if adaptive and proposed['action'] == 'features':
-            from agent.feature_schema import FACTORY_SOURCE, validate_program, operation_facts
-            from agent.predictions import targets
-            profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
-            excluded = [*targets(self.spec), *self.spec['excluded_features']]
-            try:
-                program = validate_program(proposed['feature_program'],
-                    ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
-                     else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
-                     else None), excluded)
-            except (ValueError, KeyError) as error:
-                raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
+            from agent.feature_schema import FACTORY_SOURCE, operation_facts
             params = {'base_recipe_id': plan_recipe, 'model_parameters': params, 'feature_program': program}
             plan_recipe = 'python-pipeline-v1'
             source = FACTORY_SOURCE
@@ -189,6 +201,8 @@ class Researcher:
                 {**{k: proposed[k] for k in ['action', 'tuning', 'evidence_ids', 'hypothesis', 'expected_effect']},
                  'knowledge_ids': proposed.get('knowledge_ids', []),
                  'research_notes': proposed.get('research_notes'),
+                 'scientific_protocol': protocol,
+                 'strongest_measured_reference': landscape.get('strongest_measured_learned', {}).get('experiment_id') if landscape.get('strongest_measured_learned') else None,
                  'investigation': proposed.get('investigation'),
                  'investigation_check': investigation_check,
                  'coordination': proposed.get('coordination', {}),
@@ -218,9 +232,13 @@ class Researcher:
             configuration = {'plan_id': plan['plan_id'], 'code_artifact_id': plan['code_artifact_id'],
                 'fingerprint_core': Store.fingerprint_core(plan, self.artifacts.meta(plan['code_artifact_id'])['sha256'])}
         record = {key: proposed[key] for key in ('action', 'hypothesis', 'expected_effect', 'evidence_ids')}
+        record['evidence_ids'] = list(dict.fromkeys([*record['evidence_ids'],
+            *(proposed.get('research_notes') or {}).get('test_plan', {}).get('evidence_ids', [])]))
         record.update(research_notes=proposed.get('research_notes'), knowledge_ids=proposed.get('knowledge_ids', []),
+            created_monotonic=time.monotonic(),
+            researcher_id=payload['researcher_id'],
             tuning=proposed['tuning'],
-            researcher_id=payload['researcher_id'], context_id=payload['context_id'],
+            context_id=payload['context_id'],
             work_order_id=binding.get('work_order_id'), branch_id=binding.get('branch_id'),
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)
         record['delivered_feedback'] = [call for call in answer.get('tool_calls', []) if call.get('name') == 'research_updates']
@@ -238,6 +256,8 @@ class Researcher:
         art = self.artifacts.write_json('research/decision-'+uuid.uuid4().hex[:16]+'.json', record, 'research_decision')
         self.log.event('research.decision_saved', artifact_id=art['artifact_id'], researcher_id=payload['researcher_id'],
             action=proposed['action'], notes_supplied=proposed.get('research_notes') is not None,
+            test_plan_supplied=bool((proposed.get('research_notes') or {}).get('test_plan')),
+            continuation=(proposed.get('research_notes') or {}).get('test_plan', {}).get('continuation'),
             work_order_id=binding.get('work_order_id'))
         if record['investigation']:
             self.log.event('research.investigation_saved', artifact_id=art['artifact_id'],

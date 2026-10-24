@@ -49,6 +49,20 @@ def action(kind='pipeline', **changes):
                  feature_steps=[{'step': 'selected_numeric_polynomial', 'degree': 2}] if kind == 'pipeline' else [],
                  code=SOURCE if kind == 'pipeline' else None, tuning=None, evidence_ids=[])
     value.update(changes)
+    if 'investigation' not in value:
+        value['investigation'] = {
+            'question': 'Does this complete synthetic configuration improve the measured reference?',
+            'basis_ids': [], 'columns': ['x_numeric', 'z_numeric'] if kind == 'pipeline' else
+                list(dict.fromkeys(c for op in value.get('feature_program', []) for c in op.get('columns', []))),
+            'interpretation': 'exploratory', 'mechanism': 'Compare the explicitly declared synthetic inputs and estimator.',
+            'assumptions': ['Synthetic regression fixture; no physical interpretation is claimed.'],
+            'expected_observation': 'The independent evaluator measures the complete proposed configuration.',
+            'alternative_explanation': 'The proposed representation may add noise or duplicate the baseline signal.',
+            'decision_rule': 'Use the fixed evaluation protocol and retain the better valid output.'}
+    if 'research_notes' not in value:
+        from agent.scientific_research import synthetic_notes
+        value['research_notes'] = synthetic_notes(value, {})
+        value['research_notes']['test_plan']['switch_reason'] = 'This fixture explicitly exercises the proposed alternative configuration.'
     return value
 
 

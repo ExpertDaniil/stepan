@@ -11,6 +11,17 @@
 
 # Наблюдаемость
 
+`diagnostics.oof_started/completed/unavailable` отделяют вспомогательные fit-only
+проверки от оценки кандидата. `job.started.purpose=fit_oof_diagnostics` использует
+обычные CPU/RSS/timeout/process-group guards, но не создаёт candidate score.
+Полные reports находятся в `diagnostics/`; API получает ограниченные агрегаты.
+`research.preflight_reviewed` фиксирует стоимость, финансирование и admitted/deferred.
+`research.decision_saved.test_plan_supplied/continuation` показывают наличие плана
+и продолжение вопроса. Его полный наблюдаемый decision record сохранён артефактом.
+`llm.deliberation_budget` показывает запрошенный/профинансированный дополнительный
+бюджет. Он не доказывает применение provider thinking. `scripts/analyze_run.py`
+сводит OOF reports, followups, preflight deferrals и фактически сообщённую usage.
+
 `data.cache_prepared` показывает source artifact, строки/столбцы, размер и время
 построения `numpy-columns-v1`. `data.cache_bypassed` фиксирует причину сохранения CSV
 пути. `worker.data_prepared` сообщает фактический формат train-входа, время подготовки,

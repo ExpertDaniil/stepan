@@ -58,11 +58,14 @@ class ContextBuilder:
                 from agent.research_memory import build_research_memory
                 ids = [row[0] for row in self.store.db.execute('SELECT experiment_id FROM experiments WHERE run_id=?', (self.store.run_id,))]
                 user['research_memory'] = build_research_memory(self.store, self.artifacts, ids)
+                full_memory = user['research_memory']
                 user['feature_memory'] = archive(self.store, self.artifacts, ids)
                 from agent.research_landscape import build_landscape
                 user['research_landscape'] = build_landscape(self.store, self.artifacts, ids)
                 from agent.evidence import comparison_context
                 user['comparison_evidence'] = comparison_context(self.store, self.artifacts, ids)
+                if getattr(self, 'science', None):
+                    user['scientific_protocol'] = self.science.context(ids, full_memory, payload['researcher_id'])
             user['recipes'] = self.catalog.branch_recipes(allowed, {'required_capability_ids': [], 'forbidden_capability_ids': []})
             user['research_feedback'] = list(getattr(self, 'research_feedback', []))
             if getattr(self, 'analysis', None):
@@ -79,6 +82,10 @@ class ContextBuilder:
         # Conservative byte heuristic, not a claim about the provider tokenizer.
         from agent.context_budget import assembly_limit
         limit = assembly_limit(self.catalog.config, {}) if self.catalog.config.research_mode == 'adaptive' else payload["max_input_tokens"] * 3
+        if len(json.dumps(messages, ensure_ascii=False).encode()) > limit and user.get('scientific_protocol'):
+            from agent.scientific_research import compact_protocol
+            user['scientific_protocol'] = compact_protocol(user['scientific_protocol'])
+            messages[1]['content'] = json.dumps(user, ensure_ascii=False)
         while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and recent:
             recent.pop()
             user["recent_experiments"] = recent
@@ -191,6 +198,11 @@ class ContextBuilder:
                 user['profile_summary']['comparison_evidence'] = comparison_context(self.store, self.artifacts,
                     graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
+            full_memory = user['profile_summary']['research_memory']
+            if getattr(self, 'science', None):
+                ids = graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent])
+                user['profile_summary']['scientific_protocol'] = self.science.context(
+                    ids, full_memory, payload['researcher_id'])
             if getattr(self, 'knowledge', None):
                 user['profile_summary']['knowledge'] = self.knowledge.seed(user.get('base_result'),
                     focus=knowledge_focus(user['profile_summary']['research_memory'], self.semantic_model))
@@ -237,6 +249,9 @@ class ContextBuilder:
         while size() > limit and len(comparisons.get('comparisons', [])) > 1:
             comparisons['comparisons'].pop()
             comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
+        if size() > limit and user['profile_summary'].get('scientific_protocol'):
+            from agent.scientific_research import compact_protocol
+            user['profile_summary']['scientific_protocol'] = compact_protocol(user['profile_summary']['scientific_protocol'])
         if size() > limit:
             raise AgentError("CONTEXT_TOO_LARGE", "Mandatory branch identity, measured base/history, code, recipe and task contract do not fit",
                              details={'context_bytes': size(), 'limit_bytes': limit})

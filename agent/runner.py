@@ -28,7 +28,7 @@ def frozen_execution(artifacts, experiment, task_spec, phase):
     if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
         raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
     runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py',
-               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/data_transport.py',
+               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
                'tools/data.py', 'tools/runtime_guard.py']
     value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
              'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
@@ -138,6 +138,8 @@ class Job:
     last_heartbeat: float = 0.0
     event: dict | None = None
     prediction_path: Path | None = None
+    diagnostic: bool = False
+    lease_owner_id: str | None = None
 
 
 class Runner:
@@ -208,6 +210,9 @@ class Runner:
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))
+        if payload.get('diagnostic'):
+            job_spec['diagnostic'] = payload['diagnostic']
+            job_spec['model_snapshot_max_bytes'] = 0
         from agent.data_transport import transport
         tables = transport(self.artifacts)
         job_spec['input_tables'] = {'train': tables.prepare(task_spec['train_artifact_id'], task_spec)}
@@ -229,6 +234,8 @@ class Runner:
         job = Job(ident, experiment["experiment_id"], payload.get("attempt_no", experiment["attempt_no"]), phase,
                   dict(lease), proc, directory, time.monotonic(), last_heartbeat=time.monotonic())
         job.prediction_path = prediction_path
+        job.diagnostic = bool(payload.get('diagnostic'))
+        job.lease_owner_id = payload.get('lease_owner_id')
         self.jobs[ident] = job  # Track before starting drain threads, for cleanup on partial start.
         self.model_snapshot_reservations[ident] = job_spec["model_snapshot_max_bytes"]
         for name, stream in [("stdout.log", proc.stdout), ("stderr.log", proc.stderr)]:
@@ -236,10 +243,15 @@ class Runner:
             thread.start()
             job.threads.append(thread)
         self.log.event("job.started", job_id=ident, experiment_id=job.experiment_id, phase=phase,
+                       purpose='fit_oof_diagnostics' if job.diagnostic else 'candidate',
                        pid=proc.pid, cpu_threads=lease["cpu_threads"], memory_limit_mb=lease["memory_limit_mb"],
                        recipe_id=experiment["plan"]["recipe_id"], hyperparameters=job_spec["hyperparameters"],
                        timeout_seconds=lease["timeout_seconds"], stderr_log_path=str(directory/"stderr.log"))
         return job
+
+    def start_diagnostics(self, payload, spec, experiment):
+        """Trusted fit-only probe; its completion must never go through C15/C16."""
+        return self._start(payload, spec, experiment, 'train')
 
     def start_train(self, payload, spec, experiment):
         if "plan" in payload and canonical(payload["plan"]) != canonical(experiment["plan"]):
@@ -343,7 +355,7 @@ class Runner:
             if path.suffix not in {".csv", ".log", ".joblib"} and path.name != "features.json":
                 continue
             kind = ('feature_execution' if path.name == 'features.json' else
-                    ('validation_predictions' if job.phase == 'train' else 'submission') if path == job.prediction_path else
+                    ('fit_oof_predictions' if job.diagnostic else 'validation_predictions' if job.phase == 'train' else 'submission') if path == job.prediction_path else
                     'fitted_pipeline' if path.suffix == '.joblib' else 'execution_log')
             media = 'application/json' if path.name == 'features.json' else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'
             art = self.artifacts.register(path, kind, media)

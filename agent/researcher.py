@@ -161,6 +161,8 @@ class Researcher:
             work_order_id=binding.get('work_order_id'), branch_id=binding.get('branch_id'),
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)
         record['delivered_feedback'] = [call for call in answer.get('tool_calls', []) if call.get('name') == 'research_updates']
+        record['transcript_artifact_ids'] = [call['reference_id'] for call in answer.get('tool_calls', [])
+            if call.get('name') == 'transcript_archive' and isinstance(call.get('reference_id'), str)]
         record['coordination'] = proposed.get('coordination', {})
         with self.artifacts.lock:
             output_kind = self.artifacts.entries.get(answer['output_artifact_id'], {}).get('meta', {}).get('kind')

@@ -173,6 +173,7 @@ class Gateway:
         if self.cancelled.is_set():
             raise AgentError('RESEARCH_CANCELLED', 'Research was cancelled before request dispatch')
         delivered = None
+        feedback_message = None
         if payload['purpose'] == 'research_proposal' and self.feedback is not None:
             scope = context['metadata'].get('graph_binding', {}).get('branch_id', 'legacy')
             delivered = self.feedback.latest(scope)
@@ -187,8 +188,9 @@ class Gateway:
                 delivered = compact_updates(delivered)
                 context['metadata'].setdefault('delivered_experiment_ids', []).extend(r['experiment_id'] for r in delivered['results'])
             if delivered:
-                request['messages'].append({'role': 'user', 'content': json.dumps(
-                    {'research_updates': delivered}, ensure_ascii=False)})
+                feedback_message = {'role': 'user', 'content': json.dumps(
+                    {'research_updates': delivered}, ensure_ascii=False)}
+                request['messages'].append(feedback_message)
         if self.config.llm_reasoning_protocol == 'qwen_chat_template':
             # Explicit opt-in only. This is a documented self-hosted Qwen format,
             # not a claim that the organizers' proxy applies these fields.
@@ -201,10 +203,14 @@ class Gateway:
         request_bytes = measure_request(request)
         # The initial schema/tools/feedback nearly filled the graph limit in the
         # observed classification run. Keep room for answers before requesting them.
-        first_tool_turn = request.get('tools') and not any(m.get('role') == 'tool' for m in request['messages'])
-        packing_limit = byte_limit-min(16384, byte_limit//6) if first_tool_turn else byte_limit
+        packing_limit = byte_limit-min(16384, byte_limit//6) if request.get('tools') else byte_limit
         if request_bytes > packing_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
-            self._compact_research_request(request, packing_limit)
+            packed = self._compact_research_request(request, packing_limit,
+                archive=(lambda history: self._archive_transcript(history, context))
+                        if context['metadata'].get('detail_scope') else None)
+            if packed['archived_tool_call_ids']:
+                # Keep the bounded transcript on later turns as well.
+                context['_packed_messages'] = deepcopy([m for m in request['messages'] if m is not feedback_message])
             request_bytes = measure_request(request)
         if request_bytes > byte_limit:
             raise AgentError('CONTEXT_TOO_LARGE', 'Complete JSON request cannot fit without removing protected contract/base/latest results',
@@ -464,10 +470,14 @@ class Gateway:
             answer = self._complete_dialogue(payload, context, messages, expected, tools, deadline, phase_limited,
                                            token_limit, dialogue_id, slots)
             if payload['response_schema_id'] == 'ResearchAction-v1':
+                answer['tool_calls'].extend({'name': 'transcript_archive', 'reference_id': aid, 'status': 'archived'}
+                    for aid in context.get('_transcript_ids', []))
+                checkpoint = self.artifacts.meta(answer['output_artifact_id'])['kind'] == 'controller_research_checkpoint'
                 self.log.event('research.dialogue_summary', context_id=payload['context_artifact_id'],
                     duration_seconds=round(time.monotonic()-dialogue_started, 3),
-                    tool_results=sum(c.get('name') != 'research_updates' for c in answer['tool_calls']),
-                    decision_received=True, tool_seconds_limit=self.config.llm_research_tool_seconds,
+                    tool_results=sum(c.get('name') not in {'research_updates', 'transcript_archive'} for c in answer['tool_calls']),
+                    decision_received=not checkpoint, checkpoint_saved=checkpoint,
+                    decision_origin='controller' if checkpoint else 'model', tool_seconds_limit=self.config.llm_research_tool_seconds,
                     dialogue_seconds_limit=self.config.llm_research_dialogue_seconds)
             return answer
         except AgentError as error:
@@ -496,6 +506,7 @@ class Gateway:
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
         tool_cache, force_decision = {}, False
+        consecutive_errors = 0
         schema_by_name = {tool['function']['name']: tool['function']['parameters'] for tool in tools}
         completion_id = "completion-" + uuid.uuid4().hex[:12]
         # Token/call reservations alone cannot protect wall time. Bound tool
@@ -526,6 +537,7 @@ class Gateway:
                     continue
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             terminal = True
+            retry_delay = None
             try:
                 if tools and dialogue_id is not None and not force_decision and tool_seconds >= self.config.llm_research_tool_seconds:
                     force_decision = True
@@ -572,6 +584,11 @@ class Gateway:
                         reason='final_time_reserve', attempt=attempt, final_capacity_retained=True)
                     continue
                 if exc.code == 'CONTEXT_TOO_LARGE' and calls and payload['response_schema_id'] == 'ResearchAction-v1':
+                    if not terminal and not force_decision:
+                        force_decision = True
+                        self.log.event('llm.tool_phase_closed', context_id=payload['context_artifact_id'],
+                            reason='context_pressure', attempt=attempt, final_capacity_retained=True)
+                        continue
                     # Preserve completed observations and roll over without inventing an
                     # LLM decision, training score or private reasoning transcript.
                     from agent.research_actions import normalize_action
@@ -586,6 +603,7 @@ class Gateway:
                                 pass
                             if question != 'Resume the unresolved research question using saved reports.':break
                         if question != 'Resume the unresolved research question using saved reports.':break
+                    self._archive_transcript(messages, context)
                     checkpoint = normalize_action({'action': 'research', 'next_step': 'continue',
                         'hypothesis': 'Controller context checkpoint: '+question,
                         'evidence_ids': evidence, 'investigation': {
@@ -595,7 +613,8 @@ class Gateway:
                             'assumptions': ['Completed reports remain available in scoped memory.'],
                             'expected_observation': 'Read the saved reports in a fresh bounded dialogue.',
                             'alternative_explanation': 'Context pressure does not refute the research hypothesis.',
-                            'decision_rule': 'Resume unresolved checks before choosing the next experiment.'}})
+                            'decision_rule': 'Read transcripts_index and saved reports, repair a failed check if present, '
+                                'then decide the next executable experiment for this question.'}})
                     art = self.artifacts.write_json('research/controller-checkpoint-'+uuid.uuid4().hex[:12]+'.json',
                         checkpoint, 'controller_research_checkpoint')
                     self.log.event('research.context_checkpoint', artifact_id=art['artifact_id'],
@@ -607,12 +626,21 @@ class Gateway:
                 if not exc.retryable or attempt == payload["attempt_limit"]:
                     raise
                 last_error = exc
-                delay = min(2 ** (attempt-1), max(0, deadline-time.monotonic()-1))
-                self.log.event("llm.retry_scheduled", level="WARNING", code=exc.code, attempt=attempt, delay_seconds=delay)
-                time.sleep(delay)
-                continue
+                consecutive_errors += 1
+                remaining = max(0, deadline-time.monotonic())
+                retry_reserve = min(max(1, self.budget.reasoning_estimate()), remaining*.5)
+                delay = min(2 ** min(consecutive_errors-1, 3), max(0, remaining-retry_reserve-1))
+                self.log.event("llm.retry_scheduled", level="WARNING", code=exc.code, attempt=attempt,
+                    consecutive_errors=consecutive_errors, delay_seconds=delay)
+                retry_delay = delay
             finally:
                 self.semaphore.release()
+                if '_packed_messages' in context:
+                    messages[:] = context.pop('_packed_messages')
+            if retry_delay is not None:
+                time.sleep(retry_delay)
+                continue
+            consecutive_errors = 0
             token_data = response.get("usage") or {}
             if response.get('_delivered_feedback'):
                 calls.append(response.pop('_delivered_feedback'))
@@ -652,7 +680,7 @@ class Gateway:
                                     result[field] = previous[field]
                             if name in {'read_memory', 'read_solution'} and 'text' in previous:
                                 result.update({k: deepcopy(v) for k, v in previous.items() if k not in {'reused', 'original_tool_call_id'}})
-                            if name == 'analyze_data' and 'report' in previous:
+                            if name in {'analyze_data', 'run_analysis'} and 'report' in previous:
                                 # The original reply can have been compacted in the
                                 # actual API request; retain the requested report now.
                                 result['report'] = deepcopy(previous['report'])
@@ -843,9 +871,22 @@ class Gateway:
                     force_decision = True
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")
 
-    def _compact_research_request(self, request, limit):
+    def _archive_transcript(self, messages, context):
+        scope = deepcopy(context['metadata'].get('detail_scope', {}))
+        value = {k: scope.get(k) for k in ('task_spec_id', 'dataset_id', 'validation_id')}
+        value.update(branch_id=scope.get('branch_id') or 'legacy', scope=scope,
+            messages=deepcopy(messages), results=[], kind='research_transcript',
+            completed_elapsed_ms=int((time.monotonic()-self.budget.started)*1000),
+            instruction='Exact observable messages; tool/model statements are not new verified measurements.')
+        art = self.artifacts.write_json('research/transcript-'+uuid.uuid4().hex[:16]+'.json',
+            self.log.redactor.clean(value), 'research_transcript')
+        context['metadata'].setdefault('authorized_feedback_ids', []).append(art['artifact_id'])
+        context.setdefault('_transcript_ids', []).append(art['artifact_id'])
+        return {'reference_id': art['artifact_id'], 'section': 'transcript_index'}
+
+    def _compact_research_request(self, request, limit, *, archive=None):
         from agent.context_budget import compact_research_request
-        return compact_research_request(request, limit, self.log)
+        return compact_research_request(request, limit, self.log, archive=archive)
 
     @staticmethod
     def _section_bytes(request):

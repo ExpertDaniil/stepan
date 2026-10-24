@@ -162,18 +162,39 @@ def read_details(query, context, artifacts, log):
         if (snapshot.get('branch_id') != (frozen.get('branch_id') or 'legacy')
                 or any(snapshot.get(k) != frozen.get(k) for k in ('dataset_id', 'task_spec_id', 'validation_id'))):
             raise AgentError('MEMORY_SCOPE_DENIED', 'Feedback outside this task/branch/validation')
-        snapshot = {'scope': frozen, 'sections': {'updates': snapshot, 'results': snapshot.get('results', []),
-            **{'results/'+str(i): row for i, row in enumerate(snapshot.get('results', []))}}}
+        if artifacts.meta(query['reference_id'])['kind'] == 'research_transcript':
+            from agent.artifacts import file_sha256
+            from agent.context_transcript import transcript_sections
+            if snapshot.get('scope') != frozen:
+                raise AgentError('MEMORY_SCOPE_DENIED', 'Transcript belongs to another issued context')
+            if file_sha256(artifacts.resolve(query['reference_id'])) != artifacts.meta(query['reference_id'])['sha256']:
+                raise AgentError('MEMORY_SOURCE_CHANGED', 'Immutable transcript changed on disk')
+            snapshot = {'scope': frozen, 'sections': transcript_sections(snapshot)}
+        else:
+            snapshot = {'scope': frozen, 'sections': {'updates': snapshot, 'results': snapshot.get('results', []),
+                **{'results/'+str(i): row for i, row in enumerate(snapshot.get('results', []))}}}
     if snapshot['scope'] != metadata.get('detail_scope') or snapshot['scope']['run_id'] != artifacts.run_id:
         raise AgentError('MEMORY_SCOPE_DENIED', 'Task/dataset/validation/context scope mismatch')
     section = query['section']
-    if section in snapshot.get('documents', {}):
+    documents = snapshot.get('documents', {})
+    document_key = section if section in documents else next((key for key, doc in documents.items()
+        if doc['format'] == 'transcript' and section.startswith(key+'/')), None)
+    if document_key is not None:
         from agent.artifacts import file_sha256
-        doc = snapshot['documents'][section]
+        doc = documents[document_key]
         if file_sha256(artifacts.resolve(doc['artifact_id'])) != doc['sha256']:
             raise AgentError('MEMORY_SOURCE_CHANGED', 'Immutable context source changed on disk')
-        snapshot['sections'][section] = (artifacts.read_json(doc['artifact_id']) if doc['format'] == 'json'
-            else artifacts.resolve(doc['artifact_id']).read_text(encoding='utf-8'))
+        if doc['format'] == 'transcript':
+            from agent.context_transcript import transcript_sections
+            views = transcript_sections(artifacts.read_json(doc['artifact_id']))
+            for record in views['transcript_index']:
+                for key in ('result_section', 'arguments_section'):
+                    record[key] = document_key+'/'+record[key]
+            snapshot['sections'][document_key] = views['transcript_index']
+            snapshot['sections'].update({document_key+'/'+key: value for key, value in views.items()})
+        else:
+            snapshot['sections'][section] = (artifacts.read_json(doc['artifact_id']) if doc['format'] == 'json'
+                else artifacts.resolve(doc['artifact_id']).read_text(encoding='utf-8'))
     if section == 'detail_index':
         snapshot['sections'][section] = {'reference_id': query['reference_id'],
             'sections': sorted(set(snapshot['sections']) | set(snapshot.get('documents', {}))),
@@ -259,6 +280,14 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         analysis_index.append(summary)
     sections['analyses_index'] = analysis_index
     documents = {}
+    transcripts = []
+    from agent.context_transcript import visible_transcripts
+    for meta, decision_id, question in visible_transcripts(memory, artifacts, scope):
+        section = 'transcript/'+meta['artifact_id']
+        documents[section] = {**meta, 'format': 'transcript'}
+        transcripts.append({'section': section, 'decision_artifact_id': decision_id,
+            'question': question, 'preview_only': True})
+    sections['transcripts_index'] = transcripts
     sections['experiments'] = list(dict.fromkeys(experiment_ids))
     if store is not None:
         for eid in sections['experiments']:

@@ -107,3 +107,11 @@ Filters apply before counting. Derived expressions are stateless and named.
 cyclic_sin/cyclic_cos take period>0 and optional origin; the period uses input units.
 read_memory additionally exposes semantic_model, quantities/index and relations/index.
 Source quotations are checked for occurrence; semantic interpretations remain unverified.
+# Context continuation
+
+Completed tool turns may be replaced by a research_transcript observation summary.
+Its archive reference supports read_memory section=transcript_index, then the
+listed tool/CALL_ID/result or tool/CALL_ID/arguments sections. Exact observations
+and code are retained; previews are not new verified conclusions. Reuse successful
+checks instead of rerunning them to rebuild the transcript. A fresh dialogue can
+read transcripts_index in its frozen details, then the listed transcript sections.

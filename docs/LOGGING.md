@@ -1,3 +1,9 @@
+> Context continuation: [CONTEXT-CONTINUATION.md](CONTEXT-CONTINUATION.md).
+> `llm.tool_history_archived` links removed tool-call IDs, retained batches and exact
+> transcript reference to measured request bytes. `llm.context_compacted` includes
+> `archived_tool_call_ids`. `research.dialogue_summary.decision_received` is false
+> for controller checkpoints; `decision_origin`/`checkpoint_saved` distinguish them
+> from model decisions. Retry delay uses `consecutive_errors`, not tool-turn number.
 > Current version queue and pipeline.* events: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md).
 > `research.solution_read` records experiment/view/scope/page bytes; `llm.dialogue_time_reserved`
 > records the final response window. `llm.tool_phase_closed.reason=final_time_reserve`

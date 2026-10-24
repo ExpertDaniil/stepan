@@ -1,0 +1,267 @@
+{
+  "date_msk": "2026-10-25",
+  "base_commit": "9c5d6ac5dedb1ca062b315dd7bc458e8b0b4cacd",
+  "focused": {
+    "run": 67,
+    "seconds": 17.04,
+    "passed": true
+  },
+  "additional": {
+    "run": 24,
+    "seconds": 5.465,
+    "passed": true
+  },
+  "new_continuation_test_cases": 18,
+  "randomized_transcripts": 20,
+  "observed_overflow_sizes_synthetic": [
+    98376,
+    99970,
+    102549,
+    99779,
+    101190
+  ],
+  "original_limit_bytes_tested": 98304,
+  "larger_limit_bytes_tested": 196608,
+  "scripted_smokes": [
+    {
+      "kind": "regression",
+      "exit_code": 0,
+      "state": "completed",
+      "history_archives": 1,
+      "controller_checkpoints": 0,
+      "python_analyses": 4,
+      "evaluated": 2,
+      "published": 2,
+      "csv_exists": true
+    },
+    {
+      "kind": "classification",
+      "exit_code": 0,
+      "state": "completed",
+      "history_archives": 1,
+      "controller_checkpoints": 0,
+      "python_analyses": 4,
+      "evaluated": 2,
+      "published": 2,
+      "csv_exists": true
+    }
+  ],
+  "smoke_scope": "Scripted model replies with real fit-only Python processes, estimator fit/evaluate/refit and CSV; no live Qwen.",
+  "package": {
+    "flat_entries": 78,
+    "modules": 75,
+    "all_module_bytes_equal": true,
+    "requirements_equal": true,
+    "sha256": "1b92e8435dee7254ed64405447bae80aa62d6b13edda70c001b1785c582ad3bc"
+  },
+  "static_audit": {
+    "python_files_parsed": 145,
+    "owned_runtime_modules": 75,
+    "json_files_parsed": 169,
+    "schema_vocabulary_and_refs": "checked_without_importing_project_modules",
+    "runtime_contract_schema_declarations": "byte-independent_data_equality_checked",
+    "knowledge_manifest": "all_file_hashes_equal",
+    "requirements_sha256": "9173b0388532fbd2a709e4f4b3029e3b9ccab685fce43a85261ffa1ba95efbe6"
+  },
+  "required_full_check": {
+    "command": "python scripts/check.py --jobs 3",
+    "status": "not_green",
+    "initially_discovered": 523,
+    "initial_runner_session": "Unavailable before the first group summary; two completed group logs retained.",
+    "completed_groups": [
+      {
+        "group": "group-2.log",
+        "run": 174,
+        "seconds": 388.317,
+        "passed": false,
+        "failed_cases": [
+          {
+            "kind": "ERROR",
+            "case": "test_expired_tuning_authorization_does_not_poison_catalogue_fallback (tests.test_adaptive_regressions.AdaptiveToolRegressions.test_expired_tuning_authorization_does_not_poison_catalogue_fallback)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_local_tuning_requires_authorization_and_respects_axes_count_and_time (tests.test_adaptive_research.AdaptiveResearchTests.test_local_tuning_requires_authorization_and_respects_axes_count_and_time)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts (tests.test_adaptive_research.AdaptiveResearchTests.test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_an_existing_series_is_paused_without_consuming_a_trial (tests.test_data_research_window.DataResearchWindowTests.test_an_existing_series_is_paused_without_consuming_a_trial)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_completed_trial_reaches_optuna_and_research_memory (tests.test_optuna_search.OptunaSearchTests.test_completed_trial_reaches_optuna_and_research_memory)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_expired_authorization_proposes_no_new_work (tests.test_optuna_search.OptunaSearchTests.test_expired_authorization_proposes_no_new_work)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code (tests.test_optuna_search.OptunaSearchTests.test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase (tests.test_adaptive_refinement.AdaptiveRefinementExecutionTests.test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_failed_refit_does_not_block_a_later_publishable_candidate (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_failed_refit_does_not_block_a_later_publishable_candidate)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_custom_classifier_train_publish_and_reconstruct_refit (tests.test_adaptive_research.AdaptiveIntegrationTests.test_custom_classifier_train_publish_and_reconstruct_refit)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue (tests.test_open_investigation.ResearchCheckpointTests.test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_unsubmitted_decision_does_not_cross_graph_visibility (tests.test_research_memory.ResearchMemoryTests.test_unsubmitted_decision_does_not_cross_graph_visibility)"
+          }
+        ]
+      },
+      {
+        "group": "group-3.log",
+        "run": 174,
+        "seconds": 463.735,
+        "passed": false,
+        "failed_cases": [
+          {
+            "kind": "ERROR",
+            "case": "test_tool_error_can_be_corrected_without_replaying_provider_reasoning (tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tool_error_can_be_corrected_without_replaying_provider_reasoning)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_api_exhaustion_keeps_verified_answer_without_early_parameter_search (tests.test_data_research_window.DataResearchExecutionTests.test_api_exhaustion_keeps_verified_answer_without_early_parameter_search) (graph=True)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory (tests.test_optuna_search.OptunaSearchTests.test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_optimizer_tell_failure_preserves_the_committed_evaluation (tests.test_optuna_search.OptunaSearchTests.test_optimizer_tell_failure_preserves_the_committed_evaluation)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_initial_observation_seeds_optuna_without_fit (tests.test_pipeline_background.PipelineBackgroundTests.test_initial_observation_seeds_optuna_without_fit)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_completed_series_is_in_the_next_sent_request_and_evidence_trace (tests.test_platform_research.ActualRequestTests.test_completed_series_is_in_the_next_sent_request_and_evidence_trace)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_opted_in_provider_field_survives_a_tool_turn (tests.test_platform_research.ActualRequestTests.test_opted_in_provider_field_survives_a_tool_turn)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_zero_tool_wall_budget_preserves_final_and_json_repair (tests.test_research_latency.ResearchLatencyTests.test_zero_tool_wall_budget_preserves_final_and_json_repair)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_serialized_budget_survives_tools_feedback_final_and_repair (tests.test_semantic_research.FrozenContextTests.test_serialized_budget_survives_tools_feedback_final_and_repair)"
+          },
+          {
+            "kind": "ERROR",
+            "case": "test_reading_a_just_returned_report_reuses_it_and_closes_tool_phase (tests.test_tool_semantics.ToolSemanticsTests.test_reading_a_just_returned_report_reuses_it_and_closes_tool_phase)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_failed_custom_training_preserves_the_previous_checked_answer (tests.test_adaptive_refinement.AdaptiveRefinementExecutionTests.test_failed_custom_training_preserves_the_previous_checked_answer)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_tune_of_a_measured_base_runs_new_trials_in_both_controllers (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers) (graph=False)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_tune_of_a_measured_base_runs_new_trials_in_both_controllers (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers) (graph=True)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_custom_pipeline_train_publish_and_reconstruct_refit (tests.test_adaptive_research.AdaptiveIntegrationTests.test_custom_pipeline_train_publish_and_reconstruct_refit)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning (tests.test_dialogue_progress.TuningProgressTests.test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_feature_action_rejects_target_input_before_training (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_rejects_target_input_before_training)"
+          },
+          {
+            "kind": "FAIL",
+            "case": "test_unknown_feature_still_rejected_with_compacted_provider_context (tests.test_feature_admission.FeatureAdmissionTests.test_unknown_feature_still_rejected_with_compacted_provider_context)"
+          }
+        ]
+      }
+    ],
+    "first_group_completed_before_session_end": 70,
+    "remaining_first_group_rerun": {
+      "run": 105,
+      "failures": [],
+      "errors": [
+        "tests.test_optuna_search.OptunaSearchTests.test_declared_increase_region_is_sampled_jointly_and_anchor_is_unchanged",
+        "tests.test_optuna_search.OptunaSearchTests.test_pending_duplicate_does_not_release_another_trials_claim",
+        "tests.test_optuna_search.OptunaSearchTests.test_verified_history_warms_only_the_same_fixed_pipeline_and_resumes_study",
+        "tests.test_platform_research.ActualRequestTests.test_eight_tool_turns_leave_a_final_action_and_preserve_content_and_call_ids",
+        "tests.test_platform_research.RollingDispatcherTests.test_free_peer_starts_another_dialogue_before_slow_peer_finishes",
+        "tests.test_semantic_planning.SemanticPersistenceTests.test_model_details_are_frozen_and_identity_checks_reject_other_tasks"
+      ]
+    },
+    "continuation_per_case_timeout_seconds": 120,
+    "note": "Five later-added continuation test cases are covered by the final focused run. The project-wide suite is not claimed green."
+  },
+  "baseline_failures_reproduced_without_this_patch": [
+    {
+      "kind": "ERROR",
+      "case": "test_reading_a_just_returned_report_reuses_it_and_closes_tool_phase (tests.test_tool_semantics.ToolSemanticsTests.test_reading_a_just_returned_report_reuses_it_and_closes_tool_phase)"
+    },
+    {
+      "kind": "FAIL",
+      "case": "test_unsubmitted_decision_does_not_cross_graph_visibility (tests.test_research_memory.ResearchMemoryTests.test_unsubmitted_decision_does_not_cross_graph_visibility)"
+    },
+    {
+      "kind": "ERROR",
+      "case": "test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts (tests.test_adaptive_research.AdaptiveResearchTests.test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts)"
+    },
+    {
+      "kind": "ERROR",
+      "case": "test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies)"
+    },
+    {
+      "kind": "ERROR",
+      "case": "test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code (tests.test_optuna_search.OptunaSearchTests.test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code)"
+    },
+    {
+      "kind": "FAIL",
+      "case": "test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue (tests.test_open_investigation.ResearchCheckpointTests.test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue)"
+    }
+  ],
+  "environment": {
+    "python": "3.12.14",
+    "missing_approved_packages": [
+      "optuna",
+      "catboost",
+      "openai"
+    ],
+    "dependency_installation_performed": false,
+    "organizers_pinned_environment_verified": false
+  },
+  "not_performed": [
+    "live_qwen_run",
+    "organizers_container_run",
+    "benchmark_quality_comparison"
+  ],
+  "limits": "The protected mandatory contract may still exceed a finite input budget. This produces an explicit controller checkpoint/error, never silent task truncation. Provider availability and valid final JSON remain external limits."
+}

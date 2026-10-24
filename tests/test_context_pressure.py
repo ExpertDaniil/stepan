@@ -15,9 +15,9 @@ class ResearchContextSchemaTests(unittest.TestCase):
     def test_runtime_metadata_passes_for_both_tasks_and_unknown_fields_still_fail(self):
         from tests.graph_helpers import GraphHarness
         from agent.semantic_planning import build_task_model, unknown_model
-        for kind in ('regression', 'classification'):
-            with self.subTest(kind=kind):
-                h = GraphHarness(kind, research_mode='adaptive')
+        for kind, background in [(kind, background) for kind in ('regression', 'classification') for background in (False, True)]:
+            with self.subTest(kind=kind, background=background):
+                h = GraphHarness(kind, research_mode='adaptive', background_tuning_enabled=background)
                 try:
                     g = h.g
                     model = build_task_model(unknown_model(), '', h.h.profile['summary'], g.schemas, g.spec)
@@ -26,7 +26,7 @@ class ResearchContextSchemaTests(unittest.TestCase):
                     ticket = h.issue()
                     context = g.artifacts.read_json(ticket['work_order']['context_id'])
                     self.assertTrue({'graph_request_max_bytes', 'detail_artifact_id', 'detail_scope',
-                        'semantic_contract'} <= set(context['metadata']))
+                        'pipeline_execution' if background else 'semantic_contract'} <= set(context['metadata']))
                     g.schemas.validate(context, 'GResearchContext')
                     context['metadata']['unknown_runtime_flag'] = True
                     with self.assertRaises(AgentError):
@@ -282,7 +282,7 @@ class DeferredPeerAccountingTests(unittest.TestCase):
         from agent.graph.controller import research_batch
         from agent.research_feedback import FeedbackMailbox
         from tests.graph_helpers import GraphHarness
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, background_tuning_enabled=False)
         release = Event()
         try:
             c, g = h.controller, h.g

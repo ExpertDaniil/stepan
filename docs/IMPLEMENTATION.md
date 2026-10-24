@@ -1,3 +1,7 @@
+> Current context packing: [CONTEXT-CONTINUATION.md](CONTEXT-CONTINUATION.md).
+> Completed tool turns can be archived as whole matched batches, with bounded observation
+> excerpts and scoped exact reads. Their original source/results stay immutable; the
+> bounded transcript is reused on subsequent requests. C00–C24 schemas are unchanged.
 > Current default: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md): independent version-owned Optuna and executable submissions.
 > Direct scoped solution reads and dialogue time reserve: [RESEARCH-LOGISTICS.md](RESEARCH-LOGISTICS.md).
 > Previous research interface and compatibility: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).

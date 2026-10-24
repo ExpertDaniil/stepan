@@ -97,11 +97,12 @@ def compact_tool_reply(value, maximum):
     return result
 
 
-def compact_research_request(request, limit, log=None, *, stage="request"):
+def compact_research_request(request, limit, log=None, *, stage="request", archive=None):
     """Account for tool results and schemas without deleting the protected core or base."""
     def size():
         return len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
     previous_size = size()
+    original_messages = deepcopy(request['messages']) if archive is not None else None
     omissions = []
     # Nested JSON is sent as message text. Its whitespace otherwise consumes
     # the same budget again after escaping in the outer request.
@@ -184,10 +185,10 @@ def compact_research_request(request, limit, log=None, *, stage="request"):
             recent.pop(index)
             user['omitted_recent_experiments'] = user.get('omitted_recent_experiments', 0)+1
             omissions.append('older_recent_experiments');refresh()
-        archive = profile.get('feature_memory', {})
-        while size() > limit and len(archive.get('representations', [])) > 1:
-            archive['representations'].pop()
-            archive['omitted_representation_count'] = archive.get('omitted_representation_count', 0)+1
+        feature_archive = profile.get('feature_memory', {})
+        while size() > limit and len(feature_archive.get('representations', [])) > 1:
+            feature_archive['representations'].pop()
+            feature_archive['omitted_representation_count'] = feature_archive.get('omitted_representation_count', 0)+1
             omissions.append('older_feature_program_details');refresh()
         comparisons = profile.get('comparison_evidence', {})
         while size() > limit and len(comparisons.get('comparisons', [])) > 1:
@@ -299,11 +300,14 @@ def compact_research_request(request, limit, log=None, *, stage="request"):
                         profile[field] = {'details': 'read_memory section=full_context'}
                         omissions.append(field+'_by_reference');refresh()
 
-    # Preserve every assistant/tool-call pair. Compact all retrievable result
+    # Preserve linkage while compacting retrievable result
     # kinds, including the latest answer; keeping only the final report intact
     # could still make the complete request impossible to send.
+    latest_tool_assistant = next((m for m in reversed(request['messages'])
+        if m.get('role') == 'assistant' and m.get('tool_calls')), None)
     for message in request['messages']:
-        if size() > limit and message.get('role') == 'assistant' and message.get('tool_calls') and message.get('content'):
+        if (size() > limit and message is not latest_tool_assistant and message.get('role') == 'assistant'
+                and message.get('tool_calls') and message.get('content')):
             message['content'] = 'Earlier tool request; use its paired results and immutable output artifact.'
             omissions.append('older_assistant_tool_prose')
     tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']
@@ -325,7 +329,12 @@ def compact_research_request(request, limit, log=None, *, stage="request"):
             if len(candidate.encode('utf-8')) < len(message['content'].encode('utf-8')):
                 message['content'] = candidate
                 omissions.append('retrievable_tool_details')
+    from agent.context_transcript import compact_history
+    archived_ids = compact_history(request, limit, archive, original_messages, log)
+    if archived_ids:
+        omissions.append('completed_tool_history_by_reference')
     result = {'previous_bytes': previous_size, 'request_bytes': size(), 'limit_bytes': limit,
+              'archived_tool_call_ids': archived_ids,
               'omitted_fields': omissions, 'retained_tool_call_ids': [
                   m.get('tool_call_id') for m in request['messages'] if m.get('role') == 'tool']}
     if log is not None:

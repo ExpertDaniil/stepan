@@ -9,6 +9,11 @@ The assignment base is graph lineage and can be older than the measured leader.
 Use read_memory only for task definitions, non-solution reports and research notes. Reports
 survive dialogue failures. Read analyses_index, analysis_result/ARTIFACT_ID and
 analysis_code/ARTIFACT_ID instead of paging through unrelated source code.
+Under context pressure completed tool turns are replaced by observation excerpts
+and a scoped archive reference. Excerpts are not new conclusions. Continue the
+same question using saved results; do not repeat successful checks to rebuild
+the transcript. Use read_memory with the supplied reference/section for exact
+calls and results. In a later dialogue read transcripts_index for visible archives.
 
 The controller independently evaluates every candidate and automatically tunes useful
 versions in the background. You are free to continue researching while trials run.

@@ -1,3 +1,4 @@
+> Context continuation under tool-history pressure: [CONTEXT-CONTINUATION.md](docs/CONTEXT-CONTINUATION.md).
 > Current default: [executable pipeline versions and background Optuna](docs/BACKGROUND-PIPELINES.md).
 > Latest interface/timeout fixes: [docs/RESEARCH-LOGISTICS.md](docs/RESEARCH-LOGISTICS.md).
 > Earlier open research interface and compatibility: [docs/OPEN-INVESTIGATION.md](docs/OPEN-INVESTIGATION.md).

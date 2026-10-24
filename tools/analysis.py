@@ -159,9 +159,15 @@ class AnalysisService:
                              'test': tables.existing(spec['test_artifact_id'])}
         self.records, self.cache, self.lock = [], {}, threading.RLock()
 
-    def recent(self, visible_orders=None):
+    def recent(self, visible_orders=None, cutoffs=None):
         with self.lock:
-            return deepcopy([r for r in self.records if visible_orders is None or r.get('work_order_id') in visible_orders][-6:])
+            rows = [r for r in self.records if (visible_orders is None or r.get('work_order_id') in visible_orders)
+                    and (cutoffs is None or r.get('completed_elapsed_ms', 0) <= cutoffs.get(r.get('work_order_id'), -1))]
+            result = deepcopy(rows[-64:] if cutoffs is not None else rows[-6:])
+            if cutoffs is not None:
+                for row in result:
+                    row['query'].pop('code', None)
+            return result
 
     def _check_time(self, started):
         if not self.budget.snapshot()['search_allowed']:
@@ -518,6 +524,7 @@ class AnalysisService:
         with self.lock:
             self.cache[digest] = response
             record = {'artifact_id': art['artifact_id'], 'query': deepcopy(query), 'scope': result['scope'],
+                'completed_elapsed_ms': int((time.monotonic()-getattr(self.budget, 'started', time.monotonic()))*1000),
                 'work_order_id': (getattr(self, 'query_context', None) or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')}
             if query['kind'] == 'check':
                 record['computed_observation'] = {k: deepcopy(result[k]) for k in (

@@ -207,6 +207,7 @@ class Runner:
                     "prediction_path": str(prediction_path), "model_path": str(directory / "pipeline.joblib"),
                     "model_snapshot_max_bytes": self.snapshot_allowance(),
                     "result_path": str(directory / "result.json")}
+        job_spec['preflight'] = phase == 'train' and experiment['plan']['plan_id'].startswith('candidate-')
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))

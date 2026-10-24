@@ -37,6 +37,17 @@ class Budget:
         self.data_research_started = None
         self.data_research_ended = None
         self.data_research_finished = False
+        from agent.pipeline_candidates import enabled, execution_capacity
+        self.cpu_capacity, self.memory_capacity = execution_capacity() if enabled(config) else (6, 20480)
+        self.analysis_memory = min(1024, max(256, self.memory_capacity//6))
+
+    def sized_resources(self, resources):
+        with self.lock:
+            from agent.pipeline_candidates import enabled
+            background = enabled(self.config)
+            return {**resources, 'cpu_threads': min(resources['cpu_threads'], max(1, self.cpu_capacity-int(background))),
+                    'memory_limit_mb': min(resources['memory_limit_mb'],
+                        max(256, self.memory_capacity-(self.analysis_memory if background else 0)))}
 
     def start_data_research(self):
         """One run-wide wall-clock window, after the checked startup models."""
@@ -182,7 +193,7 @@ class Budget:
             cpu = sum(v["lease"]["cpu_threads"] for v in self.leases.values())
             memory = sum(v["lease"]["memory_limit_mb"] for v in self.leases.values())
             return {"wall_seconds_remaining": int(self.remaining()), "finalization_reserve_seconds": int(self.reserve_seconds()),
-                    "cpu_threads_available": max(0, 6 - cpu - int(self.analysis_active)), "memory_mb_available": max(0, 20480 - memory - 1024*int(self.analysis_active)),
+                    "cpu_threads_available": max(0, self.cpu_capacity - cpu - int(self.analysis_active)), "memory_mb_available": max(0, self.memory_capacity - memory - self.analysis_memory*int(self.analysis_active)),
                     "llm_calls_remaining": self.bounded_count(self.call_limit() - self.calls - self._dialogue_calls()),
                     "search_allowed": not self.search_stopped and self.remaining() - self.reserve_seconds() >= 1}
 
@@ -326,7 +337,9 @@ class Budget:
                 raise AgentError("BUDGET_EXHAUSTED", "Insufficient time for this phase")
             if plan and (not self.can_train(plan)["allowed"]):
                 raise AgentError("BUDGET_EXHAUSTED", "Predicted training and finalization no longer fit")
-            if req["cpu_threads"] > 3 or req["memory_limit_mb"] > 10240:
+            from agent.pipeline_candidates import enabled
+            per_job_cpu = self.config.background_cpu_threads if enabled(self.config) else 3
+            if req["cpu_threads"] > max(per_job_cpu, self.config.train_cpu_threads) or req["memory_limit_mb"] > self.config.train_memory_mb:
                 raise AgentError("INVALID_PLAN", "Per-job resource limit exceeded")
             train_busy = payload["phase"] == "train" and sum(item["phase"] == "train" for item in self.leases.values()) >= getattr(self, "train_worker_limit", self.config.max_workers)
             if train_busy or len(self.leases) >= self.config.max_workers or req["cpu_threads"] > snapshot["cpu_threads_available"] or req["memory_limit_mb"] > snapshot["memory_mb_available"]:

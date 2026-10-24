@@ -156,14 +156,24 @@ class WorkService:
 
     def research_memory(self, branch_id, donors):
         orders = set()
+        cutoffs = {}
+        from agent.pipeline_candidates import enabled
+        independent = enabled(self.config)
         for line, cut in self.lineage_cuts(branch_id):
-            rows = self.db.execute("SELECT DISTINCT w.work_order_id FROM g_work_orders w JOIN g_events e ON e.run_id=w.run_id AND json_extract(e.record_json,'$.entity_id')=w.work_order_id WHERE w.run_id=? AND w.branch_id=? AND e.event_seq<=? AND json_extract(e.record_json,'$.operation')='G04'", (self.run_id, line, cut))
-            orders.update(row[0] for row in rows)
+            rows = self.db.execute("SELECT DISTINCT w.work_order_id FROM g_work_orders w JOIN g_events e ON e.run_id=w.run_id AND json_extract(e.record_json,'$.entity_id')=w.work_order_id WHERE w.run_id=? AND w.branch_id=? AND e.event_seq<=? AND json_extract(e.record_json,'$.operation') IN ('G04',?)", (self.run_id, line, cut, 'G03' if independent else 'G04'))
+            ids = [row[0] for row in rows]
+            orders.update(ids)
+            record = self.db.execute('SELECT record_json FROM g_events WHERE run_id=? AND event_seq<=? ORDER BY event_seq DESC LIMIT 1', (self.run_id, cut)).fetchone()
+            elapsed = json.loads(record[0])['elapsed_ms'] if record else 0
+            cutoffs.update({ident: elapsed for ident in ids})
         # Donor measurements are explicit, but donor branch decisions are not
         # silently imported into this branch's pre-idea memory.
         ids = [*self.visible_history(branch_id), *donors]
-        return build_research_memory(self.store, self.artifacts, ids, work_order_ids=orders,
-                                     branch_cuts=dict(self.lineage_cuts(branch_id)))
+        memory = build_research_memory(self.store, self.artifacts, ids, work_order_ids=orders,
+                                      branch_cuts=dict(self.lineage_cuts(branch_id)))
+        if independent:
+            memory['visible_analysis_cutoffs'] = cutoffs
+        return memory
 
     def expire_work(self):
         expired = self.db.execute("SELECT work_order_id,order_json FROM g_work_orders WHERE run_id=? AND state IN ('preparing','issued') AND expires_elapsed_ms<=?", (self.run_id, self.elapsed())).fetchall()

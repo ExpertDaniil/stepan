@@ -119,6 +119,9 @@ class MockTransport:
                     'assumptions': ['Synthetic demo only.'], 'expected_observation': 'A valid independent configuration score.',
                     'alternative_explanation': 'Differences may reflect the joint estimator and representation.',
                     'decision_rule': 'Retain the better valid configuration without asserting a component mechanism.'}
+        if context['metadata'].get('pipeline_execution'):
+            payload.pop('research_notes', None)
+            payload.pop('investigation', None)
         return {"id": "mock-" + uuid.uuid4().hex[:12],
                 "choices": [{"message": {"role": "assistant", "content": json.dumps(payload, ensure_ascii=False)}, "finish_reason": "stop"}]}
 
@@ -338,6 +341,13 @@ class Gateway:
         context = self.artifacts.read_json(payload["context_artifact_id"])
         messages = deepcopy(context["messages"])
         expected = deepcopy(self.output_schemas[payload["response_schema_id"]])
+        executable = bool(context['metadata'].get('pipeline_execution'))
+        if executable:
+            fields = {'action', 'hypothesis', 'code', 'recipe_id', 'hyperparameters', 'feature_steps',
+                      'feature_program', 'evidence_ids', 'expected_effect', 'next_step', 'tuning'}
+            expected['properties'] = {k:v for k,v in expected['properties'].items() if k in fields}
+            expected['properties']['action']['enum'] = ['pipeline', 'features', 'catalog', 'research', 'stop']
+            expected['required'] = ['action']
         user = json.loads(context['messages'][1]['content']) if payload['response_schema_id'] == 'ResearchAction-v1' else {}
         if payload['response_schema_id'] == 'ResearchAction-v1':
             from agent.data_research import attach_context
@@ -348,7 +358,7 @@ class Gateway:
             if window['active']:
                 expected['properties']['action']['enum'] = ['features', 'pipeline', 'research']
         scientific = user.get('profile_summary', user).get('scientific_protocol', {}) if isinstance(user, dict) else {}
-        if payload['response_schema_id'] == 'ResearchAction-v1' and scientific.get('version') == 'scientific-v1':
+        if payload['response_schema_id'] == 'ResearchAction-v1' and not executable and scientific.get('version') == 'scientific-v1':
             expected['required'] = list(dict.fromkeys([*expected['required'], 'research_notes']))
             notes = expected['properties']['research_notes']
             notes['required'] = list(dict.fromkeys([*notes['required'], 'test_plan']))
@@ -471,6 +481,7 @@ class Gateway:
 
     def _complete_dialogue(self, payload, context, messages, expected, tools, deadline, phase_limited,
                            token_limit, dialogue_id, reserved_slots):
+        executable = bool(context['metadata'].get('pipeline_execution'))
         tool_seconds = 0.0
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
@@ -699,7 +710,14 @@ class Gateway:
                     raise
                 if payload['response_schema_id'] == 'ResearchAction-v1':
                     from agent.research_actions import normalize_action
-                    parsed = normalize_action(parsed)
+                    if executable:
+                        from agent.pipeline_candidates import normalize_candidate
+                        try:
+                            parsed = normalize_candidate(parsed)
+                        except AgentError as error:
+                            raise ValueError(error.code+': '+str(error)) from error
+                    else:
+                        parsed = normalize_action(parsed)
                 self.bus.schemas._check(parsed, expected, "$")
                 if payload['response_schema_id'] == 'ResearchAction-v1':
                     from agent.data_research import require_action

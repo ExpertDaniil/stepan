@@ -62,6 +62,7 @@ def run_analysis(service, query, context=None):
             # Retain visibility for this work order without claiming a new computation.
             owner = (context or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')
             service.records.append({'artifact_id': response['artifact_id'], 'query': {**key, 'kind': 'python'},
+                                    'completed_elapsed_ms': int((time.monotonic()-getattr(service.budget, 'started', time.monotonic()))*1000),
                                     'scope': 'fit_only', 'work_order_id': owner})
             response['reused'] = True
             return response
@@ -111,6 +112,8 @@ def run_analysis(service, query, context=None):
                     'report': {k:v for k,v in result.items() if k != 'query'}}
         service.cache[digest] = deepcopy(response)
         service.records.append({'artifact_id': art['artifact_id'], 'query': {**key,'kind':'python'},
+            'code_artifact_id': code_art['artifact_id'],
+            'completed_elapsed_ms': int((time.monotonic()-getattr(service.budget, 'started', time.monotonic()))*1000),
             'scope': 'fit_only', 'work_order_id': (context or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')})
         service.log.event('research.python_analysis_completed', artifact_id=art['artifact_id'],
             code_artifact_id=code_art['artifact_id'], success=result['success'], rows=len(frame),

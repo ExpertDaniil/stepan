@@ -42,7 +42,8 @@ class Researcher:
             investigation_check = checked['investigation_check']
             if proposed['action'] in {'stop', 'research'}:
                 self.save_decision(proposed, None, payload, context, answer, investigation_check=investigation_check)
-                self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
+                self.log.event('research.checkpoint_saved' if proposed['action'] == 'research' else 'research.stop_requested',
+                    researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
                         'plan': None, 'decision': ('research' if proposed['action'] == 'research' and proposed.get('next_step', 'continue') == 'continue' else 'stop'), 'stop_reason': proposed['hypothesis']}
             catalog_mode = proposed['action'] != 'pipeline' and proposed['recipe_id'] != 'python-pipeline-v1'
@@ -187,6 +188,8 @@ class Researcher:
                 check=record['investigation_check'], plan_id=plan['plan_id'] if plan else None)
 
     def validate_adaptive(self, proposed, context, answer):
+        if context['metadata'].get('pipeline_execution'):
+            return self.validate_executable(proposed, context)
         program = None
         validate_action(proposed, self.catalog)
         from agent.data_research import require_action, require_feature_parameters
@@ -320,3 +323,32 @@ class Researcher:
                 from tools.code import validate_code
                 validate_code(proposed['code'])
         return dict(user=user, program=program, memory=memory, evidence=evidence, knowledge=knowledge, protocol=protocol, landscape=landscape, investigation_check=investigation_check)
+
+    def validate_executable(self, proposed, context):
+        """Operational checks only; explanatory prose never gates an executable candidate."""
+        validate_action(proposed, self.catalog)
+        user = json.loads(context['messages'][1]['content'])
+        detail = context['metadata'].get('detail_artifact_id')
+        if detail:
+            sections = self.artifacts.read_json(detail)['sections']
+            user['base_code'] = user.get('base_code') or sections.get('base_code')
+            if not user.get('base_result'):
+                user['base_result'] = sections.get('base_result')
+        program = None
+        if proposed['action'] == 'features':
+            from agent.feature_schema import validate_program
+            from agent.predictions import targets
+            program = validate_program(proposed['feature_program'], self.feature_columns,
+                                       [*targets(self.spec), *self.spec['excluded_features']])
+        if proposed['action'] not in {'research', 'stop'}:
+            self.catalog.normalize(proposed['recipe_id'], proposed['hyperparameters'])
+        if proposed.get('code'):
+            from tools.code import validate_code
+            from agent.pipeline_candidates import automatic_space
+            validate_code(proposed['code'])
+            automatic_space(self.catalog, {'recipe_id': proposed['recipe_id'],
+                'model': {'hyperparameters': proposed['hyperparameters']}}, proposed['code'])
+        profile = user.get('profile_summary', user)
+        return dict(user=user, program=program, memory=profile.get('research_memory', {}), evidence=set(),
+            knowledge=profile.get('knowledge', {}), protocol={}, landscape=profile.get('research_landscape', {}),
+            investigation_check={'verification': 'executable_interface_checked', 'warnings': []})

@@ -56,6 +56,11 @@ class Config:
     catalog_warmup_experiments: int = 4
     research_mode: str = "adaptive"
     research_protocol: str = "compact"
+    background_tuning_enabled: bool = True
+    background_max_trials: int = 128
+    background_trial_seconds: int = 300
+    background_cpu_threads: int = 6
+    background_switch_margin: float = 0.0
     python_analysis_enabled: bool = True
     data_research_min_seconds: int | None = 0  # Auto: one sixth of the run, up to 30 minutes.
     llm_max_calls: int | None = 32
@@ -136,6 +141,11 @@ class Config:
             catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
             research_mode=os.environ.get("RESEARCH_MODE", "adaptive"),
             research_protocol=os.environ.get("RESEARCH_PROTOCOL", "compact"),
+            background_tuning_enabled=boolean('BACKGROUND_TUNING_ENABLED', True),
+            background_max_trials=integer('BACKGROUND_MAX_TRIALS', 128, 1, 10000),
+            background_trial_seconds=integer('BACKGROUND_TRIAL_SECONDS', 300, 5, 3600),
+            background_cpu_threads=integer('BACKGROUND_CPU_THREADS', 6, 1, 7),
+            background_switch_margin=real('BACKGROUND_SWITCH_MARGIN', 0.0, 0, 1000000),
             python_analysis_enabled=boolean("PYTHON_ANALYSIS_ENABLED", True),
             data_research_min_seconds=(integer('DATA_RESEARCH_MIN_SECONDS', 0, 0, 10800)
                                        if 'DATA_RESEARCH_MIN_SECONDS' in os.environ else 0),

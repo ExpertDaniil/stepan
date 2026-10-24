@@ -67,6 +67,9 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         p['hard_decision_constraints'] = self.config.graph_hard_decisions
         p.update(peer_count=min(self.config.graph_peers, self.config.max_workers), max_train_workers=min(self.config.graph_train_workers, self.config.max_workers),
                  max_live_branches=self.config.graph_max_live_branches, max_total_branches=self.config.graph_max_total_branches)
+        from agent.pipeline_candidates import enabled
+        if enabled(self.config):
+            p['max_train_workers'] = self.config.max_workers
         p["context"].update(max_input_tokens=min(self.config.max_context_tokens, 12000), max_output_tokens=self.config.llm_max_output_tokens,
                             max_api_request_bytes=self.config.graph_context_bytes)
         p["plateau"].update(window_full_evaluations=self.config.graph_plateau_window, min_distinct_solutions=self.config.graph_plateau_window,
@@ -421,7 +424,8 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
 
     def check_order(self, order_id):
         order = self.order(order_id)
-        if order["state"] != "issued":
+        background = order['state'] == 'background'
+        if order["state"] not in {"issued", "background"}:
             raise AgentError("WORK_ORDER_NOT_ISSUED", "Work order is no longer issued")
         if self.elapsed() >= order["expires_elapsed_ms"]:
             with self.store.transaction():
@@ -431,7 +435,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if branch["state"] != "active":
             raise AgentError("INVALID_BRANCH_STATE", "The proposal's origin branch is not active")
         head = next((h for h in self.heads(order["branch_id"]) if h["researcher_id"] == order["researcher_id"]), None)
-        if not head or head["head_revision"] != order["base_head_revision"] or head["experiment_id"] != order["base_experiment_id"] or head["solution_id"] != order["base_solution_id"]:
+        if not head or (not background and (head["head_revision"] != order["base_head_revision"] or head["experiment_id"] != order["base_experiment_id"] or head["solution_id"] != order["base_solution_id"])):
             raise AgentError("HEAD_REVISION_CONFLICT", "The proposal no longer matches its own peer head")
         if not self.db.execute("SELECT search_allowed FROM g_runs WHERE run_id=?", (self.run_id,)).fetchone()[0] or not self.budget.snapshot()["search_allowed"]:
             raise AgentError("SEARCH_CLOSED", "No new experiments may be submitted")
@@ -532,9 +536,10 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             self.db.execute("INSERT OR IGNORE INTO g_experiment_links VALUES(?,?,?)", (self.run_id, submission["experiment_id"], manifest["solution_id"]))
             self.db.execute("INSERT INTO g_proposals VALUES(?,?,?,?,?)", (self.run_id, proposal["proposal_id"], order["work_order_id"], canonical(prepared), 1))
             self.db.execute("INSERT INTO g_bindings VALUES(?,?,?,?,?,?,?)", (self.run_id, ident("binding"), order["work_order_id"], submission["experiment_id"], "pending", 0, None))
-            self.db.execute("UPDATE g_work_orders SET state='submitted' WHERE run_id=? AND work_order_id=?", (self.run_id, order["work_order_id"]))
+            state = 'background' if order['state'] == 'background' else 'submitted'
+            self.db.execute("UPDATE g_work_orders SET state=? WHERE run_id=? AND work_order_id=?", (state, self.run_id, order["work_order_id"]))
             # Use an existing closed schema for this event; the full proposal remains in g_proposals.
-            updated_order = {**order, "state": "submitted"}
+            updated_order = {**order, "state": state}
             self.event("G04", "work_order", order["work_order_id"], "GWorkOrder", updated_order)
             ev = self.store.experiment_evaluation(submission["experiment_id"])
             if submission["state"] in {"failed", "timed_out", "cancelled", "invalid"}:
@@ -566,6 +571,10 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                 head = next(h for h in self.heads(order["branch_id"]) if h["researcher_id"] == order["researcher_id"])
                 if branch["state"] != "active" or binding["invalidated"]:
                     disposition = "archived_branch_closed"
+                elif branch['branch_revision'] != order['branch_revision']:
+                    disposition = 'archived_stale'
+                elif order['state'] == 'background':
+                    disposition = 'kept_background'
                 elif branch["branch_revision"] != order["branch_revision"] or head["head_revision"] != order["base_head_revision"]:
                     disposition = "archived_stale"
                 elif metric["fidelity"] != "full":

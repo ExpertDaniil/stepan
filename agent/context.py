@@ -12,7 +12,10 @@ def research_schema(mode):
     return {'adaptive': 'ResearchAction-v1', 'catalog': 'ResearchChoice-v1', 'code': 'ResearchProposal-v1'}[mode]
 
 
-def research_prompt(mode):
+def research_prompt(mode, config=None):
+    from agent.pipeline_candidates import enabled
+    if config is not None and enabled(config):
+        return (ROOT/'prompts/researcher-pipeline.md').read_text(encoding='utf-8')
     return (ROOT / 'prompts' / ('researcher-adaptive.md' if mode == 'adaptive' else
                                 'researcher-catalog.md' if mode == 'catalog' else 'researcher.md')).read_text(encoding='utf-8')
 
@@ -40,7 +43,7 @@ class ContextBuilder:
             return self.build_graph(payload, graph)
         recent = self.artifacts.read_json(snapshot["summary_artifact_id"])
         catalog_mode = self.catalog.config.research_mode == "catalog"
-        system = research_prompt(self.catalog.config.research_mode)
+        system = research_prompt(self.catalog.config.research_mode, self.catalog.config)
         if self.catalog.config.research_mode == 'adaptive' and self.catalog.config.research_protocol == 'legacy':
             system = (ROOT/'prompts/researcher-adaptive-legacy.md').read_text(encoding='utf-8')
         allowed = [key for key, recipe in self.catalog.recipes.items()
@@ -193,16 +196,19 @@ class ContextBuilder:
             user['profile_summary']['branch_focus'] = deepcopy(graph['decision_focus'])
         user["budget"] = graph["budget"]
         catalog_mode = self.catalog.config.research_mode == "catalog"
-        system = research_prompt(self.catalog.config.research_mode)
+        system = research_prompt(self.catalog.config.research_mode, self.catalog.config)
         if self.catalog.config.research_mode == 'adaptive' and self.catalog.config.research_protocol == 'legacy':
             system = (ROOT/'prompts/researcher-adaptive-legacy.md').read_text(encoding='utf-8')
         if adaptive:
+            if hasattr(self, 'pipeline_status'):
+                user['profile_summary']['pipeline_search'] = self.pipeline_status
             user['assignment'] = ('Choose the next research action using measured history and missing evidence. '
                 'The exploit/explore hint does not restrict the recipe or number of coordinated pipeline changes. '
                 'During refinement prefer affordable improvements of the measured best, but reassess feature/target choices when evidence warrants it.')
             if getattr(self, 'analysis', None):
                 user['profile_summary']['analysis_history'] = self.analysis.recent(
-                    visible_orders=graph.get('research_memory', {}).get('visible_work_order_ids', []))
+                    visible_orders=graph.get('research_memory', {}).get('visible_work_order_ids', []),
+                    cutoffs=graph.get('research_memory', {}).get('visible_analysis_cutoffs'))
             user['profile_summary']['research_feedback'] = [r for r in getattr(self, 'research_feedback', [])
                                                            if r['branch_id'] == user['branch_id']]
             user['profile_summary']['context_budget'] = {
@@ -302,6 +308,10 @@ class ContextBuilder:
         metadata = {"schema_id": research_schema(self.catalog.config.research_mode), "researcher_id": payload["researcher_id"],
                     "recipe_ids": allowed, "round_no": self.round_no, "demo_spec": self.demo, "graph_binding": graph["binding"],
                     "graph_request_max_bytes": byte_cap, **detail_metadata}
+        from agent.pipeline_candidates import enabled
+        if enabled(self.catalog.config):
+            metadata.pop('semantic_contract', None)
+            metadata['pipeline_execution'] = True
         art = self.artifacts.write_json("contexts/"+graph["context_id"]+".json", self.log.redactor.clean({"messages": messages, "metadata": metadata}), "llm_context", ident=graph["context_id"])
         self.log.event("context.built", context_id=art["artifact_id"], researcher_id=payload["researcher_id"], branch_id=user["branch_id"],
                        work_order_id=user["work_order_id"], assignment=payload["assignment"], base_experiment_id=user["base_experiment_id"],

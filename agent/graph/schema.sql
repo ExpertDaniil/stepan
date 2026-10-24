@@ -96,7 +96,7 @@ CREATE TABLE g_checkpoints(
 CREATE TABLE g_work_orders(
  run_id TEXT NOT NULL, work_order_id TEXT NOT NULL, branch_id TEXT NOT NULL, researcher_id TEXT NOT NULL,
  branch_revision INTEGER NOT NULL, base_head_revision INTEGER NOT NULL,
- state TEXT NOT NULL CHECK(state IN('preparing','issued','submitted','stopped','revoked','expired','completed')),
+ state TEXT NOT NULL CHECK(state IN('preparing','issued','submitted','background','stopped','revoked','expired','completed')),
  expires_elapsed_ms INTEGER NOT NULL CHECK(expires_elapsed_ms>0), order_json TEXT CHECK(order_json IS NULL OR json_valid(order_json)),
  PRIMARY KEY(run_id,work_order_id),
  FOREIGN KEY(run_id,branch_id,researcher_id) REFERENCES g_heads(run_id,branch_id,researcher_id)

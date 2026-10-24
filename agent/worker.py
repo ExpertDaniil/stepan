@@ -63,7 +63,9 @@ def watch_job(job, done):
     started = time.monotonic()
     while not done.is_set():
         memory = self_peak_mb()
-        code = "JOB_MEMORY_LIMIT" if memory > job["memory_limit_mb"] else "JOB_TIMEOUT" if time.monotonic() - started >= job["timeout_seconds"] else None
+        code = ("JOB_MEMORY_LIMIT" if memory > job["memory_limit_mb"] else
+                "PREFLIGHT_TIMEOUT" if time.monotonic() >= job.get('_preflight_deadline', float('inf')) else
+                "JOB_TIMEOUT" if time.monotonic() - started >= job["timeout_seconds"] else None)
         if code:
             result = {"success": False, "error_type": code, "error": "Worker resource limit reached", "peak_memory_mb": memory}
             target = Path(job["result_path"])
@@ -140,6 +142,25 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
         model = SequentialTargets(model)
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
+    if job.get('preflight'):
+        # Fit-only smoke check: never train on validation rows, and never reuse its fitted state.
+        sample = fit_x.sample(n=min(2048, len(fit_x)), random_state=job['seed'])
+        sample_y = fit_y.loc[sample.index]
+        job['_preflight_deadline'] = time.monotonic()+min(30, job['timeout_seconds'])
+        try:
+            from joblib import parallel_backend
+            with threadpool_limits(limits=job['cpu_threads']), parallel_backend('threading', n_jobs=job['cpu_threads']):
+                model.fit(sample, sample_y)
+                smoke = predict(model, sample.iloc[:min(32, len(sample))], task, 'train')
+                if len(smoke) != min(32, len(sample)):
+                    raise ValueError('Preflight prediction row count changed')
+            print('AUTOML_WORKER '+json.dumps({'stage': 'preflight_completed', 'rows': len(sample)}), flush=True)
+        finally:
+            job.pop('_preflight_deadline', None)
+        model = validate_estimator(enforce_threads(module.make_pipeline(task, params), job['cpu_threads']))
+        if len(targets(task)) > 1:
+            from agent.ml import SequentialTargets
+            model = SequentialTargets(model)
     started = time.monotonic()
     print("AUTOML_WORKER "+json.dumps({"stage": "fit_started", "phase": job["phase"], "cpu_threads": job["cpu_threads"]}),flush=True)
     with limits:

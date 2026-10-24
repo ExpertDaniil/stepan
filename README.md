@@ -1,4 +1,5 @@
-> Current open research interface, context projections and verification: [docs/OPEN-INVESTIGATION.md](docs/OPEN-INVESTIGATION.md).
+> Current default: [executable pipeline versions and background Optuna](docs/BACKGROUND-PIPELINES.md).
+> Earlier open research interface and compatibility: [docs/OPEN-INVESTIGATION.md](docs/OPEN-INVESTIGATION.md).
 > Compact protocol and optional data window supersede historical default descriptions below.
 
 # AutoML Agent · Adaptive Research

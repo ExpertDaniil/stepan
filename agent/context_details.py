@@ -126,6 +126,25 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         sections.update(semantic_model=model, quantities=model['quantities'], relations=model['relations'])
     sections['analyses'] = [{**r, 'report': artifacts.read_json(r['artifact_id'])}
                             for r in sections['analyses']]
+    analysis_index = []
+    for record in sections['analyses']:
+        aid, report = record['artifact_id'], record['report']
+        query = report.pop('query', {})
+        code = query.pop('code', None)
+        if code is not None:
+            sections['analysis_code/'+aid] = code
+        record.get('query', {}).pop('code', None)
+        question = query.get('question') or query.get('investigation', {}).get('question', '')
+        sections['analysis_result/'+aid] = {'artifact_id': aid, 'question': question,
+            'report': deepcopy(report)}
+        summary = {'artifact_id': aid, 'question': question[:300],
+            'success': report.get('success'), 'result_section': 'analysis_result/'+aid,
+            'result_preview': canonical(report.get('result', report.get('error', {})))[:700],
+            'preview_only': True}
+        if code is not None:
+            summary['code_section'] = 'analysis_code/'+aid
+        analysis_index.append(summary)
+    sections['analyses_index'] = analysis_index
     documents = {}
     sections['experiments'] = list(dict.fromkeys(experiment_ids))
     if store is not None:

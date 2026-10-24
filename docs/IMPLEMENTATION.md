@@ -1,4 +1,5 @@
-> Current open research interface, context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
+> Current default: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md): independent version-owned Optuna and executable submissions.
+> Previous research interface and compatibility: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
 > Compact protocol and optional data window supersede historical default descriptions below.
 
 > Обязательный начальный этап данных: [DATA-RESEARCH-WINDOW.md](DATA-RESEARCH-WINDOW.md).

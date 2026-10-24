@@ -141,7 +141,9 @@ class Catalog:
         if not recipe or plan["model"]["family"] != recipe["family"]:
             raise AgentError("INVALID_PLAN", "Recipe/model family mismatch")
         plan["model"]["hyperparameters"] = self.normalize(plan["recipe_id"], plan["model"]["hyperparameters"])
-        if plan["resources"]["cpu_threads"] > self.config.train_cpu_threads or plan["resources"]["memory_limit_mb"] > self.config.train_memory_mb:
+        from agent.pipeline_candidates import enabled
+        max_cpu = max(self.config.train_cpu_threads, self.config.background_cpu_threads) if enabled(self.config) else self.config.train_cpu_threads
+        if plan["resources"]["cpu_threads"] > max_cpu or plan["resources"]["memory_limit_mb"] > self.config.train_memory_mb:
             raise AgentError("INVALID_PLAN", "Resource request exceeds configuration")
         if artifacts.meta(plan["code_artifact_id"])["kind"] != "python_source":
             raise AgentError("INVALID_PLAN", "Expected a Python code artifact")

@@ -451,6 +451,10 @@ def search(controller):
         accepted += controller.run_training([plan], [ticket])
         if (warmup_index+1) % len(peers) == 0 or warmup_index+1 == len(warmups):
             controller.finalize_best()
+    from agent.pipeline_candidates import enabled
+    if enabled(controller.config):
+        from agent.pipeline_search import search as pipeline_search
+        return pipeline_search(controller, root, accepted)
     stop_reason, round_no = "time_reserve", 0
     controller.budget.start_data_research()
     while controller.budget.snapshot()["search_allowed"]:

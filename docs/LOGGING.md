@@ -1,4 +1,5 @@
-> Current open research interface, context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
+> Current version queue and pipeline.* events: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md).
+> Earlier context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
 > Compact protocol and optional data window supersede historical default descriptions below.
 
 > Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).

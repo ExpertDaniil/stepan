@@ -93,8 +93,8 @@ class Orchestrator:
                   key="release/" + job.lease["lease_id"])
 
     def resources(self, timeout=None):
-        return {"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
-                "timeout_seconds": timeout or self.config.experiment_timeout_seconds}
+        return self.budget.sized_resources({"cpu_threads": self.config.train_cpu_threads, "memory_limit_mb": self.config.train_memory_mb,
+                "timeout_seconds": timeout or self.config.experiment_timeout_seconds})
 
     def admit_training(self, plan, owner):
         window = self.budget.data_research_snapshot()

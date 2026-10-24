@@ -6484,7 +6484,8 @@
             "stopped",
             "revoked",
             "expired",
-            "completed"
+            "completed",
+            "background"
           ]
         }
       },
@@ -6811,7 +6812,8 @@
             "kept_not_better",
             "kept_screening",
             "archived_stale",
-            "archived_branch_closed"
+            "archived_branch_closed",
+            "kept_background"
           ]
         },
         "solution_id": {
@@ -11880,6 +11882,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "pipeline_execution": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -11944,6 +11949,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "pipeline_execution": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -12070,6 +12078,9 @@
             },
             "semantic_contract": {
               "const": "semantic-planning-1"
+            },
+            "pipeline_execution": {
+              "type": "boolean"
             }
           },
           "required": [

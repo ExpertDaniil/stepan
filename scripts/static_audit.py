@@ -13,8 +13,26 @@ def data_value(node, bindings):
     """Interpret data literals/references only, never execute project code."""
     if isinstance(node, ast.Name):
         return bindings[node.id]
+    if isinstance(node, ast.Subscript):
+        return data_value(node.value, bindings)[data_value(node.slice, bindings)]
     if isinstance(node, ast.Dict):
-        return {data_value(k, bindings): data_value(v, bindings) for k, v in zip(node.keys, node.values)}
+        result = {}
+        for key, value in zip(node.keys, node.values):
+            if key is None:
+                result.update(data_value(value, bindings))
+            else:
+                result[data_value(key, bindings)] = data_value(value, bindings)
+        return result
+    if isinstance(node, ast.DictComp) and len(node.generators) == 1:
+        generator = node.generators[0]
+        if not isinstance(generator.target, ast.Name) or generator.ifs or generator.is_async:
+            raise ValueError('Unsupported schema comprehension')
+        return {data_value(node.key, {**bindings, generator.target.id: value}):
+                data_value(node.value, {**bindings, generator.target.id: value})
+                for value in data_value(generator.iter, bindings)}
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'text_schema' and len(node.args) <= 1 and not node.keywords:
+        return {'type': 'string', 'minLength': 1, 'maxLength': data_value(node.args[0], bindings) if node.args else 400}
+
     if isinstance(node, (ast.List, ast.Tuple)):
         values = [data_value(v, bindings) for v in node.elts]
         return tuple(values) if isinstance(node, ast.Tuple) else values
@@ -87,7 +105,7 @@ def audit(root, official_archive=None):
                 schema_structure(value[key])
     schema_structure(schema)
     declarations = {}
-    for module in ('agent/feature_schema.py', 'agent/research_actions.py', 'tools/analysis.py', 'agent/context_details.py'):
+    for module in ('agent/semantic_planning.py', 'agent/feature_schema.py', 'agent/research_actions.py', 'tools/analysis.py', 'agent/context_details.py'):
         for node in trees[module].body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:

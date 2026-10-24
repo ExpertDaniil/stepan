@@ -55,7 +55,9 @@ class Config:
     research_series_size: int = 4
     catalog_warmup_experiments: int = 4
     research_mode: str = "adaptive"
-    data_research_min_seconds: int | None = None  # Auto: one sixth of the run, up to 30 minutes.
+    research_protocol: str = "compact"
+    python_analysis_enabled: bool = True
+    data_research_min_seconds: int | None = 0  # Auto: one sixth of the run, up to 30 minutes.
     llm_max_calls: int | None = 32
     llm_timeout_seconds: int = 600
     llm_operation_timeout_seconds: int = 1200
@@ -133,8 +135,10 @@ class Config:
             research_series_size=integer("RESEARCH_SERIES_SIZE", 4, 1, 16),
             catalog_warmup_experiments=integer("CATALOG_WARMUP_EXPERIMENTS", 4, 0, 20),
             research_mode=os.environ.get("RESEARCH_MODE", "adaptive"),
+            research_protocol=os.environ.get("RESEARCH_PROTOCOL", "compact"),
+            python_analysis_enabled=boolean("PYTHON_ANALYSIS_ENABLED", True),
             data_research_min_seconds=(integer('DATA_RESEARCH_MIN_SECONDS', 0, 0, 10800)
-                                       if 'DATA_RESEARCH_MIN_SECONDS' in os.environ else None),
+                                       if 'DATA_RESEARCH_MIN_SECONDS' in os.environ else 0),
             llm_max_calls=optional_limit("LLM_MAX_CALLS", None if platform else 32, 1, 1000000),
             llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 600, 1, 1800),
             llm_operation_timeout_seconds=integer("LLM_OPERATION_TIMEOUT_SECONDS", 1200, 1, 3600),
@@ -195,6 +199,8 @@ class Config:
             raise AgentError("INVALID_CONFIG", "Unsupported LOG_LEVEL")
         if cfg.data_research_min_seconds is not None and cfg.data_research_min_seconds >= cfg.time_budget_seconds:
             raise AgentError('INVALID_CONFIG', 'DATA_RESEARCH_MIN_SECONDS must leave time for final training and output')
+        if cfg.research_protocol not in {'compact', 'legacy'}:
+            raise AgentError('INVALID_CONFIG', 'RESEARCH_PROTOCOL must be compact or legacy')
         if cfg.llm_research_tool_seconds >= cfg.llm_research_dialogue_seconds:
             raise AgentError('INVALID_CONFIG', 'Tool phase must leave time for a final research decision')
         if cfg.llm_reasoning_protocol not in {'compatible', 'qwen_chat_template'}:

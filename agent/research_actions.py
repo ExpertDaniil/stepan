@@ -78,8 +78,9 @@ TUNING_SCHEMA = {
     'required': ['max_trials', 'budget_seconds'], 'additionalProperties': False}
 ACTION_SCHEMA = {
     'type': 'object', 'properties': {
-        'action': {'enum': ['catalog', 'pipeline', 'features', 'tune', 'stop']},
+        'action': {'enum': ['research', 'catalog', 'pipeline', 'features', 'tune', 'stop']},
         'feature_program': FEATURE_PROGRAM_SCHEMA,
+        'next_step': {'enum': ['continue', 'wait', 'finish']},
         'coordination': {'type': 'object', 'properties': {
             'related_series_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 4},
             'reason': {'type': 'string', 'minLength': 12, 'maxLength': 1000}},
@@ -102,8 +103,7 @@ ACTION_SCHEMA = {
         'knowledge_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
         'research_notes': RESEARCH_NOTES_SCHEMA, 'semantic_updates': SEMANTIC_UPDATE_SCHEMA,
         'investigation': INVESTIGATION_SCHEMA},
-    'required': ['action', 'recipe_id', 'hyperparameters', 'hypothesis', 'expected_effect',
-                 'feature_steps', 'code', 'tuning', 'evidence_ids'], 'additionalProperties': False}
+    'required': ['action', 'hypothesis', 'evidence_ids'], 'additionalProperties': False}
 
 
 def validate_research_notes(notes, memory, evidence, knowledge):
@@ -157,7 +157,7 @@ def validate_action(action, catalog):
             raise AgentError('INVALID_RESEARCH_ACTION', 'features needs an owned learned recipe, feature_program, code/tuning=null and feature_steps=[]')
     elif 'feature_program' in action:
         raise AgentError('INVALID_RESEARCH_ACTION', 'feature_program belongs only to features actions')
-    if kind == 'stop':
+    if kind in {'stop', 'research'}:
         if action['code'] is not None or action['tuning'] is not None:
             raise AgentError('INVALID_RESEARCH_ACTION', 'Stop cannot execute code or start tuning')
         return
@@ -177,3 +177,11 @@ def validate_action(action, catalog):
         domains = catalog.recipes.get(action['recipe_id'], {}).get('parameters', {})
         if not axes or len(set(axes)) != len(axes) or (action['recipe_id'] != CUSTOM_RECIPE and not set(axes) <= set(domains)):
             raise AgentError('INVALID_RESEARCH_ACTION', 'Tuning axes must be distinct declared parameters; supply search_space')
+
+
+def normalize_action(action):
+    action = dict(action)
+    for key, value in {'recipe_id': 'none', 'hyperparameters': {}, 'feature_steps': [],
+                       'code': None, 'tuning': None, 'expected_effect': action.get('hypothesis', '')}.items():
+        action.setdefault(key, value)
+    return action

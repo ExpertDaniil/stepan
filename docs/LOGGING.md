@@ -1,3 +1,6 @@
+> Current open research interface, context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
+> Compact protocol and optional data window supersede historical default descriptions below.
+
 > Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
 
 Смысловое планирование: [SEMANTIC-PLANNING.md](SEMANTIC-PLANNING.md).

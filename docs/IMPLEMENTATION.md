@@ -1,3 +1,6 @@
+> Current open research interface, context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
+> Compact protocol and optional data window supersede historical default descriptions below.
+
 > Обязательный начальный этап данных: [DATA-RESEARCH-WINDOW.md](DATA-RESEARCH-WINDOW.md).
 > Планирование по смыслу задачи: [SEMANTIC-PLANNING.md](SEMANTIC-PLANNING.md).
 > Пересматриваемые fork preferences и время ветки: [SOFT-BRANCHES.md](SOFT-BRANCHES.md).

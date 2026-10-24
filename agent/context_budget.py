@@ -67,6 +67,11 @@ def compact_tool_reply(value, maximum):
             while request_bytes(result) > maximum and isinstance(records, list) and len(records) > 1:
                 records.pop()
                 report['display_omitted_'+field] = report.get('display_omitted_'+field, 0)+1
+        if request_bytes(result) > maximum and report.get('result') is not None:
+            report.pop('result')
+            report['result_details_omitted'] = True
+        if request_bytes(result) > maximum and report.get('stdout'):
+            report['stdout'] = report['stdout'][:240]
         report['detail_hint'] = 'analyze_data kind=report with report_id='+result['artifact_id']+'; use offset/limit_bytes for pages.'
         report['details_omitted'] = True
     if isinstance(result.get('results'), list) and result.get('artifact_id'):
@@ -239,6 +244,58 @@ def compact_research_request(request, limit, log=None, *, stage="request"):
             profile['research_memory'] = compact_memory(profile['research_memory'],
                 base_experiment_id=user.get('base_experiment_id'), max_bytes=4000)
             omissions.append('smaller_research_memory');refresh()
+        if size() > limit and details.get('reference_id'):
+            # Freeze-before-project: every field below exists verbatim in full_context.
+            reference = details['reference_id']
+            current = profile.get('current_pipeline_facts', {})
+            if current.get('effective_parameters') is not None:
+                current.pop('effective_parameters')
+                current['parameter_details'] = 'read_memory section=base_result; preprocessing facts remain authoritative'
+                omissions.append('duplicate_current_parameters');refresh()
+            if user.get('base_code') and request_bytes(user['base_code']) > 4000:
+                user['base_code'] = None
+                profile['base_code_details'] = {'reference_id': reference, 'section': 'base_code',
+                    'instruction': 'Read exact code before editing it; tuning without new source reuses controller-owned code.'}
+                omissions.append('base_code_by_reference');refresh()
+            # Analysis plans and old failures must not grow every new assignment.
+            for field, section in [('analysis_history','analyses'), ('research_feedback','research_feedback')]:
+                rows = profile.get(field, [])
+                while size() > limit and len(rows) > 2:
+                    rows.pop(0);omissions.append(field+'_older_records');refresh()
+                for index, row in enumerate(rows):
+                    if size() <= limit:break
+                    if 'query' in row:
+                        row['query'] = {k:v for k,v in row['query'].items() if k in {'kind','columns','group_by','include_target'}}
+                    if 'message' in row:row['message'] = row['message'][:240]
+                    row['detail_hint'] = 'read_memory section='+section
+                    refresh()
+            if size() > limit:
+                # One catalogue name/family per recipe, with parameters retrievable.
+                profile['recipes'] = [{k:v for k,v in recipe.items() if k in {'id','family','description'}}
+                                      for recipe in profile.get('recipes', [])]
+                omissions.append('catalogue_details_by_reference');refresh()
+            if size() > limit:
+                # Remove duplicated nested plans, retaining the exact base in scoped details.
+                base = user.get('base_result')
+                if base:
+                    user['base_result'] = None
+                    profile['base_result_details'] = {'reference_id': reference, 'section': 'base_result'}
+                    omissions.append('base_parameters_by_reference');refresh()
+            if size() > limit:
+                # Protected ID does not mean protected duplicated prose.
+                user['facts'] = [{k:v for k,v in fact.items() if k != 'summary'} | {
+                    'summary': 'Read scoped facts/experiment details for exact result.'} for fact in user.get('facts', [])]
+                omissions.append('fact_details_by_reference');refresh()
+            if size() > limit:
+                # Keep the map of all column names; detailed definitions remain pageable.
+                profile['data'] = {k:v for k,v in data.items() if k in {
+                    'train_columns','test_columns','train_rows','test_rows','core_profile','dictionary_index'}}
+                for field in ('feature_memory','comparison_evidence','research_landscape','knowledge','optimizer_facts','feature_engineering'):
+                    if size() <= limit:break
+                    if field in profile:
+                        profile[field] = {'details': 'read_memory section=full_context'}
+                        omissions.append(field+'_by_reference');refresh()
+
     # Preserve every assistant/tool-call pair. Compact all retrievable result
     # kinds, including the latest answer; keeping only the final report intact
     # could still make the complete request impossible to send.

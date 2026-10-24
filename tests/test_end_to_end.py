@@ -178,8 +178,16 @@ class EndToEndTests(unittest.TestCase):
                         try:return lease(budget,payload)
                         finally:override.remove(id(budget))
                     return lease(budget,payload)
+                # Force an actual slow child; do not depend on library-import latency.
+                popen=subprocess.Popen
+                delayed=[]
+                def slow_train(args,*a,**kw):
+                    if clipped and not delayed and isinstance(args,list) and 'agent.worker' in args:
+                        delayed.append(True)
+                        args=[args[0],'-u','-c',"import time,runpy;time.sleep(3);runpy.run_module('agent.worker',run_name='__main__')",args[-1]]
+                    return popen(args,*a,**kw)
                 settings={**self.env(),'GRAPH_ENABLED':str(int(graph)),'GRAPH_REFINEMENT_ENABLED':'0','TIME_BUDGET_SECONDS':'90'}
-                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),redirect_stderr(io.StringIO()) as stderr:
+                with patch.dict(os.environ,settings),patch.object(Budget,'lease',clip),patch.object(Budget,'can_train',estimate),patch('agent.runner.subprocess.Popen',slow_train),redirect_stderr(io.StringIO()) as stderr:
                     code=main([str(task),'--work-dir',str(Path(temp)/'runs')])
                 self.assertEqual(code,0,stderr.getvalue()[-3000:])
                 run=next((Path(temp)/'runs').glob('run-*'))

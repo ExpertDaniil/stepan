@@ -105,7 +105,8 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
              'visibility': deepcopy(visibility),
              'allowed_donor_experiment_ids': deepcopy(user.get('allowed_donor_experiment_ids', []))}
     from agent.config import ROOT
-    sections = {'task_description': task_text, 'tool_guide': (ROOT/'prompts/TOOLS.md').read_text(encoding='utf-8'),
+    sections = {'base_code': user.get('base_code'), 'base_result': deepcopy(user.get('base_result')),
+        'full_context': deepcopy(user), 'task_description': task_text, 'tool_guide': (ROOT/'prompts/TOOLS.md').read_text(encoding='utf-8'),
         'decisions': memory.get('decisions', []), 'ideas': memory.get('open_ideas', []),
         'semantics': memory.get('semantic_records', []), 'dictionary': data.get('data_dictionary', []),
         'schema': {k: deepcopy(data.get(k)) for k in ('train_columns', 'test_columns', 'train_dtypes', 'test_dtypes')},

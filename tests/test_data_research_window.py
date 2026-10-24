@@ -26,7 +26,7 @@ class DataResearchWindowTests(unittest.TestCase):
         from agent.context import output_schemas
         from agent.llm.gateway import Gateway, MockTransport
         from tests.test_adaptive_research import SOURCE
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, data_research_min_seconds=None)
         try:
             reply, payload = h.submit(h.issue(), {'alpha': 1.}, recipe='python-pipeline-v1', source=SOURCE)
             h.commit(reply, 7)
@@ -56,9 +56,9 @@ class DataResearchWindowTests(unittest.TestCase):
         finally:
             h.close()
 
-    def test_default_three_hour_window_starts_once_and_unlocks_at_thirty_minutes(self):
+    def test_opt_in_auto_three_hour_window_starts_once_and_unlocks_at_thirty_minutes(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:
-            budget = Budget(Config(time_budget_seconds=10800), 100, None)
+            budget = Budget(Config(time_budget_seconds=10800, data_research_min_seconds=None), 100, None)
             self.assertEqual(budget.data_research_snapshot()['stage'], 'not_started')
             budget.start_data_research()
             self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 1800)
@@ -70,8 +70,8 @@ class DataResearchWindowTests(unittest.TestCase):
             self.assertEqual(budget.deadline, 10900)
 
     def test_short_runs_scale_and_explicit_disable_and_legacy_are_supported(self):
-        for config, expected in [(Config(time_budget_seconds=60), 10),
-                                 (Config(time_budget_seconds=90), 15),
+        for config, expected in [(Config(time_budget_seconds=60, data_research_min_seconds=None), 10),
+                                 (Config(time_budget_seconds=90, data_research_min_seconds=None), 15),
                                  (Config(data_research_min_seconds=37), 37),
                                  (Config(data_research_min_seconds=0), 0),
                                  (Config(research_mode='catalog'), 0)]:
@@ -88,15 +88,15 @@ class DataResearchWindowTests(unittest.TestCase):
                 with self.assertRaises(AgentError):
                     Config.from_env(profile='development')
 
-    def test_runtime_defaults_enable_the_window_in_both_profiles(self):
+    def test_runtime_defaults_do_not_force_the_window_in_either_profile(self):
         for profile in ('platform', 'development'):
             with self.subTest(profile=profile), patch.dict(os.environ, {}, clear=True):
                 config = Config.from_env(profile=profile)
-                self.assertIsNone(config.data_research_min_seconds)
+                self.assertEqual(config.data_research_min_seconds, 0)
                 budget = Budget(config, time.monotonic(), None)
                 budget.start_data_research()
-                self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 1800)
-                self.assertTrue(budget.data_research_snapshot()['active'])
+                self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 0)
+                self.assertFalse(budget.data_research_snapshot()['active'])
 
     def test_data_window_never_extends_the_global_deadline_or_output_reserve(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:
@@ -109,7 +109,7 @@ class DataResearchWindowTests(unittest.TestCase):
             self.assertEqual(budget.deadline, 160)
 
     def test_only_data_actions_are_permitted_then_all_actions_reopen(self):
-        budget = Budget(Config(), time.monotonic(), None)
+        budget = Budget(Config(data_research_min_seconds=None), time.monotonic(), None)
         budget.start_data_research()
         active = budget.data_research_snapshot()
         for kind in ['catalog', 'tune', 'stop']:
@@ -126,7 +126,7 @@ class DataResearchWindowTests(unittest.TestCase):
 
     def test_final_training_does_not_complete_an_interrupted_data_window(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:
-            budget = Budget(Config(), 100, None)
+            budget = Budget(Config(data_research_min_seconds=None), 100, None)
             budget.start_data_research()
             clock.return_value = 1000
             budget.end_data_research('llm_call_limit')
@@ -173,7 +173,7 @@ class DataResearchWindowTests(unittest.TestCase):
         self.assertEqual(packed['profile_summary']['data_research'], window)
 
     def test_optuna_and_emergency_parameter_search_cannot_bypass_the_window(self):
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, data_research_min_seconds=None)
         try:
             c = h.controller
             c.graph = h.g
@@ -198,7 +198,7 @@ class DataResearchWindowTests(unittest.TestCase):
             h.close()
 
     def test_an_existing_series_is_paused_without_consuming_a_trial(self):
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, data_research_min_seconds=None)
         try:
             c = h.controller
             c.graph = h.g
@@ -216,7 +216,7 @@ class DataResearchWindowTests(unittest.TestCase):
             h.close()
 
     def test_controller_rechecks_data_changes_before_launching_a_training_process(self):
-        h = GraphHarness('regression', research_mode='adaptive')
+        h = GraphHarness('regression', research_mode='adaptive', data_research_min_seconds=None)
         try:
             c = h.controller
             plan = h.proposal(h.issue())['proposal']['plan']
@@ -230,7 +230,7 @@ class DataResearchWindowTests(unittest.TestCase):
     def test_context_and_gateway_expose_the_same_restricted_action_schema(self):
         from agent.context import output_schemas
         from agent.llm.gateway import Gateway, MockTransport
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, data_research_min_seconds=None)
         try:
             g = h.g
             g.context.data_research = g.budget.data_research_snapshot
@@ -252,7 +252,7 @@ class DataResearchWindowTests(unittest.TestCase):
             self.assertEqual(result['parsed_payload']['action'], 'features')
             schema_message = next(m['content'] for m in requests[0]['messages'] if m['content'].startswith('Final output JSON schema:'))
             schema = json.loads(schema_message.split('\n', 1)[1])
-            self.assertEqual(schema['properties']['action']['enum'], ['features', 'pipeline'])
+            self.assertEqual(schema['properties']['action']['enum'], ['features', 'pipeline', 'research'])
             self.assertIn('tune', schemas['ResearchAction-v1']['properties']['action']['enum'])
         finally:
             h.close()

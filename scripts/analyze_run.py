@@ -70,14 +70,22 @@ def research_summary(events):
 def inspect_run(source):
     source = Path(source)
     if source.is_dir():
-        names = [p.relative_to(source).as_posix() for p in source.rglob("*") if p.is_file() and not p.is_symlink()]
+        # Temporary journal/checkpoint files can disappear during an active run.
+        # A metadata inspection must not fail because such a file was renamed.
+        sizes = {}
+        for path in source.rglob("*"):
+            try:
+                if path.is_file() and not path.is_symlink():
+                    sizes[path.relative_to(source).as_posix()] = path.stat().st_size
+            except FileNotFoundError:
+                continue
+        names = list(sizes)
         def read(name):
             path = source/name
             if path.stat().st_size > 8*1024*1024:
                 raise ValueError("Metadata file too large")
             return path.read_text(encoding="utf-8")
         archive = None
-        sizes = {name: (source/name).stat().st_size for name in names}
     else:
         archive = zipfile.ZipFile(source)
         names = archive.namelist()

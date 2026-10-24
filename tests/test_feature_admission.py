@@ -74,7 +74,8 @@ class FeatureAdmissionTests(unittest.TestCase):
     def test_feature_action_rejects_target_input_before_training(self):
         with self.assertRaises(AgentError) as error:
             self.propose(self.h.g.spec['target_column'])
-        self.assertEqual(error.exception.code, 'INVALID_FEATURE_PROGRAM')
+        self.assertEqual(error.exception.code, 'INVALID_LLM_OUTPUT')
+        self.assertIn('INVALID_FEATURE_PROGRAM', str(error.exception))
 
     def test_authoritative_schema_survives_provider_context_compaction(self):
         plan = self.propose('x_numeric', compacted=True)
@@ -83,7 +84,8 @@ class FeatureAdmissionTests(unittest.TestCase):
     def test_unknown_feature_still_rejected_with_compacted_provider_context(self):
         with self.assertRaises(AgentError) as error:
             self.propose('nonexistent_input', compacted=True)
-        self.assertEqual(error.exception.code, 'INVALID_FEATURE_PROGRAM')
+        self.assertEqual(error.exception.code, 'INVALID_LLM_OUTPUT')
+        self.assertIn('INVALID_FEATURE_PROGRAM', str(error.exception))
 
     def test_other_peers_measured_landscape_is_valid_visible_evidence(self):
         g = self.h.g

@@ -586,7 +586,7 @@ class Orchestrator:
         prepared = self.call("C18", {"experiment_id": ident, "evaluation_id": evaluation["evaluation_id"],
                                      "task_spec_id": self.spec["task_spec_id"], "mode": "refit_full_train",
                                      "expected_champion_version": champion["champion_version"] if champion else 0}, self.submission.prepare,
-                             key="prepare/" + ident)
+                             key="prepare/" + ident + "/" + str(champion["champion_version"] if champion else 0))
         subjob = prepared["submission_job_id"]
         lease_reply = self.lease(subjob, "refit", self.resources(max(self.config.experiment_timeout_seconds, math.ceil(predicted))))
         if not lease_reply["granted"]:
@@ -626,7 +626,7 @@ class Orchestrator:
         if confirmation and confirmation['chosen_experiment_id'] == ident:
             publication_payload['confirmation_report_id'] = confirmation['artifact_id']
         publication = self.call("C21", publication_payload, self.submission.publish,
-                  key="publish/" + ident + "/" + report["candidate_sha256"])
+                  key="publish/" + ident + "/" + report["candidate_sha256"] + "/" + str(current["champion_version"] if current else 0))
         self.submission.change_state(subjob, "skipped_not_better" if publication["disposition"] == "skipped_not_better" else "published")
         self.update_final_reserve()
 

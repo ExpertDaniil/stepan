@@ -15,6 +15,8 @@ class Researcher:
     def __init__(self, bus, gateway, artifacts, spec, catalog, config, log, feature_columns=None):
         self.bus, self.gateway, self.artifacts, self.spec, self.catalog, self.config, self.log = bus, gateway, artifacts, spec, catalog, config, log
         self.validation_id = None
+        if self.gateway is not None:
+            self.gateway.proposal_validator = self.validate_adaptive
         self.feature_columns = list(feature_columns) if feature_columns is not None else None
 
     def propose(self, payload):
@@ -27,115 +29,22 @@ class Researcher:
         investigation_check = None
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
-                                        "tool_schema_ids": (['analyze_data', 'read_memory'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
+                                        "tool_schema_ids": (['analyze_data', 'run_analysis', 'read_memory'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds,
                                         "attempt_limit": self.config.llm_research_tool_turns + 2 if adaptive else 4}, self.gateway.complete)["data"]
         proposed = answer["parsed_payload"]
         if adaptive:
-            validate_action(proposed, self.catalog)
-            from agent.data_research import require_action, require_feature_parameters
-            window = self.gateway.budget.data_research_snapshot()
-            require_action(proposed, window)
-            user = json.loads(context['messages'][1]['content'])
-            require_feature_parameters(proposed, self.catalog, window, user.get('restrictions'))
-            from agent.feature_search import validate_focus
-            validate_focus(proposed, user)
-            if proposed['action'] == 'features':
-                from agent.feature_schema import validate_program
-                from agent.predictions import targets
-                profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
-                excluded = [*targets(self.spec), *self.spec['excluded_features']]
-                try:
-                    program = validate_program(proposed['feature_program'],
-                        ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
-                         else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
-                         else None), excluded)
-                except (ValueError, KeyError) as error:
-                    raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
-            memory = user.get('profile_summary', user).get('research_memory', {})
-            evidence = {f['source_id'] for f in user.get('facts', [])}
-            for fact in user.get('facts', []):
-                evidence.update(fact.get('artifact_ids', []))
-            evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
-            evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
-            evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
-            evidence.update(r['artifact_id'] for r in user.get('analysis_history', []))
-            evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
-            evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
-            evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id') and call.get('name') != 'search_knowledge')
-            for delivery in answer['tool_calls']:
-                if delivery.get('name') == 'research_updates':
-                    evidence.update(delivery['evidence_ids'])
-            projection = user.get('profile_summary', user)
-            protocol = projection.get('scientific_protocol', {})
-            for report in protocol.get('fit_diagnostics', []):
-                evidence.add(report['artifact_id'])
-            episode = protocol.get('episode')
-            if episode:
-                evidence.update(episode['evidence_ids'])
-                evidence.update(episode['measured_experiment_ids'])
-                memory = {**memory, 'open_ideas': [*memory.get('open_ideas', []), episode]}
-            semantic_task = projection.get('semantic_task', {})
-            if semantic_task.get('model_id'):
-                evidence.add(semantic_task['model_id'])
-            evidence.update(item['record_id'] for field in ('quantities', 'relations') for item in semantic_task.get(field, []))
-            evidence.update(item['record_id'] for item in memory.get('semantic_records', []))
-            landscape = projection.get('research_landscape', {})
-            for result in [*landscape.get('best_per_family', []), *projection.get('feature_memory', {}).get('representations', [])]:
-                evidence.add(result['experiment_id'])
-            if landscape.get('strongest_measured_learned'):
-                evidence.add(landscape['strongest_measured_learned']['experiment_id'])
-            for comparison in projection.get('comparison_evidence', {}).get('comparisons', []):
-                evidence.update(comparison.get('experiment_ids', []))
-            for decision in memory.get('decisions', []):
-                evidence.update(decision['evidence_ids'])
-                for observation in decision['observations']:
-                    evidence.add(observation['experiment_id'])
-                    if observation.get('diagnostics_artifact_id'):
-                        evidence.add(observation['diagnostics_artifact_id'])
-            for idea in memory.get('open_ideas', []):
-                evidence.update(idea['evidence_ids'])
-            for delivery in answer['tool_calls']:
-                if delivery.get('name') == 'read_memory':
-                    evidence.update(delivery.get('evidence_ids', []))
-                    memory.setdefault('open_ideas', []).extend({'idea_id': ident, 'evidence_ids': [], 'knowledge_ids': []} for ident in delivery.get('idea_ids', []))
-            evidence.update(i for i in (self.spec.get('dictionary_artifact_id'), self.spec.get('task_spec_id')) if i)
-            from agent.research_memory import validate_semantic_updates
-            detail_id = context['metadata'].get('detail_artifact_id')
-            semantic_records = self.artifacts.read_json(detail_id)['sections']['semantics'] if detail_id else []
-            from agent.semantic_planning import validate_investigation, check_declared_semantics, effective_model
-            investigation_check = validate_investigation(proposed.get('investigation'), context, evidence,
-                self.feature_columns, self.bus.schemas, program=proposed.get('feature_program', []))
-            if (proposed.get('investigation', {}).get('interpretation') in {'physical', 'mathematical'}
-                    and (proposed['hyperparameters'].get('numeric_interactions') is True
-                         or 'numeric_interactions' in (proposed.get('tuning') or {}).get('search_space', {})
-                         or 'numeric_interactions' in (proposed.get('tuning') or {}).get('parameters', []))):
-                raise AgentError('INVALID_INVESTIGATION', 'Automatic numeric_interactions cannot substantiate named physical/mathematical interactions; use an explicit feature_program or an exploratory interpretation')
-            frozen_model = self.artifacts.read_json(detail_id)['sections'].get('semantic_model') if detail_id else None
-            investigation_check['warnings'] = check_declared_semantics(proposed.get('feature_program', []),
-                proposed.get('investigation'), effective_model(frozen_model, semantic_records))
-            validate_semantic_updates(proposed.get('semantic_updates', []), memory, evidence,
-                                      (self.feature_columns + [step['name'] for step in proposed.get('feature_program', [])]
-                                       if self.feature_columns is not None else None),
-                                      context['metadata'].get('detail_scope'), semantic_records)
-            if not set(proposed['evidence_ids']) <= evidence:
-                raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
-            knowledge = user.get('profile_summary', user).get('knowledge', {})
-            visible_knowledge = {r['id'] for r in knowledge.get('results', [])}
-            visible_knowledge.update(ident for call in answer['tool_calls'] for ident in call.get('knowledge_ids', []))
-            for idea in memory.get('open_ideas', []):
-                visible_knowledge.update(idea['knowledge_ids'])
-            if not set(proposed.get('knowledge_ids', [])) <= visible_knowledge:
-                raise AgentError('INVALID_RESEARCH_ACTION', 'Unseen knowledge_ids: '+', '.join(sorted(set(proposed.get('knowledge_ids', []))-visible_knowledge))+
-                                 '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
-            validate_research_notes(proposed.get('research_notes'), memory, evidence, visible_knowledge)
-            validate_test_plan(proposed, protocol)
-            if proposed['action'] == 'stop':
+            checked = self.validate_adaptive(proposed, context, answer)
+            user, program = checked['user'], checked['program']
+            memory, evidence, knowledge = checked['memory'], checked['evidence'], checked['knowledge']
+            protocol, landscape = checked['protocol'], checked['landscape']
+            investigation_check = checked['investigation_check']
+            if proposed['action'] in {'stop', 'research'}:
                 self.save_decision(proposed, None, payload, context, answer, investigation_check=investigation_check)
                 self.log.event('research.stop_requested', researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
-                        'plan': None, 'decision': 'stop', 'stop_reason': proposed['hypothesis']}
+                        'plan': None, 'decision': ('research' if proposed['action'] == 'research' and proposed.get('next_step', 'continue') == 'continue' else 'stop'), 'stop_reason': proposed['hypothesis']}
             catalog_mode = proposed['action'] != 'pipeline' and proposed['recipe_id'] != 'python-pipeline-v1'
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
@@ -147,7 +56,7 @@ class Researcher:
                 raise AgentError('INVALID_RESEARCH_ACTION', 'To tune custom source, provide code or reuse the current measured custom base_code')
             submitted_params = {**custom_base['hyperparameters'], **submitted_params}
         if catalog_mode and context['metadata'].get('graph_binding'):
-            branch_user = json.loads(context['messages'][1]['content'])
+            branch_user = user if adaptive else json.loads(context['messages'][1]['content'])
             base = branch_user.get('base_result')
             if (base and base['recipe_id'] == proposed['recipe_id']
                     and (branch_user.get('research_phase') == 'refine'
@@ -233,7 +142,10 @@ class Researcher:
         configuration = None
         if plan is not None:
             from agent.store import Store
-            configuration = {'plan_id': plan['plan_id'], 'code_artifact_id': plan['code_artifact_id'],
+            configuration = {'plan_id': plan['plan_id'], 'parent_ids': list(plan['parent_ids']),
+                'code_artifact_id': plan['code_artifact_id'],
+                'code_sha256': self.artifacts.meta(plan['code_artifact_id'])['sha256'],
+                'dataset_id': plan['dataset_id'], 'validation_id': plan['validation_id'],
                 'fingerprint_core': Store.fingerprint_core(plan, self.artifacts.meta(plan['code_artifact_id'])['sha256'])}
         record = {key: proposed[key] for key in ('action', 'hypothesis', 'expected_effect', 'evidence_ids')}
         record['evidence_ids'] = list(dict.fromkeys([*record['evidence_ids'],
@@ -247,6 +159,11 @@ class Researcher:
             output_artifact_id=answer['output_artifact_id'], configuration=configuration)
         record['delivered_feedback'] = [call for call in answer.get('tool_calls', []) if call.get('name') == 'research_updates']
         record['coordination'] = proposed.get('coordination', {})
+        with self.artifacts.lock:
+            output_kind = self.artifacts.entries.get(answer['output_artifact_id'], {}).get('meta', {}).get('kind')
+        record['decision_origin'] = ('controller' if output_kind == 'controller_research_checkpoint'
+                                     else 'model' if output_kind == 'llm_output' else 'unknown_legacy')
+        record['next_step'] = proposed.get('next_step')
         record['claims'] = proposed.get('claims', [])
         record['model_interpretations_verified'] = False
         record['semantic_updates'] = proposed.get('semantic_updates', [])
@@ -268,3 +185,138 @@ class Researcher:
                 question=record['investigation']['question'], basis_ids=record['investigation']['basis_ids'],
                 columns=record['investigation']['columns'], interpretation=record['investigation']['interpretation'],
                 check=record['investigation_check'], plan_id=plan['plan_id'] if plan else None)
+
+    def validate_adaptive(self, proposed, context, answer):
+        program = None
+        validate_action(proposed, self.catalog)
+        from agent.data_research import require_action, require_feature_parameters
+        window = self.gateway.budget.data_research_snapshot()
+        require_action(proposed, window)
+        user = json.loads(context['messages'][1]['content'])
+        detail = context['metadata'].get('detail_artifact_id')
+        if detail:
+            sections = self.artifacts.read_json(detail)['sections']
+            if not user.get('base_code'):
+                user['base_code'] = sections.get('base_code')
+            if user.get('profile_summary', {}).get('base_result_details'):
+                user['base_result'] = sections.get('base_result')
+        require_feature_parameters(proposed, self.catalog, window, user.get('restrictions'))
+        from agent.feature_search import validate_focus
+        validate_focus(proposed, user)
+        if proposed['action'] == 'features':
+            from agent.feature_schema import validate_program
+            from agent.predictions import targets
+            profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
+            excluded = [*targets(self.spec), *self.spec['excluded_features']]
+            try:
+                program = validate_program(proposed['feature_program'],
+                    ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
+                     else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
+                     else None), excluded)
+            except (ValueError, KeyError) as error:
+                raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
+        memory = user.get('profile_summary', user).get('research_memory', {})
+        evidence = {f['source_id'] for f in user.get('facts', [])}
+        for fact in user.get('facts', []):
+            evidence.update(fact.get('artifact_ids', []))
+        evidence.update(r['experiment_id'] for r in user.get('recent_experiments', []))
+        evidence.update(r['experiment_id'] for r in user.get('profile_summary', {}).get('measured_search', {}).get('entries', []))
+        evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('analysis_history', []))
+        evidence.update(r['artifact_id'] for r in user.get('analysis_history', []))
+        evidence.update(r['artifact_id'] for r in user.get('research_feedback', []))
+        evidence.update(r['artifact_id'] for r in user.get('profile_summary', {}).get('research_feedback', []))
+        evidence.update(call['artifact_id'] for call in answer['tool_calls'] if call.get('artifact_id') and call.get('name') != 'search_knowledge')
+        for delivery in answer['tool_calls']:
+            if delivery.get('name') == 'research_updates':
+                evidence.update(delivery['evidence_ids'])
+        projection = user.get('profile_summary', user)
+        protocol = projection.get('scientific_protocol', {})
+        for report in protocol.get('fit_diagnostics', []):
+            evidence.add(report['artifact_id'])
+        episode = protocol.get('episode')
+        if episode:
+            evidence.update(episode['evidence_ids'])
+            evidence.update(episode['measured_experiment_ids'])
+            memory = {**memory, 'open_ideas': [*memory.get('open_ideas', []), episode]}
+        semantic_task = projection.get('semantic_task', {})
+        if semantic_task.get('model_id'):
+            evidence.add(semantic_task['model_id'])
+        evidence.update(item['record_id'] for field in ('quantities', 'relations') for item in semantic_task.get(field, []))
+        evidence.update(item['record_id'] for item in memory.get('semantic_records', []))
+        landscape = projection.get('research_landscape', {})
+        for result in [*landscape.get('best_per_family', []), *projection.get('feature_memory', {}).get('representations', [])]:
+            evidence.add(result['experiment_id'])
+        if landscape.get('strongest_measured_learned'):
+            evidence.add(landscape['strongest_measured_learned']['experiment_id'])
+        for comparison in projection.get('comparison_evidence', {}).get('comparisons', []):
+            evidence.update(comparison.get('experiment_ids', []))
+        for decision in memory.get('decisions', []):
+            evidence.update(decision['evidence_ids'])
+            for observation in decision['observations']:
+                evidence.add(observation['experiment_id'])
+                if observation.get('diagnostics_artifact_id'):
+                    evidence.add(observation['diagnostics_artifact_id'])
+        for idea in memory.get('open_ideas', []):
+            evidence.update(idea['evidence_ids'])
+        for delivery in answer['tool_calls']:
+            if delivery.get('name') == 'read_memory':
+                evidence.update(delivery.get('evidence_ids', []))
+                memory.setdefault('open_ideas', []).extend({'idea_id': ident, 'evidence_ids': [], 'knowledge_ids': []} for ident in delivery.get('idea_ids', []))
+        evidence.update(i for i in (self.spec.get('dictionary_artifact_id'), self.spec.get('task_spec_id')) if i)
+        from agent.research_memory import validate_semantic_updates
+        detail_id = context['metadata'].get('detail_artifact_id')
+        semantic_records = self.artifacts.read_json(detail_id)['sections']['semantics'] if detail_id else []
+        from agent.semantic_planning import validate_investigation, check_declared_semantics, effective_model
+        investigation_check = validate_investigation(proposed.get('investigation'), context, evidence,
+            self.feature_columns, self.bus.schemas, program=proposed.get('feature_program', []))
+        if (proposed.get('investigation', {}).get('interpretation') in {'physical', 'mathematical'}
+                and (proposed['hyperparameters'].get('numeric_interactions') is True
+                     or 'numeric_interactions' in (proposed.get('tuning') or {}).get('search_space', {})
+                     or 'numeric_interactions' in (proposed.get('tuning') or {}).get('parameters', []))):
+            raise AgentError('INVALID_INVESTIGATION', 'Automatic numeric_interactions cannot substantiate named physical/mathematical interactions; use an explicit feature_program or an exploratory interpretation')
+        frozen_model = self.artifacts.read_json(detail_id)['sections'].get('semantic_model') if detail_id else None
+        validate_semantic_updates(proposed.get('semantic_updates', []), memory, evidence,
+                                  (self.feature_columns + [step['name'] for step in proposed.get('feature_program', [])]
+                                   if self.feature_columns is not None else None),
+                                  context['metadata'].get('detail_scope'), semantic_records)
+        provisional = list(semantic_records)
+        for index, update in enumerate(proposed.get('semantic_updates', [])):
+            provisional.append({'record_id': 'provisional-'+str(index), 'content': update,
+                                'status': 'active', 'verification': 'model_statement_unverified'})
+        superseded = {u.get('supersedes') for u in proposed.get('semantic_updates', []) if u.get('supersedes')}
+        provisional = [r for r in provisional if r['record_id'] not in superseded]
+        investigation_check['warnings'] = check_declared_semantics(proposed.get('feature_program', []),
+            proposed.get('investigation'), effective_model(frozen_model, provisional))
+        if not set(proposed['evidence_ids']) <= evidence:
+            raise AgentError('INVALID_RESEARCH_ACTION', 'Research evidence must reference visible measured results or completed analyses')
+        knowledge = user.get('profile_summary', user).get('knowledge', {})
+        visible_knowledge = {r['id'] for r in knowledge.get('results', [])}
+        visible_knowledge.update(ident for call in answer['tool_calls'] for ident in call.get('knowledge_ids', []))
+        for idea in memory.get('open_ideas', []):
+            visible_knowledge.update(idea['knowledge_ids'])
+        if not set(proposed.get('knowledge_ids', [])) <= visible_knowledge:
+            raise AgentError('INVALID_RESEARCH_ACTION', 'Unseen knowledge_ids: '+', '.join(sorted(set(proposed.get('knowledge_ids', []))-visible_knowledge))+
+                             '. Read those items using search_knowledge before citing them, or use knowledge_ids=[].')
+        validate_research_notes(proposed.get('research_notes'), memory, evidence, visible_knowledge)
+        validate_test_plan(proposed, protocol)
+        if proposed['action'] not in {'stop', 'research'}:
+            params = proposed['hyperparameters']
+            if proposed['action'] == 'tune' and proposed['recipe_id'] == 'python-pipeline-v1' and proposed['code'] is None:
+                if not user.get('base_code') or not user.get('base_result') or user['base_result']['recipe_id'] != 'python-pipeline-v1':
+                    raise AgentError('INVALID_RESEARCH_ACTION', 'Custom tuning without source needs a measured custom base')
+                params = {**user['base_result']['hyperparameters'], **params}
+            elif user.get('base_result') and user['base_result']['recipe_id'] == proposed['recipe_id'] and (user.get('research_phase') == 'refine' or user.get('research_strategy') == 'exploit_incumbent'):
+                params = {**user['base_result']['hyperparameters'], **params}
+            normalized = self.catalog.normalize(proposed['recipe_id'], params)
+            if user.get('restrictions'):
+                normalized = self.catalog.constrain_params(proposed['recipe_id'], normalized, user['restrictions'])
+            if proposed.get('investigation', {}).get('interpretation') in {'physical','mathematical'} and normalized.get('numeric_interactions') is True:
+                raise AgentError('INVALID_INVESTIGATION', 'Inherited numeric_interactions has unnamed inputs; disable it or use exploratory interpretation')
+            if proposed['action'] == 'tune':
+                from agent.tuning_space import normalize_space
+                normalize_space(self.catalog, {'recipe_id': proposed['recipe_id'],
+                    'model': {'hyperparameters': normalized}}, proposed['tuning'], user.get('restrictions'))
+            if proposed['code']:
+                from tools.code import validate_code
+                validate_code(proposed['code'])
+        return dict(user=user, program=program, memory=memory, evidence=evidence, knowledge=knowledge, protocol=protocol, landscape=landscape, investigation_check=investigation_check)

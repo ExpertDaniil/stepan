@@ -26,7 +26,7 @@ def attach_context(user, window):
 def require_action(action, window):
     if not window['active']:
         return
-    if action['action'] == 'features':
+    if action['action'] in {'features', 'research'}:
         return
     if action['action'] == 'pipeline' and action.get('feature_steps'):
         return

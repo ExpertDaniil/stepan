@@ -41,6 +41,8 @@ class ContextBuilder:
         recent = self.artifacts.read_json(snapshot["summary_artifact_id"])
         catalog_mode = self.catalog.config.research_mode == "catalog"
         system = research_prompt(self.catalog.config.research_mode)
+        if self.catalog.config.research_mode == 'adaptive' and self.catalog.config.research_protocol == 'legacy':
+            system = (ROOT/'prompts/researcher-adaptive-legacy.md').read_text(encoding='utf-8')
         allowed = [key for key, recipe in self.catalog.recipes.items()
                    if self.catalog.config.research_mode != 'adaptive' or recipe['family'] != 'dummy']
         if catalog_mode:
@@ -192,6 +194,8 @@ class ContextBuilder:
         user["budget"] = graph["budget"]
         catalog_mode = self.catalog.config.research_mode == "catalog"
         system = research_prompt(self.catalog.config.research_mode)
+        if self.catalog.config.research_mode == 'adaptive' and self.catalog.config.research_protocol == 'legacy':
+            system = (ROOT/'prompts/researcher-adaptive-legacy.md').read_text(encoding='utf-8')
         if adaptive:
             user['assignment'] = ('Choose the next research action using measured history and missing evidence. '
                 'The exploit/explore hint does not restrict the recipe or number of coordinated pipeline changes. '

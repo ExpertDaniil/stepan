@@ -109,9 +109,8 @@ def execute(job, trusted_thread=None):
         guard = PipelineGuard(job['code_path'], trusted_thread=trusted_thread)
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))
-    if job.get('guard_generated'):
-        from joblib import parallel_backend
-        limits.enter_context(parallel_backend('threading', n_jobs=job['cpu_threads']))
+    from joblib import parallel_backend
+    limits.enter_context(parallel_backend('threading', n_jobs=job['cpu_threads']))
     if guard:
         guard.active = True
     try:

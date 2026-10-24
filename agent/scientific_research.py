@@ -95,12 +95,12 @@ class ScientificResearch:
         episode = episode_context(memory, researcher_id, c.runner.jobs.values(), allowance)
         reports = self.diagnostics.visible(visible_ids)
         extended = bool(episode and (len(episode['measured_experiment_ids']) >= 2 or episode['failed_experiment_ids']))
-        return {'version': 'scientific-v1', 'episode': episode, 'fit_diagnostics': reports,
+        return {'version': ('scientific-v1' if c.config.research_protocol == 'legacy' else 'research-v2'), 'episode': episode, 'fit_diagnostics': reports,
                 'decision_record_required': True,
                 'deliberation': {'extended_requested': extended,
                     'reason': 'Multiple related measurements or an execution failure warrant reassessing explanations.' if extended else 'Use the normal dialogue budget for a well-specified next test.',
                     'provider_thinking_application': 'unverified'},
-                'instruction': 'Supply research_notes.test_plan and compare concrete alternatives. '
+                'instruction': ('Supply research_notes.test_plan. ' if c.config.research_protocol == 'legacy' else 'Supply one investigation record; legacy research_notes are optional. ')+
                     'Cite completed evidence. Diagnostics discover candidate patterns, not proven mechanisms. '
                     'Do not optimize private reasoning length or invent measured outcomes.'}
 
@@ -109,6 +109,15 @@ class ScientificResearch:
         self.funding.pop(plan['plan_id'], None)
         notes = intent.get('research_notes') or {}
         test = notes.get('test_plan')
+        if not test and intent.get('investigation'):
+            inv = intent['investigation']
+            from agent.research_memory import idea_id
+            episode = intent.get('scientific_protocol', {}).get('episode')
+            same_question = episode and episode['idea_id'] == idea_id(inv['question'], inv['mechanism'])
+            test = {'evidence_ids': intent.get('evidence_ids', []), 'continuation': 'followup' if same_question else 'new',
+                    'counterargument': inv['alternative_explanation'], 'prediction': inv['expected_observation'],
+                    'falsifier': inv['decision_rule'], 'cheap_check': inv['question']}
+
         # Legacy saved actions remain executable; new contexts enforce the record
         # in Gateway and Researcher before producing a plan.
         if not test:

@@ -2571,7 +2571,8 @@
                 "decision": {
                   "enum": [
                     "propose",
-                    "stop"
+                    "stop",
+                    "research"
                   ]
                 },
                 "stop_reason": {
@@ -5493,7 +5494,8 @@
         "decision": {
           "enum": [
             "propose",
-            "stop"
+            "stop",
+            "research"
           ]
         },
         "stop_reason": {
@@ -13977,6 +13979,7 @@
       "properties": {
         "action": {
           "enum": [
+            "research",
             "catalog",
             "pipeline",
             "features",
@@ -14060,6 +14063,13 @@
             ],
             "additionalProperties": false
           }
+        },
+        "next_step": {
+          "enum": [
+            "continue",
+            "wait",
+            "finish"
+          ]
         },
         "coordination": {
           "type": "object",
@@ -14717,13 +14727,7 @@
       },
       "required": [
         "action",
-        "recipe_id",
-        "hyperparameters",
         "hypothesis",
-        "expected_effect",
-        "feature_steps",
-        "code",
-        "tuning",
         "evidence_ids"
       ],
       "additionalProperties": false

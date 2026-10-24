@@ -170,13 +170,19 @@ class Catalog:
     def warmup_choices(self):
         suffix = "regressor-v1" if self.kind == "regression" else "classifier-v1"
         choices = []
-        for family in ("catboost", "hist-gradient", "extra-trees", "linear"):
+        for family in ("extra-trees", "hist-gradient", "catboost", "linear"):
             key = family + "-" + suffix
             if key not in self.recipes:
                 continue
             variants = ["identity", "shifted_log1p"] if self.kind == "regression" and family in {"catboost", "hist-gradient"} else ["identity"]
             for transform in variants:
-                params = {"target_transform": transform} if "target_transform" in self.recipes[key]["parameters"] else {}
+                domains = self.recipes[key]['parameters']
+                params = {"target_transform": transform} if "target_transform" in domains else {}
+                # First obtain a measured learned reference. Larger models remain
+                # available to research; cold pilots must not monopolize the budget.
+                for name, value in {'n_estimators': 64, 'max_iter': 64, 'iterations': 96, 'depth': 6}.items():
+                    if name in domains:
+                        params[name] = max(domains[name].get('min', value), min(domains[name].get('max', value), value))
                 choices.append((key, self.normalize(key, params)))
         # Both peers first measure a feature-free family. A feature discovered in
         # the next pass then has useful pre-idea bases, rather than two Dummies.

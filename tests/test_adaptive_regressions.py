@@ -161,7 +161,7 @@ class AdaptiveSearchRegressions(unittest.TestCase):
         for graph in (False, True):
             with self.subTest(graph=graph):
                 events, plans = self.run_search(graph, scripted)
-                self.assertTrue(any(e['event'] == 'research.proposal_failed' for e in events))
+                self.assertTrue(any(e['event'] in {'research.proposal_failed', 'llm.output_rejected'} for e in events))
                 self.assertTrue(any(state == 'evaluated' and p['model']['family'] != 'dummy' for state, p in plans))
                 self.assertFalse(any(e['event'] == 'search.finished' and e.get('stop_reason') == 'no_affordable_candidates'
                                      for e in events))

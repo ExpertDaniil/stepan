@@ -35,7 +35,18 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
 
     def generation(branch):
         view = controller.researcher.gateway.feedback.latest(branch)
-        return view.get('measurement_generation', view['revision']) if view else None
+        measured = view.get('measurement_generation', view['revision']) if view else None
+        analysis = getattr(controller.context, 'analysis', None) if hasattr(controller, 'context') else None
+        if analysis:
+            with analysis.lock:
+                records = list(analysis.records)
+        else:
+            records = []
+        operations = []
+        for record in records:
+            query = {k:v for k,v in record.get('query', {}).items() if k != 'investigation'}
+            operations.append(query)
+        return canonical([measured, sorted({canonical(q) for q in operations})])
 
     def blocked(branch, peer):
         record = controller.research_stalls.get((branch, peer))
@@ -153,6 +164,17 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     elif not repeated(work, 'failure:'+code):
                         activity = True
                         released.append(work)
+                    continue
+                if proposal['decision'] == 'research':
+                    stop_ticket(controller, ticket, 'Research checkpoint saved; no fit requested')
+                    controller.research_round_outcomes.append('research')
+                    # A checkpoint alone is not evidence of progress. Repeated identical
+                    # information generations pause this peer until real results arrive.
+                    deferred = repeated(work, 'research_checkpoint')
+                    activity |= not deferred
+                    released.append(work)
+                    controller.log.event('research.checkpoint_completed', researcher_id=work['researcher_id'],
+                                         work_order_id=work['work_order_id'], deferred=deferred)
                     continue
                 if proposal['decision'] == 'stop':
                     stop_ticket(controller, ticket, proposal.get('stop_reason') or 'Researcher requested stop')

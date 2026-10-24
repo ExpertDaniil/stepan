@@ -28,6 +28,7 @@ RESOURCE_FILES = (
     "prompts/researcher.md",
     "prompts/researcher-catalog.md",
     "prompts/researcher-adaptive.md",
+    "prompts/researcher-adaptive-legacy.md",
     "prompts/TOOLS.md",
     "recipes/knowledge/manifest.json",
     "recipes/knowledge/cards.json",

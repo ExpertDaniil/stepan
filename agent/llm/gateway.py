@@ -346,7 +346,7 @@ class Gateway:
             context['messages'][1]['content'] = json.dumps(user, ensure_ascii=False)
             messages = deepcopy(context['messages'])
             if window['active']:
-                expected['properties']['action']['enum'] = ['features', 'pipeline']
+                expected['properties']['action']['enum'] = ['features', 'pipeline', 'research']
         scientific = user.get('profile_summary', user).get('scientific_protocol', {}) if isinstance(user, dict) else {}
         if payload['response_schema_id'] == 'ResearchAction-v1' and scientific.get('version') == 'scientific-v1':
             expected['required'] = list(dict.fromkeys([*expected['required'], 'research_notes']))
@@ -369,8 +369,9 @@ class Gateway:
         deadline = min(time.monotonic() + payload["deadline_seconds"], self.budget.deadline - reserve)
         extended = bool(scientific.get('deliberation', {}).get('extended_requested'))
         deep_tokens = min(payload['max_output_tokens']*2, self.config.llm_max_output_tokens_limit)
+        available_output = self.budget.token_snapshot()['output_available']
         funded_deep = (payload['response_schema_id'] == 'ResearchAction-v1' and extended
-                       and self.budget.token_snapshot()['output_available'] >= 2*deep_tokens
+                       and (available_output is None or available_output >= 2*deep_tokens)
                        and deadline-dialogue_started >= self.config.llm_research_dialogue_seconds)
         if payload['response_schema_id'] == 'ResearchAction-v1':
             seconds = max(self.config.llm_research_dialogue_seconds, self.config.research_deep_dialogue_seconds) if funded_deep else self.config.llm_research_dialogue_seconds
@@ -379,12 +380,16 @@ class Gateway:
                 extended_requested=extended, extended_funded=funded_deep,
                 dialogue_seconds=seconds, output_tokens=deep_tokens if funded_deep else payload['max_output_tokens'],
                 provider_thinking_application='unverified')
-        phase_limited = False
+        phase_limited = (payload['purpose'] == 'research_proposal' and deadline >= self.budget.deadline-reserve-.01)
         if payload['purpose'] == 'research_proposal' and self.budget.phase_deadline:
             # This is a response deadline only. A received proposal can wait in
             # the dispatcher without inheriting the API timeout.
             user = json.loads(context['messages'][1]['content']) if context['metadata'].get('graph_binding') else {}
             base = user.get('base_result')
+            if base is None and user.get('profile_summary', {}).get('base_result_details'):
+                detail_id = context['metadata'].get('detail_artifact_id')
+                if detail_id:
+                    base = self.artifacts.read_json(detail_id)['sections'].get('base_result')
             recipe = next((r for r in user.get('profile_summary', {}).get('recipes', [])
                            if base and r['id'] == base['recipe_id']), None)
             after_response = self.budget.reserve_seconds()
@@ -397,7 +402,7 @@ class Gateway:
                          'resources': {'cpu_threads': self.config.train_cpu_threads}}
                 after_response = self.budget.duration.estimate(probe)+self.budget.candidate_reserve(probe)
             phase_deadline = self.budget.phase_deadline-after_response
-            phase_limited = phase_deadline < deadline
+            phase_limited = phase_limited or phase_deadline < deadline
             deadline = min(deadline, phase_deadline)
         tools = []
         if "write_code" in payload["tool_schema_ids"]:
@@ -411,6 +416,11 @@ class Gateway:
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
                 'description': 'Read-only fit summary/association/group, exact streamed check violation counts, stateless derived expressions/filters, errors for a visible experiment_id, unlabelled test comparison, dictionary or report. Computing queries attach investigation before observations. No holdout labels. columns contains inputs, never targets; include_target=true adds fit-only summaries. check requires checks, group_by=null, include_target=false. errors returns selection-only aggregates. At most 12 columns. limit/offset/limit_bytes paginate schema/report reads; omit them for group/summary queries.',
                 'parameters': ANALYSIS_SCHEMA}})
+        if 'run_analysis' in payload['tool_schema_ids'] and self.config.python_analysis_enabled:
+            from tools.python_analysis import PYTHON_ANALYSIS_SCHEMA
+            tools.append({'type': 'function', 'function': {'name': 'run_analysis',
+                'description': 'Execute analyze(X_fit,y_fit,X_test,context) Python using approved libraries. Choose raw input columns. Deterministic fit-only sample <=20000 rows. y_fit only with include_target=true; X_test only with compare_test=true. No files/network/processes. Return compact dict/tables. Tracebacks are returned for repair; no authoritative model scores.',
+                'parameters': PYTHON_ANALYSIS_SCHEMA}})
         if 'read_memory' in payload['tool_schema_ids']:
             from agent.context_details import READ_SCHEMA
             tools.append({'type': 'function', 'function': {'name': 'read_memory',
@@ -461,7 +471,7 @@ class Gateway:
 
     def _complete_dialogue(self, payload, context, messages, expected, tools, deadline, phase_limited,
                            token_limit, dialogue_id, reserved_slots):
-        tool_deadline = time.monotonic()+self.config.llm_research_tool_seconds
+        tool_seconds = 0.0
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
         tool_cache, force_decision = {}, False
@@ -476,7 +486,7 @@ class Gateway:
             if not self.semaphore.acquire(timeout=left):
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
             try:
-                if tools and dialogue_id is not None and not force_decision and time.monotonic() >= tool_deadline:
+                if tools and dialogue_id is not None and not force_decision and tool_seconds >= self.config.llm_research_tool_seconds:
                     force_decision = True
                     self.log.event('llm.tool_phase_closed', context_id=payload['context_artifact_id'],
                         reason='tool_wall_budget', tool_seconds_limit=self.config.llm_research_tool_seconds,
@@ -512,6 +522,37 @@ class Gateway:
                     request.update(tools=tools, parallel_tool_calls=dialogue_id is not None)
                 response, call_no = self._request(request, context, payload, attempt, deadline, dialogue_id)
             except AgentError as exc:
+                if exc.code == 'CONTEXT_TOO_LARGE' and calls and payload['response_schema_id'] == 'ResearchAction-v1':
+                    # Preserve completed observations and roll over without inventing an
+                    # LLM decision, training score or private reasoning transcript.
+                    from agent.research_actions import normalize_action
+                    evidence = list(dict.fromkeys(c['artifact_id'] for c in calls if c.get('artifact_id') and c.get('name') != 'search_knowledge'))[-12:]
+                    question = 'Resume the unresolved research question using saved reports.'
+                    for item in reversed(messages):
+                        for call in reversed(item.get('tool_calls', [])):
+                            try:
+                                query = json.loads(call['function']['arguments'])
+                                question = query.get('question') or query.get('investigation', {}).get('question') or question
+                            except (ValueError, KeyError, TypeError):
+                                pass
+                            if question != 'Resume the unresolved research question using saved reports.':break
+                        if question != 'Resume the unresolved research question using saved reports.':break
+                    checkpoint = normalize_action({'action': 'research', 'next_step': 'continue',
+                        'hypothesis': 'Controller context checkpoint: '+question,
+                        'evidence_ids': evidence, 'investigation': {
+                            'question': question, 'basis_ids': evidence, 'columns': [],
+                            'interpretation': 'exploratory',
+                            'mechanism': 'Infrastructure checkpoint only; no scientific conclusion was inferred.',
+                            'assumptions': ['Completed reports remain available in scoped memory.'],
+                            'expected_observation': 'Read the saved reports in a fresh bounded dialogue.',
+                            'alternative_explanation': 'Context pressure does not refute the research hypothesis.',
+                            'decision_rule': 'Resume unresolved checks before choosing the next experiment.'}})
+                    art = self.artifacts.write_json('research/controller-checkpoint-'+uuid.uuid4().hex[:12]+'.json',
+                        checkpoint, 'controller_research_checkpoint')
+                    self.log.event('research.context_checkpoint', artifact_id=art['artifact_id'],
+                                   evidence_ids=evidence, reason=exc.code, decision_origin='controller')
+                    return {'completion_id': completion_id, 'output_artifact_id': art['artifact_id'],
+                            'parsed_payload': checkpoint, 'tool_calls': calls, 'usage': usage, 'attempts_used': attempt}
                 if phase_limited and time.monotonic() >= deadline:
                     raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED', 'Response window ended with time reserved for training and publication') from exc
                 if not exc.retryable or attempt == payload["attempt_limit"]:
@@ -548,6 +589,7 @@ class Gateway:
                         assistant[field] = message[field]
                     messages.append(assistant)
                     self._bound_reasoning_history(messages)
+                    tools_started = time.monotonic()
                     new_calls = 0
                     for item in prepared:
                         call, args, key = item['call'], item['args'], item['key']
@@ -592,6 +634,13 @@ class Gateway:
                             trace = {'call_id': call['id'], 'name': name,
                                      'evidence_ids': result.get('evidence_ids', []),
                                      'idea_ids': result.get('idea_ids', [])}
+                        elif name == 'run_analysis':
+                            from tools.python_analysis import run_analysis
+                            try:
+                                result = run_analysis(self.analysis, args, context)
+                            except AgentError as error:
+                                result = {'error': error.as_dict()}
+                            trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id')}
                         elif name == 'analyze_data':
                             try:
                                 result = self.analysis.analyze(args, context=context)
@@ -602,7 +651,13 @@ class Gateway:
                             try:
                                 user = json.loads(context['messages'][1]['content'])
                                 facts = user.get('profile_summary', user).get('current_pipeline_facts')
-                                result = self.knowledge.search(args, facts)
+                                query = dict(args)
+                                if not query.get('ids'):
+                                    projection = user.get('profile_summary', user)
+                                    decisions = projection.get('research_memory', {}).get('decisions', [])
+                                    question = decisions[-1].get('question', '') if decisions else ''
+                                    query['query'] = (query.get('query', '')+' '+question)[:1000]
+                                result = self.knowledge.search(query, facts)
                             except AgentError as error:
                                 result = {'error': error.as_dict()}
                             trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
@@ -620,6 +675,7 @@ class Gateway:
                                 sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False))
                             tool_cache[report_key] = (deepcopy(result), call['id'])
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
+                    tool_seconds += time.monotonic()-tools_started
                     self.log.event('llm.tool_batch_normalized', call_no=call_no, raw_calls=len(message['tool_calls']),
                         unique_calls=len(prepared), new_calls=new_calls, reused_calls=len(prepared)-new_calls,
                         invalid_arguments=sum(item['error'] is not None for item in prepared))
@@ -641,13 +697,19 @@ class Gateway:
                     if no_final_json or open_fence or ((at_cap or finish_reason == 'length') and incomplete_json(content, exc)):
                         raise IncompleteOutput(str(exc)) from exc
                     raise
+                if payload['response_schema_id'] == 'ResearchAction-v1':
+                    from agent.research_actions import normalize_action
+                    parsed = normalize_action(parsed)
                 self.bus.schemas._check(parsed, expected, "$")
                 if payload['response_schema_id'] == 'ResearchAction-v1':
                     from agent.data_research import require_action
                     try:
                         require_action(parsed, self.budget.data_research_snapshot())
+                        validator = getattr(self, 'proposal_validator', None)
+                        if validator:
+                            validator(parsed, context, {'tool_calls': calls})
                     except AgentError as error:
-                        raise ValueError(str(error)) from error
+                        raise ValueError(error.code+': '+str(error)) from error
                 if (payload['response_schema_id'] == 'TaskDraft-v1' and 'target_column' in parsed
                         and context['metadata'].get('bootstrap_profile_artifact_id')):
                     # Repair source/column mistakes within the existing bounded
@@ -660,7 +722,7 @@ class Gateway:
                             {'task_spec_id': 'bootstrap-source-check', 'dataset_id': 'bootstrap-source-check',
                              'target_column': parsed['target_column']})
                     except AgentError as error:
-                        raise ValueError(str(error)) from error
+                        raise ValueError(error.code+': '+str(error)) from error
                 if recovered:
                     self.log.event('llm.json_fence_recovered', call_no=call_no, schema_id=payload['response_schema_id'])
                 art = self.artifacts.write_json("llm/parsed-"+uuid.uuid4().hex[:12]+".json", parsed, "llm_output")

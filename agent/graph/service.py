@@ -64,6 +64,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
     def default_policy(self):
         p = json.loads((ROOT / "recipes/graph-policy.json").read_text(encoding="utf-8"))
         p["constraint_mode"] = "catalog_strict" if self.config.research_mode == "catalog" else "generated_python"
+        p['hard_decision_constraints'] = self.config.graph_hard_decisions
         p.update(peer_count=min(self.config.graph_peers, self.config.max_workers), max_train_workers=min(self.config.graph_train_workers, self.config.max_workers),
                  max_live_branches=self.config.graph_max_live_branches, max_total_branches=self.config.graph_max_total_branches)
         p["context"].update(max_input_tokens=min(self.config.max_context_tokens, 12000), max_output_tokens=self.config.llm_max_output_tokens,
@@ -72,6 +73,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                             min_elapsed_seconds=self.config.graph_plateau_seconds, absolute_epsilon=self.config.graph_plateau_absolute_epsilon,
                             relative_epsilon=self.config.graph_plateau_relative_epsilon)
         p["scheduling"]["exploit_steps"] = self.config.graph_exploit_steps
+        p['scheduling']['min_branch_seconds'] = self.config.graph_branch_min_seconds
         p['scheduling'].update(refinement_enabled=self.config.graph_refinement_enabled, search_fraction=self.config.graph_search_fraction)
         p["promotion"]["min_effect"] = self.config.graph_min_effect
         p["retention"].update(max_artifact_bytes=self.config.graph_max_artifact_bytes, min_free_disk_bytes=self.config.graph_min_free_disk_bytes)
@@ -321,14 +323,15 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if set(idea["capability_ids"]) & (required | forbidden):
             raise AgentError("CONSTRAINT_CONFLICT", "Fork must introduce a new unconstrained capability")
         children = {kind: ident("branch-"+kind) for kind in ("accept", "reject")}
+        hard_decision = self.policy.get('hard_decision_constraints', False)
         archived = []
         # The causal checkpoint remains immutable. Explicit seeds carry this peer's
         # later measured knowledge into a child, rather than throwing warmups away.
         selection_cut = self.cut()
         seeds = {}
         for kind in children:
-            constraints = {"required_capability_ids": sorted(required | (set(idea["capability_ids"]) if kind == "accept" else set())),
-                           "forbidden_capability_ids": sorted(forbidden | (set(idea["capability_ids"]) if kind == "reject" else set()))}
+            constraints = {"required_capability_ids": sorted(required | (set(idea["capability_ids"]) if hard_decision and kind == "accept" else set())),
+                           "forbidden_capability_ids": sorted(forbidden | (set(idea["capability_ids"]) if hard_decision and kind == "reject" else set()))}
             seeds[kind] = []
             for head in cp["heads"]:
                 ids = list(dict.fromkeys(([head["experiment_id"]] if head["experiment_id"] else []) + self.visible_history(parent["branch_id"], head["researcher_id"])))
@@ -342,6 +345,12 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                         choices.append({**head, "experiment_id": eid, "solution_id": self.experiment_solution(eid)})
                 eligible = [h for h in choices if self.head_satisfies(h, constraints)]
                 reason = "best_compatible_own_reference"
+                if not hard_decision:
+                    preferred = [h for h in eligible if (set(idea['capability_ids']) <= set(dependency_closure(
+                        self.manifest(h['solution_id'])['core']['components'])[0])) == (kind == 'accept')]
+                    if preferred:
+                        eligible = preferred
+                        reason = 'best_own_reference_matching_soft_preference'
                 if not eligible and kind == "accept":
                     # A new feature may not have been tested on this peer yet.
                     eligible = [h for h in choices if self.head_satisfies(h, parent["constraints"])
@@ -369,7 +378,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
             for kind, child in children.items():
                 self.db.execute("INSERT INTO g_branches VALUES(?,?,?,?,?,?,?,?,?)", (self.run_id, child, parent["branch_id"], cp["checkpoint_id"], idea["idea_id"], kind, "active" if kind == "accept" else "paused", 0, self.next_seq()))
                 self.db.execute("INSERT INTO g_constraints SELECT run_id,?,capability_id,mode,origin_branch_id FROM g_constraints WHERE run_id=? AND branch_id=?", (child, self.run_id, parent["branch_id"]))
-                for cap in idea["capability_ids"]:
+                for cap in idea["capability_ids"] if hard_decision else []:
                     self.db.execute("INSERT INTO g_constraints VALUES(?,?,?,?,?)", (self.run_id, child, cap, "required" if kind == "accept" else "forbidden", child))
                 for seed in seeds[kind]:
                     h = seed["head"]
@@ -382,10 +391,12 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
                     "revoked_work_order_ids": revoked, "origin_running_job_ids": jobs, "graph_revision": 0}
         result = self.commit("G02", p, key, mutate)
         for bid in archived:
-            self.log.event('graph.branch_state_changed', branch_id=bid, action='archive', reason='Make room for a complete pair of decision children', state='archived')
+            self.log.event('graph.branch_state_changed', branch_id=bid, action='archive', reason='Make room for a complete pair of decision children', state='archived',
+                           eligibility='legacy_strict_policy' if hard_decision else 'current_plateau_or_no_executable_work')
         self.log.event("graph.branch_forked", parent_branch_id=parent["branch_id"], idea_id=idea["idea_id"],
                        checkpoint_id=cp["checkpoint_id"], accept_branch_id=result["accept_branch"]["branch_id"],
-                       reject_branch_id=result["reject_branch"]["branch_id"], capability_ids=idea["capability_ids"])
+                       reject_branch_id=result["reject_branch"]["branch_id"], capability_ids=idea["capability_ids"],
+                       decision_constraints='hard' if hard_decision else 'soft')
         for kind, branch_key in (("accept", "accept_branch"), ("reject", "reject_branch")):
             self.log.event("graph.branch_seeded", branch_id=result[branch_key]["branch_id"],
                            heads=self.heads(result[branch_key]["branch_id"]), selection_cut=selection_cut)

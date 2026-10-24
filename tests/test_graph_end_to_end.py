@@ -22,6 +22,12 @@ from scripts.reconstruct_solution import reconstruct
 
 
 class GraphEndToEndTests(unittest.TestCase):
+    def setUp(self):
+        # These short integration scenarios deliberately exercise strict forks.
+        fixture = patch.dict(os.environ, {'GRAPH_HARD_DECISIONS': '1', 'GRAPH_BRANCH_MIN_SECONDS': '0'})
+        fixture.start()
+        self.addCleanup(fixture.stop)
+
     def test_warmup_transfer_forks_from_measured_bases_without_a_research_api_call(self):
         import numpy as np
         import pandas as pd

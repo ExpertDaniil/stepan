@@ -236,6 +236,18 @@ class WorkService:
                            "base_result": self.memory_record(head["experiment_id"], head) if base_exp else None, "observed_recipes": observed_recipes,
                            "search_memory": self.search_memory(branch['branch_id'], head),
                            "context_id": context_id, "action": p["action"], "policy": self.policy, "budget": self.budget.snapshot()}
+            if branch['decision_idea_id']:
+                idea = json.loads(self.db.execute('SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?',
+                    (self.run_id, branch['decision_idea_id'])).fetchone()[0])
+                graph_input['decision_focus'] = {
+                    'decision_idea_id': branch['decision_idea_id'],
+                    'preference': 'develop_with_component' if branch['decision'] == 'accept' else 'investigate_alternative',
+                    'capability_ids': idea['capability_ids'],
+                    'hard_constraint': self.policy.get('hard_decision_constraints', False),
+                    'interpretation': 'A measured configuration contrast is local evidence. It does not establish a global raw-feature or family verdict.',
+                    'instruction': 'Use the branch preference to organize research; a soft decision is revisable. '
+                        'You may reuse the component, try different interactions or change representation after a poor trial. '
+                        'Only restrictions lists are enforced; preserve explicit hard restrictions.'}
             if self.config.research_mode == 'adaptive':
                 graph_input['visibility'] = {'branch_cuts': dict(self.lineage_cuts(branch['branch_id']))}
                 graph_input['research_memory'] = self.research_memory(branch['branch_id'], binding['allowed_donor_experiment_ids'])

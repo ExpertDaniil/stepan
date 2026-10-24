@@ -15,6 +15,19 @@ def utility(evaluation):
 
 
 class SearchPolicy(RefinementPolicy):
+    def branch_has_current_plateau(self, branch_id):
+        row = self.db.execute("SELECT event_seq,record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.record_schema')='GPlateau' AND json_extract(record_json,'$.record.branch_id')=? ORDER BY event_seq DESC LIMIT 1", (self.run_id, branch_id)).fetchone()
+        if not row or json.loads(row['record_json'])['record']['status'] != 'plateau':
+            return False
+        evaluation_seq = self.db.execute('SELECT COALESCE(MAX(event_seq),0) FROM g_branch_evaluations WHERE run_id=? AND branch_id=?', (self.run_id, branch_id)).fetchone()[0]
+        activation_seq = self.db.execute("SELECT COALESCE(MAX(event_seq),0) FROM g_events WHERE run_id=? AND json_extract(record_json,'$.entity_id')=? AND json_extract(record_json,'$.record_schema')='GBranch' AND json_extract(record_json,'$.record.state')='active'", (self.run_id, branch_id)).fetchone()[0]
+        return row['event_seq'] >= max(evaluation_seq, activation_seq)
+
+    def branch_residence_seconds(self, branch_id):
+        row = self.db.execute("SELECT record_json FROM g_events WHERE run_id=? AND json_extract(record_json,'$.entity_id')=? AND json_extract(record_json,'$.record_schema')='GBranch' AND json_extract(record_json,'$.record.state')='active' ORDER BY event_seq DESC LIMIT 1", (self.run_id, branch_id)).fetchone()
+        activated = json.loads(row[0])['elapsed_ms'] if row else self.elapsed()
+        return max(0, (self.elapsed()-activated)/1000)
+
     def fork_victims(self, parent_branch_id):
         live = self.db.execute("SELECT count(*) FROM g_branches WHERE run_id=? AND state IN ('active','paused')", (self.run_id,)).fetchone()[0]
         needed = max(0, live+1-self.policy['max_live_branches'])
@@ -23,6 +36,10 @@ class SearchPolicy(RefinementPolicy):
         candidates = []
         for row in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' AND branch_id<>? ORDER BY created_event_seq", (self.run_id, parent_branch_id)):
             bid = row[0]
+            if (not self.policy.get('hard_decision_constraints', False)
+                    and bid not in getattr(self.controller, 'no_fit_branches', set())
+                    and not self.branch_has_current_plateau(bid)):
+                continue
             if (self.branch_trial_count(bid) < self.policy['scheduling']['minimum_alternative_trials']
                     and bid not in getattr(self.controller, 'no_fit_branches', set())):
                 continue
@@ -292,7 +309,7 @@ class SearchPolicy(RefinementPolicy):
         return None
 
     def _acceptance_transfer(self, branch, free):
-        if branch["decision"] != "accept" or not branch["decision_idea_id"]:
+        if not self.policy.get('hard_decision_constraints', False) or branch["decision"] != "accept" or not branch["decision_idea_id"]:
             return None
         idea = json.loads(self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? AND idea_id=?", (self.run_id, branch["decision_idea_id"])).fetchone()[0])
         patch = self.artifacts.read_json(idea["transfer_patch_artifact_id"])
@@ -317,6 +334,9 @@ class SearchPolicy(RefinementPolicy):
         self.expire_work()
         cp = self.checkpoint_record(p["checkpoint_id"])
         branch = self.branch(cp["branch_id"], cp["branch_revision"])
+        residence = self.branch_residence_seconds(branch['branch_id'])
+        minimum_residence = self.policy['scheduling'].get('min_branch_seconds', 600)
+        mature = residence >= minimum_residence
         if branch["state"] != "active":
             raise AgentError("INVALID_BRANCH_STATE", "Decision checkpoint must belong to an active branch")
         decision = {"decision_id": "decision-"+uuid.uuid4().hex[:16], "checkpoint_id": cp["checkpoint_id"], "evidence_ids": [], "reason": "Round-robin work on equal peers", "action": "FINALIZE", "parameters": {"reason": "search_budget_closed"}}
@@ -344,7 +364,7 @@ class SearchPolicy(RefinementPolicy):
                 if assessment["branch_id"] != branch["branch_id"] or assessment["branch_revision"] != branch["branch_revision"]:
                     raise AgentError("BRANCH_REVISION_CONFLICT", "Plateau assessment belongs to another branch epoch")
                 alternatives = [self.branch(r[0]) for r in self.db.execute("SELECT branch_id FROM g_branches WHERE run_id=? AND state='paused' ORDER BY decision='reject' DESC,rowid DESC", (self.run_id,))]
-                if assessment["status"] == "plateau" and alternatives:
+                if assessment["status"] == "plateau" and alternatives and mature and self.branch_has_current_plateau(branch['branch_id']):
                     alt = next((x for x in alternatives if x["parent_branch_id"] == branch["parent_branch_id"]), alternatives[0])
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Measured plateau; resume a saved alternative", evidence_ids=[assessment["assessment_id"]])
             attempted = self.attempted_research_count()
@@ -355,10 +375,10 @@ class SearchPolicy(RefinementPolicy):
                 current_trials = self.branch_trial_count(branch["branch_id"])
                 alternatives = self.pending_alternatives(branch)
                 reserve = sum(deficit for _, deficit in alternatives)
-                if current_trials and alternatives and ((branch["decision"] == "accept" and attempted >= threshold and current_trials >= self.policy["plateau"]["window_full_evaluations"]) or remaining <= reserve):
+                if current_trials and alternatives and ((mature and branch["decision"] == "accept" and attempted >= threshold and current_trials >= self.policy["plateau"]["window_full_evaluations"]) or remaining <= reserve):
                     alt = alternatives[0][0]
                     decision.update(action="BACKTRACK", parameters={"target_branch_id": alt["branch_id"], "expected_branch_revision": alt["branch_revision"]}, reason="Reserve time for a counterfactual trial")
-            if decision["action"] == "CONTINUE" and not final_phase and self.config.research_mode != 'adaptive':
+            if decision["action"] == "CONTINUE" and not final_phase and mature and self.config.research_mode != 'adaptive':
                 for row in self.db.execute("SELECT record_json FROM g_ideas WHERE run_id=? ORDER BY rowid DESC", (self.run_id,)):
                     idea = json.loads(row[0]);origin = self.checkpoint_record(idea["fork_checkpoint_id"])
                     already = self.db.execute("SELECT 1 FROM g_branches WHERE run_id=? AND decision_idea_id=?", (self.run_id, idea["idea_id"])).fetchone()
@@ -401,6 +421,8 @@ class SearchPolicy(RefinementPolicy):
             else:
                 reason = getattr(self.controller, 'no_fit_reasons', {}).get(branch['branch_id'], 'no_affordable_candidates')
                 decision.update(action="FINALIZE", parameters={"reason": reason}, reason=reason)
+        if decision['action'] == 'CONTINUE' and not mature:
+            decision['reason'] += '; develop the current branch before an elective fork or switch'
         artifact = self.files.put_json(decision, "search_decision")
         def mutate():
             self.branch(branch["branch_id"], branch["branch_revision"])
@@ -412,7 +434,8 @@ class SearchPolicy(RefinementPolicy):
             return {"decision": decision, "decision_artifact_id": artifact["artifact_id"], "graph_revision": 0}
         result = self.commit("G14", p, key, mutate)
         self.log.event("search.decision", decision_id=decision["decision_id"], branch_id=branch["branch_id"],
-                       action=decision["action"], reason=decision["reason"], parameters=decision["parameters"], evidence_ids=decision["evidence_ids"])
+                       action=decision["action"], reason=decision["reason"], parameters=decision["parameters"], evidence_ids=decision["evidence_ids"],
+                       branch_residence_seconds=round(residence, 3), minimum_branch_seconds=minimum_residence)
         return result
 
     def offer_component(self, experiment_id):

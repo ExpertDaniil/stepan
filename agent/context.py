@@ -159,6 +159,8 @@ class ContextBuilder:
                                    if payload['researcher_id'].endswith('1') else
                                    ' Prefer a small increase of one numerical parameter first, guided by measured history.')
         # Budget is captured by the dispatcher, not read from SQLite by model threads.
+        if graph.get('decision_focus'):
+            user['profile_summary']['branch_focus'] = deepcopy(graph['decision_focus'])
         user["budget"] = graph["budget"]
         catalog_mode = self.catalog.config.research_mode == "catalog"
         system = research_prompt(self.catalog.config.research_mode)

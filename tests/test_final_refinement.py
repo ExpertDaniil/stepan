@@ -25,7 +25,7 @@ class FinalRefinementTests(unittest.TestCase):
         return h.g.invoke('G15', {'source_experiment_id': h.g.store.best(), 'expected_graph_revision': h.g.revision(), 'reason': reason}, key=key)
 
     def test_defaults_and_time_boundary_use_85_percent_after_publication_reserve(self):
-        self.assertEqual(Config().graph_plateau_seconds, 900)
+        self.assertEqual(Config().graph_plateau_seconds, 1800)
         h = self.harness(time_budget_seconds=10800, max_research_experiments=100, llm_max_calls=96)
         try:
             h.result('researcher-1', {'alpha': 1}, 10)

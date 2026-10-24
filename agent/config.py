@@ -74,7 +74,7 @@ class Config:
     research_oof_rows: int = 10000
     research_oof_timeout_seconds: int = 90
     research_oof_budget_fraction: float = .04
-    research_episode_budget_fraction: float = .10
+    research_episode_budget_fraction: float = .15
     research_deep_dialogue_seconds: int = 600
     llm_request_max_bytes: int = 196608
     llm_context_window_tokens: int = 262144
@@ -94,8 +94,10 @@ class Config:
     graph_train_workers: int = 1
     graph_max_live_branches: int = 3
     graph_max_total_branches: int = 15
-    graph_plateau_window: int = 4
-    graph_plateau_seconds: int = 900
+    graph_plateau_window: int = 6
+    graph_plateau_seconds: int = 1800
+    graph_hard_decisions: bool = False
+    graph_branch_min_seconds: int = 600
     graph_refinement_enabled: bool = True
     graph_search_fraction: float = 0.85
     graph_plateau_absolute_epsilon: float = 0.001
@@ -149,7 +151,7 @@ class Config:
             research_oof_rows=integer('RESEARCH_OOF_ROWS', 10000, 100, 50000),
             research_oof_timeout_seconds=integer('RESEARCH_OOF_TIMEOUT_SECONDS', 90, 5, 300),
             research_oof_budget_fraction=real('RESEARCH_OOF_BUDGET_FRACTION', .04, 0, .10),
-            research_episode_budget_fraction=real('RESEARCH_EPISODE_BUDGET_FRACTION', .10, .01, .25),
+            research_episode_budget_fraction=real('RESEARCH_EPISODE_BUDGET_FRACTION', .15, .01, .25),
             research_deep_dialogue_seconds=integer('RESEARCH_DEEP_DIALOGUE_SECONDS', 600, 30, 1200),
             llm_request_max_bytes=integer('LLM_REQUEST_MAX_BYTES', 196608, 16000, 2000000),
             llm_context_window_tokens=integer('LLM_CONTEXT_WINDOW_TOKENS', 262144, 4096, 1000000),
@@ -169,8 +171,10 @@ class Config:
             graph_train_workers=integer("GRAPH_TRAIN_WORKERS", 1, 1, 2),
             graph_max_live_branches=integer("GRAPH_MAX_LIVE_BRANCHES", 3, 1, 31),
             graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
-            graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 4, 1, 20),
-            graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 900, 0, 10800),
+            graph_plateau_window=integer("GRAPH_PLATEAU_WINDOW", 6, 1, 20),
+            graph_plateau_seconds=integer("GRAPH_PLATEAU_SECONDS", 1800, 0, 10800),
+            graph_hard_decisions=boolean('GRAPH_HARD_DECISIONS', False),
+            graph_branch_min_seconds=integer('GRAPH_BRANCH_MIN_SECONDS', 600, 0, 10800),
             graph_refinement_enabled=boolean("GRAPH_REFINEMENT_ENABLED", not platform),
             graph_search_fraction=real("GRAPH_SEARCH_FRACTION", 0.85, 0.8, 0.9),
             graph_plateau_absolute_epsilon=real("GRAPH_PLATEAU_ABSOLUTE_EPSILON", 0.001, 0, 1000000),

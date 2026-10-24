@@ -11,6 +11,12 @@
 
 # Наблюдаемость
 
+`graph.branch_forked.decision_constraints` различает soft/hard решения.
+`search.decision.branch_residence_seconds/minimum_branch_seconds` объясняет,
+почему ветка продолжает работу перед добровольным fork/switch. Архивирование для
+нового fork в мягком режиме фиксирует eligibility по актуальному плато или отсутствию
+исполнимой работы. DB-label reject обозначает альтернативу, не доказанный запрет.
+
 `diagnostics.oof_started/completed/unavailable` отделяют вспомогательные fit-only
 проверки от оценки кандидата. `job.started.purpose=fit_oof_diagnostics` использует
 обычные CPU/RSS/timeout/process-group guards, но не создаёт candidate score.

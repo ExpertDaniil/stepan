@@ -1,4 +1,5 @@
 > Планирование по смыслу задачи: [SEMANTIC-PLANNING.md](SEMANTIC-PLANNING.md).
+> Пересматриваемые fork preferences и время ветки: [SOFT-BRANCHES.md](SOFT-BRANCHES.md).
 > Текущий контракт контекста, памяти, признаков и анализа: [SEMANTIC-RESEARCH.md](SEMANTIC-RESEARCH.md).
 
 > Актуальный контракт и статус проверки: [MASTER-UPDATE.md](MASTER-UPDATE.md).

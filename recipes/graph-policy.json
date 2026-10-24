@@ -22,9 +22,9 @@
     "min_effect": 0.001
   },
   "plateau": {
-    "window_full_evaluations": 4,
-    "min_distinct_solutions": 4,
-    "min_elapsed_seconds": 900,
+    "window_full_evaluations": 6,
+    "min_distinct_solutions": 6,
+    "min_elapsed_seconds": 1800,
     "absolute_epsilon": 0.001,
     "relative_epsilon": 0.001
   },
@@ -33,11 +33,13 @@
     "minimum_alternative_trials": 1,
     "exploit_steps": 3,
     "refinement_enabled": true,
-    "search_fraction": 0.85
+    "search_fraction": 0.85,
+    "min_branch_seconds": 600
   },
   "retention": {
     "max_artifact_bytes": 8000000000,
     "min_free_disk_bytes": 2000000000,
     "keep_prediction_policy": "full_and_best"
-  }
+  },
+  "hard_decision_constraints": false
 }

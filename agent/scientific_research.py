@@ -5,6 +5,10 @@ an authoritative fact or permission to inspect withheld labels.
 """
 from copy import deepcopy
 
+
+def episode_allowance(config):
+    return min(1800, max(15, config.time_budget_seconds*config.research_episode_budget_fraction))
+
 def compact_protocol(protocol):
     """Shrink displayed hints; full records remain in the scoped detail snapshot."""
     result = deepcopy(protocol)
@@ -87,7 +91,7 @@ class ScientificResearch:
         self.diagnostics.ensure(visible_ids)
         if len(self.diagnostics.records) > previous_reports:
             c.publish_research_updates()
-        allowance = min(600, max(15, c.config.time_budget_seconds*c.config.research_episode_budget_fraction))
+        allowance = episode_allowance(c.config)
         episode = episode_context(memory, researcher_id, c.runner.jobs.values(), allowance)
         reports = self.diagnostics.visible(visible_ids)
         extended = bool(episode and (len(episode['measured_experiment_ids']) >= 2 or episode['failed_experiment_ids']))
@@ -151,7 +155,7 @@ class ScientificResearch:
         if episode and test['continuation'] == 'reconsider' and episode['remaining_seconds'] < estimate:
             if not all_evidence-set(episode.get('evidence_ids', [])):
                 reason = 'Renewing a spent episode needs newly observed evidence, not only a renamed question.'
-        allowance = min(600, max(15, c.config.time_budget_seconds*c.config.research_episode_budget_fraction)) if hasattr(c, 'config') else 600
+        allowance = episode_allowance(c.config) if hasattr(c, 'config') else 600
         funded = episode['remaining_seconds'] if episode and test['continuation'] == 'followup' else allowance
         if not reason and funded < estimate:
             reason = 'The predicted fit exceeds this question\'s funding. Choose a cheaper discriminating test or reconsider the question with new evidence.'

@@ -5801,6 +5801,11 @@
               "type": "number",
               "minimum": 0.8,
               "maximum": 0.9
+            },
+            "min_branch_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10800
             }
           },
           "required": [
@@ -5833,6 +5838,9 @@
             "keep_prediction_policy"
           ],
           "additionalProperties": false
+        },
+        "hard_decision_constraints": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -13690,7 +13698,8 @@
           "enum": [
             "best_compatible_own_reference",
             "pre_feature_own_reference",
-            "checkpoint_reference"
+            "checkpoint_reference",
+            "best_own_reference_matching_soft_preference"
           ]
         }
       },

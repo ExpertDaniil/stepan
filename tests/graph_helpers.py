@@ -15,11 +15,12 @@ from tools.code import write_code
 
 
 class GraphHarness:
-    """State-machine fixture: scores are explicitly injected, never advertised as ML validation."""
+    """Injected scores and fast strict-fork compatibility; production defaults are tested separately."""
     def __init__(self, kind="regression", **config):
         self.h = Harness(kind)
         h = self.h
         defaults = dict(graph_min_free_disk_bytes=0, graph_plateau_seconds=0, graph_refinement_enabled=False,
+                        graph_plateau_window=4, graph_branch_min_seconds=0, graph_hard_decisions=True,
                         feature_research_enabled=False)
         defaults.update(config)
         cfg = replace(h.config, **defaults)

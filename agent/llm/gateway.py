@@ -390,6 +390,10 @@ class Gateway:
             after_response = self.budget.reserve_seconds()
             if recipe:
                 probe = {'recipe_id': recipe['id'], 'model': {'family': recipe['family'], 'hyperparameters': base['hyperparameters']},
+                         # Generated pipelines have separate measured histories per source.
+                         # Older saved contexts lack the optional identity: use a cold
+                         # estimate, never a different pipeline's timing samples.
+                         'code_artifact_id': base.get('code_artifact_id') or 'unresolved-source',
                          'resources': {'cpu_threads': self.config.train_cpu_threads}}
                 after_response = self.budget.duration.estimate(probe)+self.budget.candidate_reserve(probe)
             phase_deadline = self.budget.phase_deadline-after_response

@@ -22,6 +22,40 @@ from tests.test_adaptive_research import action
 
 
 class DataResearchWindowTests(unittest.TestCase):
+    def test_custom_data_base_keeps_timing_identity_with_refinement_and_old_contexts(self):
+        from agent.context import output_schemas
+        from agent.llm.gateway import Gateway, MockTransport
+        from tests.test_adaptive_research import SOURCE
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        try:
+            reply, payload = h.submit(h.issue(), {'alpha': 1.}, recipe='python-pipeline-v1', source=SOURCE)
+            h.commit(reply, 7)
+            g = h.g
+            g.context.data_research = g.budget.data_research_snapshot
+            g.budget.start_data_research()
+            context_id = h.issue()['work_order']['context_id']
+            context = g.artifacts.read_json(context_id)
+            user = json.loads(context['messages'][1]['content'])
+            source_id = user['base_result']['code_artifact_id']
+            self.assertEqual(source_id, payload['proposal']['plan']['code_artifact_id'])
+            g.budget.phase_deadline = time.monotonic()+9000
+            gateway = Gateway(g.config, g.budget, g.artifacts, g.bus, g.log, output_schemas(g.bus), MockTransport())
+            args = {'purpose': 'research_proposal', 'context_artifact_id': context_id,
+                'response_schema_id': 'ResearchAction-v1', 'tool_schema_ids': [],
+                'max_output_tokens': 1024, 'deadline_seconds': 900, 'attempt_limit': 2}
+            for legacy in (False, True):
+                if legacy:
+                    user['base_result'].pop('code_artifact_id')
+                    context['messages'][1]['content'] = json.dumps(user)
+                    args['context_artifact_id'] = g.artifacts.write_json('contexts/old-data-base.json', context)['artifact_id']
+                with self.subTest(legacy=legacy), patch.object(g.budget.duration, 'estimate', wraps=g.budget.duration.estimate) as estimate:
+                    self.assertEqual(gateway.complete(args)['parsed_payload']['action'], 'features')
+                    probes = [call.args[0] for call in estimate.call_args_list if call.args[0]['model']['family'] == 'custom']
+                    self.assertTrue(probes)
+                    self.assertTrue(all(p['code_artifact_id'] == ('unresolved-source' if legacy else source_id) for p in probes))
+        finally:
+            h.close()
+
     def test_default_three_hour_window_starts_once_and_unlocks_at_thirty_minutes(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:
             budget = Budget(Config(time_budget_seconds=10800), 100, None)
@@ -253,11 +287,11 @@ class DataResearchExecutionTests(unittest.TestCase):
                 self.assertEqual(events[-1]['state'], 'completed')
 
     def test_real_features_run_before_tuning_and_the_checked_answer_is_retained(self):
-        for graph in (False, True):
-            with self.subTest(graph=graph):
-                self.execute(graph)
+        for graph, refinement in ((False, False), (True, False), (True, True)):
+            with self.subTest(graph=graph, refinement=refinement):
+                self.execute(graph, refinement)
 
-    def execute(self, graph):
+    def execute(self, graph, refinement):
         from agent.llm.gateway import MockTransport
         from agent.runtime import main
         from agent.scientific_research import synthetic_notes
@@ -293,7 +327,8 @@ class DataResearchExecutionTests(unittest.TestCase):
                 return response
             settings = {'AUTOML_PROFILE': 'development', 'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive',
                 'TIME_BUDGET_SECONDS': '90', 'DATA_RESEARCH_MIN_SECONDS': '4', 'MAX_WORKERS': '1',
-                'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1', 'GRAPH_REFINEMENT_ENABLED': '0',
+                'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1',
+                'GRAPH_REFINEMENT_ENABLED': str(int(refinement)),
                 'TRAIN_CPU_THREADS': '1', 'LLM_MAX_CALLS': '20', 'CATALOG_WARMUP_EXPERIMENTS': '0',
                 'FEATURE_SEED_BUDGET_FRACTION': '0', 'RESEARCH_OOF_ENABLED': '0', 'LOG_LEVEL': 'ERROR',
                 'MODEL_SNAPSHOT_MAX_BYTES': '0', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}

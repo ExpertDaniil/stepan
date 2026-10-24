@@ -1,3 +1,6 @@
+> Submission configuration: [PLATFORM.md#настройки-в-посылке](PLATFORM.md#настройки-в-посылке).
+> `run.started.config` contains effective values after inherited env, explicit env file
+> and bundled public defaults are resolved. Credentials and the full environment are not logged.
 > Context continuation: [CONTEXT-CONTINUATION.md](CONTEXT-CONTINUATION.md).
 > `llm.tool_history_archived` links removed tool-call IDs, retained batches and exact
 > transcript reference to measured request bytes. `llm.context_compacted` includes

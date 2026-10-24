@@ -1,3 +1,7 @@
+> Platform settings: [PLATFORM.md#настройки-в-посылке](PLATFORM.md#настройки-в-посылке).
+> The flat ZIP embeds the public allowlisted `recipes/platform-env.json` as readable
+> RESOURCE_TEXT. Its entry point supplies `main(default_env=...)`; inherited env and
+> an explicit env file win before Config is constructed. Build-time env is never captured.
 > Current context packing: [CONTEXT-CONTINUATION.md](CONTEXT-CONTINUATION.md).
 > Completed tool turns can be archived as whole matched batches, with bounded observation
 > excerpts and scoped exact reads. Their original source/results stay immutable; the

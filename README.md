@@ -1,3 +1,7 @@
+> Профиль посылки: [recipes/platform-env.json](recipes/platform-env.json).
+> Он включён в ZIP: контекст 192 KiB, ответ 32k–64k, bootstrap 8192,
+> общий выходной бюджет 1048576 токенов, численного лимита API-вызовов нет.
+> Приоритет настроек и проверка фактических лимитов: [docs/PLATFORM.md](docs/PLATFORM.md#настройки-в-посылке).
 > Context continuation under tool-history pressure: [CONTEXT-CONTINUATION.md](docs/CONTEXT-CONTINUATION.md).
 > Current default: [executable pipeline versions and background Optuna](docs/BACKGROUND-PIPELINES.md).
 > Latest interface/timeout fixes: [docs/RESEARCH-LOGISTICS.md](docs/RESEARCH-LOGISTICS.md).
@@ -103,7 +107,7 @@ Adaptive-исследователи получают локальную библ
 Текущая семантическая память и контекст: [SEMANTIC-RESEARCH.md](docs/SEMANTIC-RESEARCH.md).
 Полный запрос, включая schema/tools/feedback/final/repair, ограничен минимумом
 `LLM_REQUEST_MAX_BYTES` и графового бюджета `GRAPH_CONTEXT_BYTES` / issued policy
-во всех режимах. Новый graph default — 98304 байта. Подробности доступны через
+во всех режимах. Кодовый graph default — 98304 байта; профиль посылки задаёт 196608. Подробности доступны через
 `read_memory` из замороженного снимка задачи/ветки; исходная полная схема остаётся
 у контроллера. Непомещающийся обязательный контракт отклоняется с диагностикой.
 Программные свойства проверены статически; новые regression-тесты написаны и не запускались.
@@ -255,7 +259,10 @@ python scripts/show_run.py runs/ИМЯ_ЗАПУСКА --experiment exp-ID
 
 ## Настройки
 
-Официальные переменные отделены от внутренних в `.env.example`. Основные внутренние значения:
+Официальные переменные отделены от внутренних в `.env.example`. Ниже приведены
+кодовые defaults без профиля посылки. Для ZIP расширенные значения из
+[`recipes/platform-env.json`](recipes/platform-env.json) применяются раньше этих
+defaults; точная таблица и приоритеты — в [PLATFORM.md](docs/PLATFORM.md#настройки-в-посылке).
 
 | Переменная | По умолчанию | Смысл |
 |---|---|---|

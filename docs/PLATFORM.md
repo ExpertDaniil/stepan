@@ -41,6 +41,46 @@ python3 solution.py "data_for_participants/Регрессия/task.md" --env-fil
 
 `requirements.runtime.txt` — разрешённое подмножество для быстрой локальной среды и Dockerfile. `requirements.txt`/`requirements.organizers.txt` сохраняют полный предоставленный список. Это не утверждение, что полный список зависимостей был успешно установлен в среде подготовки: фактические ограничения проверки указаны в `VALIDATION.md`.
 
+## Настройки в посылке
+
+Локальный `.env` сборщик не читает. Публичные настройки посылки зафиксированы
+в `recipes/platform-env.json`. Сборщик проверяет явный allowlist ключей и включает
+этот JSON открытым текстом в `stepan_resources.py`; отдельный `.env` на платформе
+не требуется. Ключ, URL API, модель, пути и произвольные переменные среды сборки
+в профиль не копируются. Неизвестные ключи, дубликаты и некорректный формат
+останавливают сборку.
+
+| Настройка | Значение в профиле посылки |
+|---|---|
+| AUTOML_PROFILE | platform |
+| RESEARCH_MODE | adaptive |
+| CATALOG_WARMUP_EXPERIMENTS / RESEARCH_SERIES_SIZE | 4 / 4 |
+| LLM_MAX_CALLS | 0 — без численного лимита вызовов |
+| LLM_MAX_OUTPUT_TOKENS | 32768 |
+| LLM_MAX_OUTPUT_TOKENS_LIMIT | 65536 |
+| LLM_BOOTSTRAP_OUTPUT_TOKENS | 8192 |
+| LLM_MAX_TOTAL_OUTPUT_TOKENS | 1048576 |
+| LLM_TIMEOUT_SECONDS / LLM_OPERATION_TIMEOUT_SECONDS | 600 / 1200 |
+| LLM_PROGRESS_SECONDS | 15 |
+| GRAPH_CONTEXT_BYTES / LLM_REQUEST_MAX_BYTES | 196608 / 196608 |
+| CONSOLE_LOG_FORMAT / LOG_LEVEL / LOG_MODEL_IO | human / INFO / 1 |
+| LLM_MODE | live |
+
+Приоритет: явные CLI-параметры (`--profile`, `--llm-mode`, `--work-dir`) →
+унаследованный env процесса → явный `--env-file` → профиль посылки → defaults
+`Config.from_env`. Генерируемая точка входа передаёт профиль в `main(default_env=...)`;
+он применяется после чтения явного env-файла и до создания `Config`. Обычный
+модульный запуск из репозитория профиль посылки автоматически не загружает;
+для него обновлён `.env.example`.
+
+Фактические значения после всех переопределений записаны в `run.started.config`
+в `runs/<run-id>/events.jsonl`. Сам env целиком не журналируется. Повышение byte cap
+не меняет окно и ограничения внешнего провайдера; архивирование истории описано
+в [CONTEXT-CONTINUATION.md](CONTEXT-CONTINUATION.md).
+
+После изменения профиля нужно заново собрать и загрузить `dist/solution.zip`:
+уже загруженная посылка сохраняет прежние значения.
+
 ## Подключение модели
 
 | Настройка | Правило |

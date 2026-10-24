@@ -15,6 +15,15 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_ZIP_BYTES = 100_000_000
+PLATFORM_ENV_RESOURCE = "recipes/platform-env.json"
+# Explicit public settings only. Never copy the build process environment or .env.
+PLATFORM_ENV_KEYS = frozenset({
+    "AUTOML_PROFILE", "RESEARCH_MODE", "CATALOG_WARMUP_EXPERIMENTS", "RESEARCH_SERIES_SIZE",
+    "LLM_MAX_CALLS", "LLM_MAX_OUTPUT_TOKENS", "LLM_MAX_OUTPUT_TOKENS_LIMIT",
+    "LLM_BOOTSTRAP_OUTPUT_TOKENS", "LLM_MAX_TOTAL_OUTPUT_TOKENS", "LLM_TIMEOUT_SECONDS",
+    "LLM_OPERATION_TIMEOUT_SECONDS", "LLM_PROGRESS_SECONDS", "CONSOLE_LOG_FORMAT",
+    "LOG_LEVEL", "LOG_MODEL_IO", "LLM_MODE", "GRAPH_CONTEXT_BYTES", "LLM_REQUEST_MAX_BYTES",
+})
 RESOURCE_FILES = (
     "agent/schema.sql",
     "agent/graph/schema.sql",
@@ -23,6 +32,7 @@ RESOURCE_FILES = (
     "recipes/catalog.json",
     "recipes/components.json",
     "recipes/graph-policy.json",
+    "recipes/platform-env.json",
     "prompts/task-interpreter.md",
     "prompts/validation.md",
     "prompts/researcher.md",
@@ -40,6 +50,24 @@ RESOURCE_FILES = (
 )
 
 
+def validate_platform_env(content):
+    def unique_keys(pairs):
+        values = {}
+        for key, value in pairs:
+            if key in values:
+                raise ValueError("Duplicate platform setting: " + key)
+            values[key] = value
+        return values
+
+    settings = json.loads(content, object_pairs_hook=unique_keys)
+    if not isinstance(settings, dict) or set(settings) != PLATFORM_ENV_KEYS:
+        raise ValueError("Platform settings must contain exactly the public allowlisted keys")
+    if any(not isinstance(value, str) or not value.strip() or "\n" in value or "\r" in value
+           for value in settings.values()):
+        raise ValueError("Platform settings must be non-empty single-line strings")
+    return settings
+
+
 def checked_bytes(root, relative):
     path = root / relative
     if any(parent.is_symlink() for parent in (path, *path.parents)):
@@ -51,6 +79,7 @@ def checked_bytes(root, relative):
 
 def runtime_files(root):
     files = {name: checked_bytes(root, name) for name in RESOURCE_FILES}
+    validate_platform_env(files[PLATFORM_ENV_RESOURCE])
     files["recipes/requirements.lock.txt"] = checked_bytes(root, "requirements.organizers.txt")
     for directory in ("agent", "tools"):
         for path in sorted((root / directory).rglob("*")):
@@ -108,6 +137,7 @@ import time
 STARTED_MONOTONIC = time.monotonic()
 
 from pathlib import Path, PurePosixPath
+import json
 import shutil
 import sys
 import tempfile
@@ -143,7 +173,8 @@ def run():
         sys.path.insert(0, str(root))
         try:
             from agent.runtime import main
-            return main(started_monotonic=STARTED_MONOTONIC)
+            return main(started_monotonic=STARTED_MONOTONIC,
+                        default_env=json.loads(RESOURCE_TEXT["recipes/platform-env.json"]))
         finally:
             sys.path.remove(str(root))
 

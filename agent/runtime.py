@@ -177,7 +177,7 @@ def write_summary(root, store, budget, config, champion, state):
     return path
 
 
-def main(argv=None, *, started_monotonic=None):
+def main(argv=None, *, started_monotonic=None, default_env=None):
     started = time.monotonic() if started_monotonic is None else started_monotonic
     parser = argparse.ArgumentParser(description="Autonomous ML agent skeleton")
     parser.add_argument("task", nargs="?", default="task.md", type=Path)
@@ -189,6 +189,10 @@ def main(argv=None, *, started_monotonic=None):
     try:
         if args.env_file:
             load_env_file(args.env_file)
+        # The flat submission carries public defaults, never API credentials.
+        # Inherited env and explicit --env-file both take precedence.
+        for name, value in (default_env or {}).items():
+            os.environ.setdefault(name, value)
         config = Config.from_env(llm_mode=args.llm_mode, work_dir=args.work_dir, profile=args.profile)
     except Exception as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)

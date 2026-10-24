@@ -1,0 +1,1058 @@
+{
+  "base_remote": "07f22e286cb495e9435c4083ecebbc586baa897e",
+  "integrated_remote": "ba9ab41d268a7e3b8c26032897c17f8ba2b31c50",
+  "environment": {
+    "cpu_limit": 8,
+    "memory_limit_gib": 8,
+    "python": "3.12",
+    "production_memory_limit_gib": 32
+  },
+  "zip": {
+    "filename": "stepan-open-research.zip",
+    "bytes": 612306,
+    "sha256": "33d99ea82f0776d9812e336b5727abc8a643cb5f8f6a3607267c09853b660393"
+  },
+  "tests": {
+    "release": {
+      "log": "suite-delivery-final.log",
+      "runs": [
+        [
+          "489",
+          "404.840"
+        ]
+      ],
+      "passed": true
+    },
+    "legacy_origin_compatibility": {
+      "log": "origin-compatibility-check.log",
+      "runs": [
+        [
+          "55",
+          "8.839"
+        ]
+      ],
+      "passed": true
+    },
+    "context": {
+      "log": "upstream-check3.log",
+      "runs": [
+        [
+          "59",
+          "85.760"
+        ]
+      ],
+      "passed": true
+    },
+    "strict_projection": {
+      "log": "strict-projection-check.log",
+      "runs": [
+        [
+          "65",
+          "10.680"
+        ]
+      ],
+      "passed": true
+    },
+    "context_rollover": {
+      "log": "context-rollover-check.log",
+      "runs": [
+        [
+          "41",
+          "10.360"
+        ]
+      ],
+      "passed": true
+    }
+  },
+  "static_audit": {
+    "audit": "static_source_and_package_inputs",
+    "python_files_parsed": 139,
+    "owned_runtime_modules": 72,
+    "allowlisted_text_resources": 20,
+    "json_files_parsed": 168,
+    "schema_vocabulary_and_refs": "checked_without_importing_project_modules",
+    "runtime_contract_schema_declarations": "byte-independent_data_equality_checked",
+    "feature_execution_dependencies": "included_in_frozen_runtime",
+    "official_requirements_byte_equal": true,
+    "requirements_sha256": "9173b0388532fbd2a709e4f4b3029e3b9ccab685fce43a85261ffa1ba95efbe6",
+    "knowledge_manifest": "all_file_hashes_equal",
+    "regression_methods_written": 465,
+    "runtime_source_sha256": {
+      "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/artifacts.py": "6a1e25701827e3e3a337be73a1d4a516d8e1db360e637c4e79aa4ac9f86eb472",
+      "agent/budget.py": "3054e0a9f9a3ccc446cc54146a39808d85012ce27710da810087adda4a5fa4b1",
+      "agent/catalog.py": "9e906fc5005d1b27fc704388da1da2e2519c7acc0ebc95ce8a435b31e054a578",
+      "agent/config.py": "39854a59d46b2f1f02e64be0a169c40f25801d00c2fe8a6ef3de63abf95f1b62",
+      "agent/confirmation.py": "eb303c6cdf6683c9743b4a09433b86e808bfda8d8a5f28584343e3a57165bbd2",
+      "agent/context.py": "6f72b252112b396933a1aeea2e83a3de17ee59b4fe48ef5d9e40091b61e8c4d1",
+      "agent/context_budget.py": "9f424f71713fcd4af87141ece120a239e819c6dd698ee5ec9510387937360d01",
+      "agent/context_details.py": "62850ab8193cd4faeb8080dfea1662dfa671e573c38d7f0d8378179f0c0ee37c",
+      "agent/contracts.py": "7963e6db27253f41737b0e265ffaaf540682b134b4e7d22f46754a40ac0e5c8b",
+      "agent/data_research.py": "b8a476d428aeae665037f213de3de738391008f064916be2593faf9f2a2ce4b3",
+      "agent/data_transport.py": "5a9d643a3a86b9805888b816397452bfe1901001fc98c03bfeaa5443e7cb777a",
+      "agent/duration.py": "810907b5579946f705b8376a2158c87d78375f764a82efaa5bb61ff27809b363",
+      "agent/errors.py": "50a2a38d0eadde3f8b961de0dddd3171609d1724b34bd38ff434e3597cab5ab0",
+      "agent/evaluation.py": "35f508889a7f19eaeb52c182cd4519f9188e0b3e515880989443c709d264c6a5",
+      "agent/evidence.py": "1394d4187bbe247fe82684207de2b927f53851e55db3fac9ceb97e67764be180",
+      "agent/feature_engineering.py": "0d3e7f8512ff3b0bf67fab30ee8de87460a6c7bd4b4bf36138e236c90d7534da",
+      "agent/feature_memory.py": "3a900ad1f1134718832b52ebe8db26a6c4a3a553421421242f31251371da5008",
+      "agent/feature_schema.py": "c46cf7c24365a7459112833d97a872f47df5a23c27f8139e9f07ae2260ee1038",
+      "agent/feature_search.py": "62e6f93678b1d30b5d57083c328cd1c124f30042343af4f80ca77dcb302d0893",
+      "agent/fit_diagnostics.py": "09389be2498ffb8fb18aebfbdd1d2fd22ca1d38fe1d4cb26f962961eba5538e4",
+      "agent/graph/__init__.py": "01fac84fdd6e5ab57f25e01609f85c886496d08d160ad54541df3b1456f376d1",
+      "agent/graph/artifacts.py": "cab8029551b491f83a521694d14f70331bb38a84c5ca47ba220b6d5a065c869d",
+      "agent/graph/constraints.py": "a8475e5a95767a086dd9f5f04558ac095e886b9dc8eaf4f256b2a9758a8b31cb",
+      "agent/graph/constructor.py": "7e279d7edcae2f9949e97a7256fb4badaf84373e9104fc55725035626dd53e4c",
+      "agent/graph/context.py": "a2cebb4009bdabdc98fbfa9332814671dc54a65e13355fedccd6b442e3090b7b",
+      "agent/graph/controller.py": "9fddcf0d8e6d1f9a4f8c5831c98b0459af1e21dca8334ac41ecd71876f70db00",
+      "agent/graph/export.py": "1841bb7a389129d14f177e9ef22ac147631978088c001c3164a2722441e19f29",
+      "agent/graph/identity.py": "4e2ea0ab88394f1cdf9ee9c3d5179c1e546336e7edb77443af38985da92822cf",
+      "agent/graph/recovery.py": "30c54febcf621ac7ee2d667faa2ec5776331a078fb06a21c69742945dc455414",
+      "agent/graph/refinement.py": "df3de90c62b96ae0053f5635fd0216a23e3c0095366edc604b26f79cd740a25a",
+      "agent/graph/research_scheduler.py": "39129198b896bfff1e5f1ecd12451b13a18061aa0005c2d859b87cf0438b2f09",
+      "agent/graph/service.py": "043fe715b168bb397f478cbc0b356b4514c90e9934044387c54382fbad944fbc",
+      "agent/llm/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/llm/gateway.py": "6dbea307d266e0676fcff9831a34a038ea5f0ded5b5806f2388e3a239b57f312",
+      "agent/llm/protocol.py": "32731bca8f33607d46116307149daa45a415822e1ba1fefe9d69e98f5c968f76",
+      "agent/local_search.py": "a3ed2d411624fd35f0306e532e8654649cb1c77c3c78e838c0facd2b077d147f",
+      "agent/ml.py": "daa84951a60c156daf0052fe9af7dd5d8503e586fb0692fe9446b897120889e8",
+      "agent/observability/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/observability/logging.py": "c18169cfd889fe5dbc48553cd1f2819401eab8ef137cdf45af73a72d290c733f",
+      "agent/optuna_search.py": "d48cf91198e6b389dfaacefd8628049a0116a39c9a9161bdc438518706992e61",
+      "agent/orchestrator.py": "5a0e3aa64686291dd5a53f40b478c3068cc8117658168ba289056638fbebb236",
+      "agent/predictions.py": "4c95a2071316b96ea06d3fc46fdf97c5c72fe1f9d2122d5dafe584385a25aca7",
+      "agent/preprocessing.py": "d7834b1ec56490c68c10fd1fa15af5723e1b084b1ddb7c7bda3cce225edacb7b",
+      "agent/research_actions.py": "9e73e9c2fce8cd53ce049fbaef8ac80257d889b5fee07f8d522bb447cfb0f354",
+      "agent/research_coordination.py": "8217e326f7a52d7ad194b853237d1ca10de441008c900f78c195c69fa8306a90",
+      "agent/research_feedback.py": "8940b734d45c744d49f6cdc8d415254fbc131de887568827e9fd4e1c4cb2d4af",
+      "agent/research_landscape.py": "0eea40830fc79e3a8d1717da2853a76c6e7bc1d70bee6f56815905baeb73587f",
+      "agent/research_memory.py": "a318d55e41ffd2c07ca718d179aec9972d6b8c3b6b6e299411a5cbb6d010fe75",
+      "agent/researcher.py": "de482b98c32e7032405d6af6af22ebae89e25da790fd9aaee6bcd560c4bbbd4f",
+      "agent/runner.py": "daa7b85636da75134360ab776861bbc5d8adf4d265f4ed94c018e136f125d467",
+      "agent/runtime.py": "10fee3e9fe322e7f7e05cbc67d5a36b97e139bdeaa677753ec5fe7559062698e",
+      "agent/scientific_research.py": "d9dbe8890b3ed4c4be01d3150c7221178971171f3d3053ce5b0a4df0d95e7cf5",
+      "agent/search_policy.py": "13c3f6d5ce6e24fd2a770e8d40c8704f712b193b826f0acf2ed3d7bbf85a620f",
+      "agent/semantic_planning.py": "7419895e27a3ce2e8083cc93ff066dfefe6a9c052d458445627738abcd3106f0",
+      "agent/store.py": "4cb4c4ce1d6ac49996597bce730a01717b77e26ca186cc2b9720934fb3707e4b",
+      "agent/submission.py": "431f9027e91ecf63287161376d62f86a616834f5fac51f2dd2b8f42865fa0021",
+      "agent/task.py": "2990da1d7def3c226b73ca8faabd4120c75fdcccad1b212c7080c6b7c56d5d70",
+      "agent/task_interpreter.py": "c43183e2c3798a02a836fdaa08ba271ac85015477be29e09029e97ce4061fb20",
+      "agent/tool_arguments.py": "8f7c1d41fbc257c2ef7f29f080adc26902f3096dd1b28e528f140aa79e8f0037",
+      "agent/tuning_space.py": "f43cf6385827707c3e154bcce1e8aecb058c48af5c7e667d1f26b9a8c4fee1e1",
+      "agent/worker.py": "44b6cca837c3f33d1324d9b1e188296a59b14d359e576a7ae939dd6b8c5454c7",
+      "tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tools/analysis.py": "5e7eb5453a2824c9fbade8d1562af9467bcc592efdf73614f3f56cfbf34c2b59",
+      "tools/analysis_worker.py": "c937eea169fbb3ed44b5100f8ee1ff608c56035baa106ae72ebd014940e6582c",
+      "tools/code.py": "beb821fb5d2f67192e7db935c8a5851b9057daa673f3487e905fd6dac2c922b6",
+      "tools/data.py": "c73015ced92431779db0c2d6fb0c5dc940259ab43d058870ea85ea47dcb01bec",
+      "tools/files.py": "90f83940b4d2d13ae6948b992e5647a0462822a274f81d295516114737ba5665",
+      "tools/knowledge.py": "ce47812d8682add79631d25b03bf2feda35ca2a616cdd73609a18fcec7457fb6",
+      "tools/knowledge_content.py": "e29c25b3e2d9880d89aadc61a1519a07937069ad265ae5e1351189b733678a71",
+      "tools/python_analysis.py": "378c5c224eadbcbd9464d68dfa2751c8b8853a8879ae0e4f1d2a2b992753decd",
+      "tools/runtime_guard.py": "e1ddfc4a3e78413eda1211b83f2d4397e1df80ce65ae2a436e00880d73961298"
+    },
+    "not_performed": [
+      "project_module_import",
+      "test_execution",
+      "training",
+      "agent_smoke_or_full_run",
+      "live_llm_request",
+      "dependency_installation",
+      "zip_build_or_runtime_execution"
+    ],
+    "limitation": "Static packaging policy/input checks do not prove generated ZIP bytes or platform execution."
+  },
+  "limitations": [
+    "Organizer traceback and original failed submitted ZIP were unavailable; the exact historical leaderboard failure is not claimed reproduced.",
+    "No full three-hour benchmark or leaderboard submission was performed.",
+    "Public pilot scores are local selection metrics, not leaderboard or confirmation scores; classification duplicates were not regrouped by this change.",
+    "Python AST/audit guards are not an OS sandbox for hostile Python.",
+    "Some local streaming logs were incomplete; final summary and read-only SQLite metadata are authoritative for state/score here.",
+    "The 120-second four-mode comparison is one synthetic repeat and cannot establish a quality advantage.",
+    "Four-mode comparison uses its own recorded frozen ZIP, before the final upstream merge and pilot-order change; all conditions within that comparison use identical bytes."
+  ],
+  "flat_zip_replay": {
+    "zip_sha256": "33d99ea82f0776d9812e336b5727abc8a643cb5f8f6a3607267c09853b660393",
+    "results": [
+      {
+        "kind": "regression",
+        "exit_code": 0,
+        "state": "completed",
+        "events": {
+          "research.python_analysis_completed": 2,
+          "research.checkpoint_completed": 1,
+          "research.action_proposed": 1,
+          "experiment.evaluated": 2
+        },
+        "report": {
+          "run": "run-20261024T153142Z-6f492e46",
+          "state": "completed",
+          "api_attempts": 7,
+          "responses": 7,
+          "truncated_responses": 0,
+          "reported_output_tokens": 500,
+          "reported_input_tokens": 500,
+          "reported_cached_input_tokens": 0,
+          "uncensored_output_median": 100,
+          "suggested_initial_output_tokens": 16384,
+          "suggested_output_ceiling": 32768,
+          "budget_note": "Client-side starting estimate, not a verified provider maximum or a RUB conversion. Truncated samples are censored; exact token need is unknown.",
+          "research_decisions": 3,
+          "feedback_deliveries": 5,
+          "job_occupancy": {
+            "elapsed_seconds": 6.385,
+            "job_present_seconds": 3.318,
+            "no_train_or_refit_seconds": 3.067,
+            "unfinished_jobs": 0,
+            "interpretation": "Job presence from saved events, not CPU utilization."
+          },
+          "research_summary": {
+            "evaluated_configurations": 2,
+            "by_recipe": {
+              "dummy-regressor-v1": {
+                "evaluations": 1,
+                "best_score": 11.283286098805224,
+                "best_experiment_id": "exp-318169bf9a10"
+              },
+              "python-pipeline-v1": {
+                "evaluations": 1,
+                "best_score": 1.8711219138177035,
+                "best_experiment_id": "exp-4ad8934b87af"
+              }
+            },
+            "proposed_llm_actions": {
+              "features": 1
+            },
+            "evaluated_owned_feature_programs": 1,
+            "observed_constant_like_outputs": 1,
+            "completed_data_analyses": 0,
+            "rejected_reference_optimizations": 0,
+            "interpretation": "Proposals are not executions. Counts describe recorded behavior; a feature program can regress, and custom pipelines without an owned program need their code/fitted report inspected."
+          },
+          "scientific_research": {
+            "test_plans": 0,
+            "followups": 0,
+            "oof_reports": 0,
+            "oof_unavailable": 0,
+            "preflight_deferrals": 0,
+            "extended_dialogues": 0,
+            "reported_reasoning_tokens": 0,
+            "calls_without_reasoning_usage": 7,
+            "calls_with_reasoning_field": 0,
+            "provider_thinking_application": "unverified; request flags and reported usage do not measure decision quality"
+          },
+          "dialogues": [
+            {
+              "timestamp": "2026-10-24T15:31:46.056+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153142Z-6f492e46",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-aeb66f7cade042e0",
+              "trace_id": "run-20261024T153142Z-6f492e46",
+              "span_id": "span-aba9eb070ac1",
+              "parent_span_id": "span-e35d4152757d",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-bdda9278b39745008f564f8ae85bcb58",
+              "duration_seconds": 0.846,
+              "tool_results": 1,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            },
+            {
+              "timestamp": "2026-10-24T15:31:46.840+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153142Z-6f492e46",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-740766b2cfe44a6d",
+              "trace_id": "run-20261024T153142Z-6f492e46",
+              "span_id": "span-e44f2d0205d2",
+              "parent_span_id": "span-a24896e9d7b5",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-c4f1808f52d443fdb7ad7baf3d61f5cb",
+              "duration_seconds": 0.698,
+              "tool_results": 1,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            },
+            {
+              "timestamp": "2026-10-24T15:31:48.767+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153142Z-6f492e46",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-0077a820fca84e8c",
+              "trace_id": "run-20261024T153142Z-6f492e46",
+              "span_id": "span-557de2bde00e",
+              "parent_span_id": "span-b21aafb171ca",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-13a196bc51d146c8bb0cff96b1689056",
+              "duration_seconds": 0.014,
+              "tool_results": 0,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            }
+          ],
+          "feature_seed_proposals": 0,
+          "overlap_deferrals": 0,
+          "rolling_peer_resumptions": 0,
+          "search_stop_reason": "researchers_stopped",
+          "fallback_seconds": 0.0,
+          "final_confirmation": {
+            "timestamp": "2026-10-24T15:31:48.802+00:00",
+            "level": "INFO",
+            "run_id": "run-20261024T153142Z-6f492e46",
+            "event": "validation.finalists_confirmed",
+            "confirmation_artifact_id": "art-4d5d010ee21d48a8",
+            "chosen_experiment_id": "exp-4ad8934b87af",
+            "finalists": [
+              {
+                "experiment_id": "exp-4ad8934b87af",
+                "prediction_artifact_id": "art-1f03c8c8a6d141a6",
+                "value": 0.7778332573833423
+              },
+              {
+                "experiment_id": "exp-318169bf9a10",
+                "prediction_artifact_id": "art-2196bdd5fc754baa",
+                "value": 9.490352698498926
+              }
+            ],
+            "rows": 24,
+            "further_research_allowed": false
+          },
+          "published_pipeline": {
+            "experiment_id": "exp-4ad8934b87af",
+            "selection_basis": "research_validation",
+            "confirmation_artifact_id": null
+          },
+          "storage": {
+            "total_bytes": 3074875,
+            "by_category": {
+              "other_metadata": 3037109,
+              "predictions_csv": 6959,
+              "model_snapshots": 6357,
+              "worker_logs": 2892,
+              "input_cache": 21558
+            },
+            "largest_files": [
+              {
+                "path": "graph/owned-runtime.zip",
+                "size_bytes": 609035
+              },
+              {
+                "path": "state.sqlite",
+                "size_bytes": 565248
+              },
+              {
+                "path": "events.jsonl",
+                "size_bytes": 289556
+              },
+              {
+                "path": "research/context-details-c169cb4b445047a5.json",
+                "size_bytes": 153036
+              },
+              {
+                "path": "research/context-details-6f58430c343b4f58.json",
+                "size_bytes": 85863
+              },
+              {
+                "path": "artifacts-index.json",
+                "size_bytes": 83537
+              },
+              {
+                "path": "llm/0007.request.json",
+                "size_bytes": 79798
+              },
+              {
+                "path": "research/context-details-59c644c2ad794924.json",
+                "size_bytes": 73150
+              },
+              {
+                "path": "llm/0006.request.json",
+                "size_bytes": 66768
+              },
+              {
+                "path": "llm/0005.request.json",
+                "size_bytes": 65607
+              }
+            ]
+          },
+          "calls": [
+            {
+              "call_no": 1,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": null,
+              "input_tokens": null,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 707,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0015
+            },
+            {
+              "call_no": 2,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": null,
+              "input_tokens": null,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 130,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.001
+            },
+            {
+              "call_no": 3,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 0,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0025
+            },
+            {
+              "call_no": 4,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 709,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0026
+            },
+            {
+              "call_no": 5,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 0,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0024
+            },
+            {
+              "call_no": 6,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 847,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0027
+            },
+            {
+              "call_no": 7,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 659,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0029
+            }
+          ]
+        },
+        "scope": "scripted decisions; real EDA/fit/evaluation/publication"
+      },
+      {
+        "kind": "classification",
+        "exit_code": 0,
+        "state": "completed",
+        "events": {
+          "research.python_analysis_completed": 2,
+          "research.checkpoint_completed": 1,
+          "research.action_proposed": 1,
+          "experiment.evaluated": 2
+        },
+        "report": {
+          "run": "run-20261024T153149Z-75fdc1d8",
+          "state": "completed",
+          "api_attempts": 7,
+          "responses": 7,
+          "truncated_responses": 0,
+          "reported_output_tokens": 500,
+          "reported_input_tokens": 500,
+          "reported_cached_input_tokens": 0,
+          "uncensored_output_median": 100,
+          "suggested_initial_output_tokens": 16384,
+          "suggested_output_ceiling": 32768,
+          "budget_note": "Client-side starting estimate, not a verified provider maximum or a RUB conversion. Truncated samples are censored; exact token need is unknown.",
+          "research_decisions": 3,
+          "feedback_deliveries": 5,
+          "job_occupancy": {
+            "elapsed_seconds": 6.834,
+            "job_present_seconds": 3.389,
+            "no_train_or_refit_seconds": 3.445,
+            "unfinished_jobs": 0,
+            "interpretation": "Job presence from saved events, not CPU utilization."
+          },
+          "research_summary": {
+            "evaluated_configurations": 2,
+            "by_recipe": {
+              "dummy-classifier-v1": {
+                "evaluations": 1,
+                "best_score": 0.17687074829931973,
+                "best_experiment_id": "exp-48bd9b5004d8"
+              },
+              "python-pipeline-v1": {
+                "evaluations": 1,
+                "best_score": 0.9451526251526251,
+                "best_experiment_id": "exp-5b76e5b63ef8"
+              }
+            },
+            "proposed_llm_actions": {
+              "features": 1
+            },
+            "evaluated_owned_feature_programs": 1,
+            "observed_constant_like_outputs": 1,
+            "completed_data_analyses": 0,
+            "rejected_reference_optimizations": 0,
+            "interpretation": "Proposals are not executions. Counts describe recorded behavior; a feature program can regress, and custom pipelines without an owned program need their code/fitted report inspected."
+          },
+          "scientific_research": {
+            "test_plans": 0,
+            "followups": 0,
+            "oof_reports": 0,
+            "oof_unavailable": 0,
+            "preflight_deferrals": 0,
+            "extended_dialogues": 0,
+            "reported_reasoning_tokens": 0,
+            "calls_without_reasoning_usage": 7,
+            "calls_with_reasoning_field": 0,
+            "provider_thinking_application": "unverified; request flags and reported usage do not measure decision quality"
+          },
+          "dialogues": [
+            {
+              "timestamp": "2026-10-24T15:31:53.103+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153149Z-75fdc1d8",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-6ba271dbc582451b",
+              "trace_id": "run-20261024T153149Z-75fdc1d8",
+              "span_id": "span-8ee450ea9c41",
+              "parent_span_id": "span-57bd6d8cb00d",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-6821343b4180463197ebcd157aa19ba0",
+              "duration_seconds": 0.894,
+              "tool_results": 1,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            },
+            {
+              "timestamp": "2026-10-24T15:31:54.100+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153149Z-75fdc1d8",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-8bda5a6b479543fd",
+              "trace_id": "run-20261024T153149Z-75fdc1d8",
+              "span_id": "span-4abffd1c9bc9",
+              "parent_span_id": "span-b3d194e21e53",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-da5b130249eb4aa7acfe9eb148c9921a",
+              "duration_seconds": 0.898,
+              "tool_results": 1,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            },
+            {
+              "timestamp": "2026-10-24T15:31:55.978+00:00",
+              "level": "INFO",
+              "run_id": "run-20261024T153149Z-75fdc1d8",
+              "event": "research.dialogue_summary",
+              "contract_id": "C10",
+              "request_id": "req-7eddd05dbe664bf3",
+              "trace_id": "run-20261024T153149Z-75fdc1d8",
+              "span_id": "span-220fdf87a8e0",
+              "parent_span_id": "span-a135c8e54a6e",
+              "sender": "TaskInterpreter / Researcher",
+              "receiver": "LLMGateway",
+              "endpoint": "POST /v1/llm/complete",
+              "context_id": "art-499841fb4c8247fd96186afee2656258",
+              "duration_seconds": 0.012,
+              "tool_results": 0,
+              "decision_received": true,
+              "tool_seconds_limit": 90,
+              "dialogue_seconds_limit": 360
+            }
+          ],
+          "feature_seed_proposals": 0,
+          "overlap_deferrals": 0,
+          "rolling_peer_resumptions": 0,
+          "search_stop_reason": "researchers_stopped",
+          "fallback_seconds": 0.0,
+          "final_confirmation": {
+            "timestamp": "2026-10-24T15:31:56.015+00:00",
+            "level": "INFO",
+            "run_id": "run-20261024T153149Z-75fdc1d8",
+            "event": "validation.finalists_confirmed",
+            "confirmation_artifact_id": "art-17d2517270394571",
+            "chosen_experiment_id": "exp-5b76e5b63ef8",
+            "finalists": [
+              {
+                "experiment_id": "exp-5b76e5b63ef8",
+                "prediction_artifact_id": "art-a0659bf0423248c4",
+                "value": 1.0
+              },
+              {
+                "experiment_id": "exp-48bd9b5004d8",
+                "prediction_artifact_id": "art-22bca4b3772b4409",
+                "value": 0.16666666666666666
+              }
+            ],
+            "rows": 24,
+            "further_research_allowed": false
+          },
+          "published_pipeline": {
+            "experiment_id": "exp-5b76e5b63ef8",
+            "selection_basis": "research_validation",
+            "confirmation_artifact_id": null
+          },
+          "storage": {
+            "total_bytes": 3062778,
+            "by_category": {
+              "other_metadata": 3031192,
+              "predictions_csv": 2046,
+              "model_snapshots": 6986,
+              "worker_logs": 2877,
+              "input_cache": 19677
+            },
+            "largest_files": [
+              {
+                "path": "graph/owned-runtime.zip",
+                "size_bytes": 609035
+              },
+              {
+                "path": "state.sqlite",
+                "size_bytes": 565248
+              },
+              {
+                "path": "events.jsonl",
+                "size_bytes": 288910
+              },
+              {
+                "path": "research/context-details-31bffeb2f2e141a2.json",
+                "size_bytes": 152473
+              },
+              {
+                "path": "research/context-details-88aa7d3f9e3e417b.json",
+                "size_bytes": 85366
+              },
+              {
+                "path": "artifacts-index.json",
+                "size_bytes": 84085
+              },
+              {
+                "path": "llm/0007.request.json",
+                "size_bytes": 79584
+              },
+              {
+                "path": "research/context-details-541f5c02b36d4d18.json",
+                "size_bytes": 71677
+              },
+              {
+                "path": "llm/0006.request.json",
+                "size_bytes": 66562
+              },
+              {
+                "path": "llm/0005.request.json",
+                "size_bytes": 65402
+              }
+            ]
+          },
+          "calls": [
+            {
+              "call_no": 1,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": null,
+              "input_tokens": null,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 726,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0012
+            },
+            {
+              "call_no": 2,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": null,
+              "input_tokens": null,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 134,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0011
+            },
+            {
+              "call_no": 3,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 0,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0022
+            },
+            {
+              "call_no": 4,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 709,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0024
+            },
+            {
+              "call_no": 5,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 0,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0025
+            },
+            {
+              "call_no": 6,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 848,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0022
+            },
+            {
+              "call_no": 7,
+              "requested_output_tokens": 1024,
+              "finish_reason": "stop",
+              "output_tokens": 100,
+              "input_tokens": 100,
+              "cached_input_tokens": null,
+              "reasoning_tokens_reported": null,
+              "usage_inconsistent": false,
+              "content_chars": 659,
+              "invalid_tool_arguments": false,
+              "truncated": false,
+              "duration_seconds": 0.0026
+            }
+          ]
+        },
+        "scope": "scripted decisions; real EDA/fit/evaluation/publication"
+      }
+    ]
+  },
+  "public_live": {
+    "regression": {
+      "run_id": "run-20261024T151034Z-60928aab",
+      "state": "completed",
+      "llm_mode": "live",
+      "elapsed_seconds": 289.81,
+      "published_metric": 52.197001137148895,
+      "metric": "rmse (minimize)",
+      "llm_requests": 5,
+      "experiments": [
+        {
+          "experiment_id": "exp-3342d0e880aa",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        },
+        {
+          "experiment_id": "exp-a9034209d257",
+          "state": "evaluated",
+          "recipe_id": "catboost-regressor-v1",
+          "hyperparameters": {
+            "depth": 6,
+            "iterations": 800,
+            "l2_leaf_reg": 3.0,
+            "learning_rate": 0.08,
+            "numeric_interactions": false,
+            "target_transform": "identity"
+          }
+        }
+      ]
+    },
+    "classification": {
+      "run_id": "run-20261024T151330Z-97caa309",
+      "state": "degraded",
+      "llm_mode": "live",
+      "elapsed_seconds": 290.09,
+      "published_metric": 0.0484149855907781,
+      "metric": "f1_macro (maximize)",
+      "llm_requests": 5,
+      "experiments": [
+        {
+          "experiment_id": "exp-25e01c955665",
+          "state": "evaluated",
+          "recipe_id": "dummy-classifier-v1",
+          "hyperparameters": {
+            "strategy": "most_frequent"
+          }
+        },
+        {
+          "experiment_id": "exp-7cabf9b93a83",
+          "state": "timed_out",
+          "recipe_id": "catboost-classifier-v1",
+          "hyperparameters": {
+            "depth": 6,
+            "iterations": 800,
+            "l2_leaf_reg": 3.0,
+            "learning_rate": 0.08,
+            "numeric_interactions": false
+          }
+        },
+        {
+          "experiment_id": "exp-1d9f0e641966",
+          "state": "timed_out",
+          "recipe_id": "hist-gradient-classifier-v1",
+          "hyperparameters": {
+            "early_stopping": false,
+            "l2_regularization": 1.0,
+            "learning_rate": 0.1,
+            "max_iter": 200,
+            "max_leaf_nodes": 15,
+            "min_samples_leaf": 10,
+            "numeric_interactions": false
+          }
+        }
+      ]
+    }
+  },
+  "public_pilot_bootstrap_replay": {
+    "regression": {
+      "run_id": "run-20261024T152347Z-b3f566b5",
+      "state": "completed",
+      "llm_mode": "mock",
+      "elapsed_seconds": 27.92,
+      "published_metric": 47.627982412185375,
+      "metric": "rmse (minimize)",
+      "llm_requests": 3,
+      "experiments": [
+        {
+          "experiment_id": "exp-6561b673a150",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        },
+        {
+          "experiment_id": "exp-64175d271274",
+          "state": "evaluated",
+          "recipe_id": "extra-trees-regressor-v1",
+          "hyperparameters": {
+            "max_depth": null,
+            "max_features": 1.0,
+            "min_samples_leaf": 2,
+            "n_estimators": 64,
+            "numeric_interactions": false,
+            "target_transform": "identity"
+          }
+        }
+      ]
+    },
+    "classification": {
+      "run_id": "run-20261024T152242Z-fa0b5686",
+      "state": "completed",
+      "llm_mode": "mock",
+      "elapsed_seconds": 27.38,
+      "published_metric": 0.6334027708295819,
+      "metric": "f1_macro (maximize)",
+      "llm_requests": 3,
+      "experiments": [
+        {
+          "experiment_id": "exp-4364077534a5",
+          "state": "evaluated",
+          "recipe_id": "dummy-classifier-v1",
+          "hyperparameters": {
+            "strategy": "most_frequent"
+          }
+        },
+        {
+          "experiment_id": "exp-e9190918ac39",
+          "state": "evaluated",
+          "recipe_id": "extra-trees-classifier-v1",
+          "hyperparameters": {
+            "max_depth": null,
+            "max_features": 1.0,
+            "min_samples_leaf": 2,
+            "n_estimators": 64,
+            "numeric_interactions": false
+          }
+        }
+      ]
+    },
+    "interpretation": "Scripted replay of prior bootstrap and stop; real generic warmup, independent evaluation and final refit on public data. No new live autonomous research claim."
+  },
+  "four_mode_smoke": {
+    "A": {
+      "run_id": "run-20261024T151648Z-b0b1da42",
+      "state": "completed",
+      "llm_mode": "live",
+      "elapsed_seconds": 115.49,
+      "published_metric": 11.283286098805224,
+      "metric": "rmse (minimize)",
+      "llm_requests": 4,
+      "experiments": [
+        {
+          "experiment_id": "exp-e84830ad4952",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        }
+      ],
+      "protocol": "legacy",
+      "python_analysis": false
+    },
+    "B": {
+      "run_id": "run-20261024T151844Z-2918781a",
+      "state": "completed",
+      "llm_mode": "live",
+      "elapsed_seconds": 115.47,
+      "published_metric": 2.27809623934886,
+      "metric": "rmse (minimize)",
+      "llm_requests": 5,
+      "experiments": [
+        {
+          "experiment_id": "exp-2bf8182ff722",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        },
+        {
+          "experiment_id": "exp-d68807a80437",
+          "state": "evaluated",
+          "recipe_id": "hist-gradient-regressor-v1",
+          "hyperparameters": {
+            "early_stopping": false,
+            "l2_regularization": 1.0,
+            "learning_rate": 0.1,
+            "max_iter": 300,
+            "max_leaf_nodes": 15,
+            "min_samples_leaf": 10,
+            "numeric_interactions": false,
+            "target_transform": "identity"
+          }
+        }
+      ],
+      "protocol": "compact",
+      "python_analysis": false
+    },
+    "C": {
+      "run_id": "run-20261024T152040Z-2da3af5a",
+      "state": "completed",
+      "llm_mode": "live",
+      "elapsed_seconds": 115.54,
+      "published_metric": 11.283286098805224,
+      "metric": "rmse (minimize)",
+      "llm_requests": 4,
+      "experiments": [
+        {
+          "experiment_id": "exp-179ebabafbf6",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        }
+      ],
+      "protocol": "legacy",
+      "python_analysis": true
+    },
+    "D": {
+      "run_id": "run-20261024T152235Z-3da094af",
+      "state": "completed",
+      "llm_mode": "live",
+      "elapsed_seconds": 115.51,
+      "published_metric": 11.283286098805224,
+      "metric": "rmse (minimize)",
+      "llm_requests": 7,
+      "experiments": [
+        {
+          "experiment_id": "exp-48edee0921ae",
+          "state": "evaluated",
+          "recipe_id": "dummy-regressor-v1",
+          "hyperparameters": {
+            "strategy": "mean"
+          }
+        }
+      ],
+      "protocol": "compact",
+      "python_analysis": true
+    }
+  },
+  "comparison_zip_sha256": "ff0f55295169ed31e24eb5758680b3765debdbfa663aeaaf881d49dcb6469531"
+}

@@ -184,6 +184,8 @@ class LocalSearch:
                 "resources": self.c.resources()}
 
     def next_choice(self, peer, branch, base=None, constraints=None, *, assignment=None):
+        if self.c.budget.data_research_snapshot()['active']:
+            return None
         if self.optuna is not None and self.optuna.has_series(peer, branch):
             plan = self.optuna.next_plan(peer, branch, constraints)
             return (plan['recipe_id'], plan['model']['hyperparameters']) if plan else None

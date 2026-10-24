@@ -22,6 +22,7 @@ class Orchestrator:
         self.runner, self.evaluator, self.submission, self.researcher = runner, evaluator, submission, researcher
         self.spec, self.validation, self.catalog, self.log = spec, validation, catalog, log
         self.context = ContextBuilder(spec, task_text, profile, catalog, artifacts, log, demo)
+        self.context.data_research = budget.data_research_snapshot
         self.context.store = store
         self.context.validation_id = validation["validation_id"]
         self.context.validation_sha256 = validation["protocol_sha256"]
@@ -96,6 +97,12 @@ class Orchestrator:
                 "timeout_seconds": timeout or self.config.experiment_timeout_seconds}
 
     def admit_training(self, plan, owner):
+        window = self.budget.data_research_snapshot()
+        if window['active'] and not plan.get('feature_steps'):
+            self.log.event('research.data_phase_trial_rejected', plan_id=plan['plan_id'],
+                experiment_id=owner, recipe_id=plan['recipe_id'], **window,
+                message='Обучение без изменений данных отложено до завершения обязательного этапа')
+            return False
         decision = self.budget.admit(owner, plan)
         self.log.event("search.admission", experiment_id=owner, recipe_id=plan["recipe_id"],
                        hyperparameters=plan["model"]["hyperparameters"], **decision)
@@ -198,6 +205,8 @@ class Orchestrator:
                     'The immutable assignment base remains unchanged; cite these results when choosing the next action.'})
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
+        if self.budget.data_research_snapshot()['active']:
+            return None  # API exhaustion never opens parameter search before the data window ends.
         optimizer = getattr(self.local_search, 'optuna', None)
         if optimizer is not None and optimizer.has_series(peer, branch):
             return optimizer.next_plan(peer, branch, constraints)
@@ -225,6 +234,8 @@ class Orchestrator:
             self.local_search.start_series(plan['researcher_id'], branch, plan)
             return
         intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        from agent.data_research import require_action
+        require_action({**intent, 'feature_steps': plan['feature_steps']}, self.budget.data_research_snapshot())
         request = None
         if intent['action'] == 'tune':
             request = dict(intent['tuning'])
@@ -255,6 +266,13 @@ class Orchestrator:
     def prepare_adaptive_proposal(self, plan, branch='legacy', constraints=None, assignment=None):
         """Authorize an action before deduplicating its optional starting fit."""
         candidate_intent = self.artifacts.read_json('intent-'+plan['plan_id'])
+        from agent.data_research import require_action, require_feature_parameters
+        window = self.budget.data_research_snapshot()
+        require_action({**candidate_intent, 'feature_steps': plan['feature_steps']}, window)
+        if candidate_intent['action'] == 'features':
+            params = plan['model']['hyperparameters']
+            require_feature_parameters({'action': 'features', 'recipe_id': params['base_recipe_id'],
+                'hyperparameters': params['model_parameters']}, self.catalog, window, constraints)
         science = getattr(self, 'science', None)
         if science is not None and science.review(plan, candidate_intent, branch):
             self.publish_research_updates()
@@ -650,6 +668,7 @@ class Orchestrator:
             accepted += self.run_training([self.warmup_plan(key, params) for key, params in batch])
             self.finalize_best()
         stop_reason, round_no = "time_reserve", 0
+        self.budget.start_data_research()
         while self.budget.snapshot()["search_allowed"]:
             self.log.event("search.round_started", round_no=round_no+1, attempted_experiments=accepted,
                            budget=self.budget.snapshot(),
@@ -736,9 +755,11 @@ class Orchestrator:
                 if not self.budget.snapshot()["search_allowed"]:
                     break
         self.set_fallback()
+        self.budget.end_data_research(self.llm_unavailable_reason() or stop_reason)
         self.confirm_finalists()
         self.finalize_best()
         self.log.event("search.finished", stop_reason=stop_reason, attempted_experiments=accepted,
+                       data_research=self.budget.data_research_snapshot(),
                        fallback_seconds=self.fallback_seconds, budget=self.budget.snapshot(), token_budget=self.budget.token_snapshot())
         self.call("C22", {"action": "stop_search", "reason": stop_reason,
                            "wall_seconds_remaining": int(self.budget.remaining()), "cancel_job_ids": []}, self.control)

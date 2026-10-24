@@ -102,6 +102,8 @@ class MockTransport:
             elif purpose == 'ResearchAction-v1':
                 payload.update(action='catalog', code=None, tuning=None, evidence_ids=[])
                 user = json.loads(context['messages'][1]['content'])
+                if user.get('profile_summary', user).get('data_research', {}).get('active'):
+                    payload['hyperparameters'] = {}
                 from agent.feature_search import feature_focus
                 if feature_focus(user):
                     data = user.get('profile_summary', {}).get('data', user.get('profile', {}))
@@ -337,6 +339,14 @@ class Gateway:
         messages = deepcopy(context["messages"])
         expected = deepcopy(self.output_schemas[payload["response_schema_id"]])
         user = json.loads(context['messages'][1]['content']) if payload['response_schema_id'] == 'ResearchAction-v1' else {}
+        if payload['response_schema_id'] == 'ResearchAction-v1':
+            from agent.data_research import attach_context
+            window = self.budget.data_research_snapshot()
+            attach_context(user, window)
+            context['messages'][1]['content'] = json.dumps(user, ensure_ascii=False)
+            messages = deepcopy(context['messages'])
+            if window['active']:
+                expected['properties']['action']['enum'] = ['features', 'pipeline']
         scientific = user.get('profile_summary', user).get('scientific_protocol', {}) if isinstance(user, dict) else {}
         if payload['response_schema_id'] == 'ResearchAction-v1' and scientific.get('version') == 'scientific-v1':
             expected['required'] = list(dict.fromkeys([*expected['required'], 'research_notes']))
@@ -628,6 +638,12 @@ class Gateway:
                         raise IncompleteOutput(str(exc)) from exc
                     raise
                 self.bus.schemas._check(parsed, expected, "$")
+                if payload['response_schema_id'] == 'ResearchAction-v1':
+                    from agent.data_research import require_action
+                    try:
+                        require_action(parsed, self.budget.data_research_snapshot())
+                    except AgentError as error:
+                        raise ValueError(str(error)) from error
                 if (payload['response_schema_id'] == 'TaskDraft-v1' and 'target_column' in parsed
                         and context['metadata'].get('bootstrap_profile_artifact_id')):
                     # Repair source/column mistakes within the existing bounded

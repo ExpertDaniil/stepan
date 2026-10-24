@@ -93,6 +93,7 @@ def bootstrap(config, started, task_path, run_id, root, log):
             controller.run()
         except Exception as exc:
             controller.degraded = True
+            budget.end_data_research('research_interrupted')
             log.exception("run.research_interrupted", exc)
             if controller.graph:
                 controller.graph.close_search("research_interrupted")

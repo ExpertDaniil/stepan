@@ -34,6 +34,53 @@ class Budget:
         self.llm_durations = deque(maxlen=32)
         self.analysis_active = False
         self.analysis_seconds_total = 0.0
+        self.data_research_started = None
+        self.data_research_ended = None
+        self.data_research_finished = False
+
+    def start_data_research(self):
+        """One run-wide wall-clock window, after the checked startup models."""
+        with self.lock:
+            if self.config.research_mode != 'adaptive' or self.data_research_started is not None:
+                return
+            self.data_research_started = time.monotonic()
+            state = self.data_research_snapshot()
+            if state['active'] and self.log:
+                self.log.event('research.data_phase_started', **state,
+                    message='Обязательный этап работы с данными: подбор параметров временно закрыт')
+
+    def data_research_snapshot(self):
+        with self.lock:
+            configured = self.config.data_research_min_seconds
+            required = (min(1800, max(1, self.config.time_budget_seconds//6)) if configured is None else configured)
+            if self.config.research_mode != 'adaptive':
+                required = 0
+            elapsed = (max(0.0, (self.data_research_ended if self.data_research_ended is not None else time.monotonic())-self.data_research_started)
+                       if self.data_research_started is not None else 0.0)
+            active = self.data_research_started is not None and elapsed < required
+            stage = ('disabled' if not required else 'not_started' if self.data_research_started is None
+                     else 'interrupted' if active and self.data_research_ended is not None
+                     else 'data' if active else 'open')
+            result = {'stage': stage, 'active': active, 'minimum_seconds': required,
+                      'elapsed_seconds': round(min(elapsed, required), 3), 'remaining_seconds': round(max(0.0, required-elapsed), 3),
+                      'tuning_allowed': not active}
+            if stage == 'open' and not self.data_research_finished:
+                self.data_research_finished = True
+                if self.log:
+                    self.log.event('research.data_phase_completed', **result,
+                        message='Обязательное время работы с данными завершено; подбор параметров разрешён')
+            return result
+
+    def end_data_research(self, reason):
+        """Final training must not be credited as time spent researching data."""
+        with self.lock:
+            if self.data_research_started is None or self.data_research_ended is not None:
+                return
+            self.data_research_ended = time.monotonic()
+            state = self.data_research_snapshot()
+            if state['stage'] == 'interrupted' and self.log:
+                self.log.event('research.data_phase_interrupted', **state, reason=reason,
+                    message='Этап данных прерван; минимальное время не достигнуто, ранний подбор не разрешён')
 
     def set_phase_caps(self, *, calls=None, output_tokens=None, deadline=None):
         with self.lock:

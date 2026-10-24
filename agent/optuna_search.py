@@ -90,6 +90,8 @@ class OptunaSearch:
 
     def start_series(self, peer, branch, plan, request):
         self.c.store._writer()
+        from agent.data_research import require_tuning
+        require_tuning(self.c.budget)
         if plan['researcher_id'] != peer:
             raise AgentError('INVALID_TUNING_SPACE', 'Tuning authorization must keep the proposal owner')
         if self.disabled_error is not None:
@@ -152,6 +154,8 @@ class OptunaSearch:
 
     def has_series(self, peer, branch):
         self.sync()
+        if self.c.budget.data_research_snapshot()['active']:
+            return False
         session = self.active.get((branch, peer))
         if session is None:
             return False

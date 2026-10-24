@@ -143,7 +143,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     controller.record_research_feedback(work['researcher_id'], work['branch_id'],
                         'proposal_failed', str(error), code=code)
                     controller.research_round_outcomes.append('failed')
-                    if code not in {'SEARCH_PHASE_BUDGET_EXHAUSTED', 'RESEARCH_CANCELLED'}:
+                    if code not in {'SEARCH_PHASE_BUDGET_EXHAUSTED', 'RESEARCH_CANCELLED', 'DATA_RESEARCH_REQUIRED'}:
                         controller.degraded = True
                         controller.log.exception('research.proposal_failed', error, work_order_id=work['work_order_id'])
                     else:

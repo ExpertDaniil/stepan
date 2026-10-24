@@ -11,6 +11,12 @@
 
 # Наблюдаемость
 
+`research.data_phase_started/completed/interrupted` показывают обязательный этап
+данных: минимум, фактически зачтённое время, остаток и доступность настройки.
+`research.data_phase_trial_rejected` объясняет отказ модельного опыта до запуска.
+Итоговый `search.finished.data_research` сохраняет состояние этапа. Время полного
+окончательного обучения не дописывается к недовыполненному этапу данных.
+
 `graph.branch_forked.decision_constraints` различает soft/hard решения.
 `search.decision.branch_residence_seconds/minimum_branch_seconds` объясняет,
 почему ветка продолжает работу перед добровольным fork/switch. Архивирование для

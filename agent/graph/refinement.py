@@ -33,6 +33,8 @@ class RefinementPolicy:
             self.budget.set_phase_caps()
 
     def refinement_due(self, pending=0):
+        if self.budget.data_research_snapshot()['active']:
+            return None
         if not self.refinement_enabled() or self.refinement():
             return None
         limits = self.phase_limits()

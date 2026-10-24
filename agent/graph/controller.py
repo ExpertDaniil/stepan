@@ -452,6 +452,7 @@ def search(controller):
         if (warmup_index+1) % len(peers) == 0 or warmup_index+1 == len(warmups):
             controller.finalize_best()
     stop_reason, round_no = "time_reserve", 0
+    controller.budget.start_data_research()
     while controller.budget.snapshot()["search_allowed"]:
         controller.context.round_no = round_no
         round_no += 1
@@ -541,10 +542,12 @@ def search(controller):
 
 def finish(controller, stop_reason, accepted):
     graph = controller.graph
+    controller.budget.end_data_research(controller.llm_unavailable_reason() or stop_reason)
     controller.set_fallback()
     controller.confirm_finalists()
     controller.finalize_best()
     controller.log.event("search.finished", stop_reason=stop_reason, phase='refine' if graph.refinement() else 'search', attempted_experiments=accepted,
+                         data_research=controller.budget.data_research_snapshot(),
                          fallback_seconds=controller.fallback_seconds, budget=controller.budget.snapshot(), token_budget=controller.budget.token_snapshot())
     controller.call("C22", {"action": "stop_search", "reason": stop_reason, "wall_seconds_remaining": int(controller.budget.remaining()), "cancel_job_ids": []}, controller.control)
     controller.cleanup()

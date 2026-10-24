@@ -34,7 +34,11 @@ class Researcher:
         proposed = answer["parsed_payload"]
         if adaptive:
             validate_action(proposed, self.catalog)
+            from agent.data_research import require_action, require_feature_parameters
+            window = self.gateway.budget.data_research_snapshot()
+            require_action(proposed, window)
             user = json.loads(context['messages'][1]['content'])
+            require_feature_parameters(proposed, self.catalog, window, user.get('restrictions'))
             from agent.feature_search import validate_focus
             validate_focus(proposed, user)
             if proposed['action'] == 'features':

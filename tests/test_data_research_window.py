@@ -54,6 +54,16 @@ class DataResearchWindowTests(unittest.TestCase):
                 with self.assertRaises(AgentError):
                     Config.from_env(profile='development')
 
+    def test_runtime_defaults_enable_the_window_in_both_profiles(self):
+        for profile in ('platform', 'development'):
+            with self.subTest(profile=profile), patch.dict(os.environ, {}, clear=True):
+                config = Config.from_env(profile=profile)
+                self.assertIsNone(config.data_research_min_seconds)
+                budget = Budget(config, time.monotonic(), None)
+                budget.start_data_research()
+                self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 1800)
+                self.assertTrue(budget.data_research_snapshot()['active'])
+
     def test_data_window_never_extends_the_global_deadline_or_output_reserve(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:
             budget = Budget(Config(time_budget_seconds=60, data_research_min_seconds=50), 100, None)
@@ -215,7 +225,39 @@ class DataResearchWindowTests(unittest.TestCase):
 
 
 class DataResearchExecutionTests(unittest.TestCase):
+    def test_api_exhaustion_keeps_verified_answer_without_early_parameter_search(self):
+        from agent.runtime import main
+        from scripts.make_demo import make_demo
+        for graph in (False, True):
+            with self.subTest(graph=graph), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                task = make_demo(root/'task', 'regression', rows=90, test_rows=12)
+                settings = {'AUTOML_PROFILE': 'development', 'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive',
+                    'TIME_BUDGET_SECONDS': '90', 'DATA_RESEARCH_MIN_SECONDS': '60', 'LLM_MAX_CALLS': '2',
+                    'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1',
+                    'GRAPH_REFINEMENT_ENABLED': '0', 'MAX_WORKERS': '1', 'TRAIN_CPU_THREADS': '1',
+                    'CATALOG_WARMUP_EXPERIMENTS': '0', 'FEATURE_SEED_BUDGET_FRACTION': '0',
+                    'RESEARCH_OOF_ENABLED': '0', 'LOG_LEVEL': 'ERROR', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}
+                with patch.dict(os.environ, settings), redirect_stderr(io.StringIO()) as stderr:
+                    code = main([str(task), '--llm-mode', 'mock', '--work-dir', str(root/'runs')])
+                self.assertEqual(code, 0, stderr.getvalue()[-6000:])
+                run = next((root/'runs').glob('run-*'))
+                events = [json.loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
+                phase = next(e for e in events if e['event'] == 'research.data_phase_interrupted')
+                self.assertEqual(phase['reason'], 'llm_call_limit')
+                self.assertFalse(phase['tuning_allowed'])
+                self.assertFalse(any(e['event'] in {'optuna.series_started', 'search.local_trial',
+                                                  'research.data_phase_completed'} for e in events))
+                import pandas as pd
+                self.assertEqual(len(pd.read_csv(task.parent/'submission.csv')), 12)
+                self.assertEqual(events[-1]['state'], 'completed')
+
     def test_real_features_run_before_tuning_and_the_checked_answer_is_retained(self):
+        for graph in (False, True):
+            with self.subTest(graph=graph):
+                self.execute(graph)
+
+    def execute(self, graph):
         from agent.llm.gateway import MockTransport
         from agent.runtime import main
         from agent.scientific_research import synthetic_notes
@@ -230,7 +272,7 @@ class DataResearchExecutionTests(unittest.TestCase):
                 if context['metadata']['schema_id'] != 'ResearchAction-v1':
                     return response
                 user = json.loads(context['messages'][1]['content'])
-                window = user['profile_summary']['data_research']
+                window = user.get('profile_summary', user)['data_research']
                 value = json.loads(response['choices'][0]['message']['content'])
                 if window['active']:
                     value.update(action='features', recipe_id='linear-regressor-v1', hyperparameters={'alpha': 1.},
@@ -251,7 +293,7 @@ class DataResearchExecutionTests(unittest.TestCase):
                 return response
             settings = {'AUTOML_PROFILE': 'development', 'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive',
                 'TIME_BUDGET_SECONDS': '90', 'DATA_RESEARCH_MIN_SECONDS': '4', 'MAX_WORKERS': '1',
-                'GRAPH_ENABLED': '1', 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1', 'GRAPH_REFINEMENT_ENABLED': '0',
+                'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1', 'GRAPH_REFINEMENT_ENABLED': '0',
                 'TRAIN_CPU_THREADS': '1', 'LLM_MAX_CALLS': '20', 'CATALOG_WARMUP_EXPERIMENTS': '0',
                 'FEATURE_SEED_BUDGET_FRACTION': '0', 'RESEARCH_OOF_ENABLED': '0', 'LOG_LEVEL': 'ERROR',
                 'MODEL_SNAPSHOT_MAX_BYTES': '0', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}

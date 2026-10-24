@@ -219,6 +219,8 @@ class AdaptiveIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp);task = make_demo(root/'task', kind, rows=120, test_rows=16)
             settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '120',
+                # This fixture tests reconstruction and explicit stop, independently of timing policy.
+                'DATA_RESEARCH_MIN_SECONDS': '0',
                 'GRAPH_ENABLED': '1', 'GRAPH_REFINEMENT_ENABLED': '0', 'CATALOG_WARMUP_EXPERIMENTS': '0',
                 'LLM_MAX_CALLS': '12', 'LOG_LEVEL': 'ERROR', 'MODEL_SNAPSHOT_MAX_BYTES': '0', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}
             with patch.dict(os.environ, settings), patch.object(MockTransport, 'complete', scripted), redirect_stderr(io.StringIO()) as stderr:

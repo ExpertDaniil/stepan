@@ -194,8 +194,12 @@ class Gateway:
         from agent.context_budget import effective_limit, request_bytes as measure_request
         byte_limit, budget_limits = effective_limit(self.config, context['metadata'], request['max_tokens'])
         request_bytes = measure_request(request)
-        if request_bytes > byte_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
-            self._compact_research_request(request, byte_limit)
+        # The initial schema/tools/feedback nearly filled the graph limit in the
+        # observed classification run. Keep room for answers before requesting them.
+        first_tool_turn = request.get('tools') and not any(m.get('role') == 'tool' for m in request['messages'])
+        packing_limit = byte_limit-min(16384, byte_limit//6) if first_tool_turn else byte_limit
+        if request_bytes > packing_limit and context['metadata']['schema_id'] == 'ResearchAction-v1':
+            self._compact_research_request(request, packing_limit)
             request_bytes = measure_request(request)
         if request_bytes > byte_limit:
             raise AgentError('CONTEXT_TOO_LARGE', 'Complete JSON request cannot fit without removing protected contract/base/latest results',
@@ -205,7 +209,7 @@ class Gateway:
         if isinstance(self.transport, OpenAITransport):
             self.transport.log = self.log
         self.log.event('llm.request_budget_checked', request_bytes=request_bytes, limit_bytes=byte_limit,
-            limits=budget_limits, section_bytes=self._section_bytes(request),
+            limits=budget_limits, section_bytes=self._section_bytes(request), packing_target_bytes=packing_limit,
             tokenizer_estimate=False, provider_safety_proxy='one_input_byte_per_estimated_token')
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
@@ -231,6 +235,7 @@ class Gateway:
                 for result in delivered['results']:
                     evidence_ids.extend(result[k] for k in ('experiment_id', 'evaluation_id', 'diagnostics_artifact_id'))
                 evidence_ids.extend(s['artifact_id'] for s in delivered['series'])
+                evidence_ids.extend(r['artifact_id'] for r in delivered.get('fit_diagnostics', []))
                 self.log.event('research.feedback_delivered', call_no=call_no,
                     context_id=payload['context_artifact_id'], branch_id=delivered['branch_id'],
                     revision=delivered['revision'], feedback_artifact_id=delivered['artifact_id'],
@@ -269,6 +274,7 @@ class Gateway:
                 raise AgentError('RESEARCH_CANCELLED' if self.cancelled.is_set() else 'LLM_OPERATION_TIMEOUT',
                                  'Late provider result was charged and archived but cannot become an experiment')
             if delivered:
+                context['metadata'].setdefault('delivered_evidence_ids', []).extend(evidence_ids)
                 response['_delivered_feedback'] = {'name': 'research_updates', 'call_no': call_no,
                     'artifact_id': delivered['artifact_id'], 'revision': delivered['revision'],
                     'measurement_generation': delivered.get('measurement_generation'),
@@ -389,7 +395,7 @@ class Gateway:
             if self.analysis is None:
                 raise AgentError('ANALYSIS_UNAVAILABLE', 'No fit-only analysis service is configured')
             tools.append({'type': 'function', 'function': {'name': 'analyze_data',
-                'description': 'Read-only fit summary/association/group, exact streamed check violation counts, stateless derived expressions/filters, errors for a visible experiment_id, unlabelled test comparison, dictionary or report. Computing queries attach investigation before observations. No holdout labels. columns contains inputs, never targets; include_target=true adds fit-only summaries. check requires checks, group_by=null, include_target=false. errors returns selection-only aggregates. At most 12 columns.',
+                'description': 'Read-only fit summary/association/group, exact streamed check violation counts, stateless derived expressions/filters, errors for a visible experiment_id, unlabelled test comparison, dictionary or report. Computing queries attach investigation before observations. No holdout labels. columns contains inputs, never targets; include_target=true adds fit-only summaries. check requires checks, group_by=null, include_target=false. errors returns selection-only aggregates. At most 12 columns. limit/offset/limit_bytes paginate schema/report reads; omit them for group/summary queries.',
                 'parameters': ANALYSIS_SCHEMA}})
         if 'read_memory' in payload['tool_schema_ids']:
             from agent.context_details import READ_SCHEMA
@@ -693,6 +699,17 @@ class Gateway:
             return len(json.dumps(request, ensure_ascii=False, allow_nan=False).encode('utf-8'))
         previous_size = size()
         omissions = []
+        # Nested JSON is sent as message text. Its whitespace otherwise consumes
+        # the same budget again after escaping in the outer request.
+        for message in request['messages']:
+            if message.get('role') not in {'user', 'tool'}:
+                continue
+            try:
+                value = json.loads(message['content'])
+            except (ValueError, TypeError):
+                continue
+            if isinstance(value, dict):
+                message['content'] = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
         for message in request['messages']:
             if message.get('role') != 'user':
                 continue
@@ -704,7 +721,7 @@ class Gateway:
                 continue
             profile = user.get('profile_summary', user)
             def refresh():
-                message['content'] = json.dumps(user, ensure_ascii=False)
+                message['content'] = json.dumps(user, ensure_ascii=False, separators=(',', ':'))
             data = profile.get('data', user.get('profile', {}))
             if profile.get('research_memory'):
                 from agent.research_feedback import compact_memory
@@ -715,7 +732,9 @@ class Gateway:
                 from agent.scientific_research import compact_protocol
                 profile['scientific_protocol'] = compact_protocol(profile['scientific_protocol'])
                 omissions.append('scientific_hints_with_scoped_details');refresh()
-            for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction', 'train_columns', 'test_columns']:
+            # Full definitions/schema stay in the frozen snapshot; the compact
+            # column table and input names must remain available to the planner.
+            for field in ['data_dictionary', 'train_dtypes', 'test_dtypes', 'train_missing_fraction', 'test_missing_fraction']:
                 if size() <= limit:
                     break
                 if field in data:
@@ -740,28 +759,47 @@ class Gateway:
                 comparisons['comparisons'].pop()
                 comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
                 omissions.append('older_comparison_details');refresh()
-        # Older reports remain retrievable by artifact_id. Preserve the latest tool
-        # result and every assistant/tool-call pair so the API dialogue stays valid.
+            if size() > limit and profile.get('knowledge', {}).get('results'):
+                from agent.context_budget import compact_tool_reply
+                profile['knowledge'] = compact_tool_reply(profile['knowledge'], 1800)
+                omissions.append('seed_knowledge_details');refresh()
+            if size() > limit and profile.get('detail_index', {}).get('sections', {}).get('recipes'):
+                base_recipe = (user.get('base_result') or {}).get('recipe_id')
+                for recipe in profile.get('recipes', []):
+                    if recipe.get('id') != base_recipe:
+                        for field in ('hyperparameters', 'parameters', 'parameter_space', 'defaults'):
+                            recipe.pop(field, None)
+                        recipe['detail_hint'] = 'read_memory section=recipes for the full catalogue.'
+                omissions.append('alternative_recipe_parameters');refresh()
+            landscape = profile.get('research_landscape', {})
+            if size() > limit and len(landscape.get('best_per_family', [])) > 1:
+                landscape['omitted_family_details'] = len(landscape['best_per_family'])-1
+                landscape['best_per_family'] = landscape['best_per_family'][:1]
+                landscape['detail_hint'] = 'read_memory section=research_landscape for all measured families.'
+                omissions.append('alternative_family_details');refresh()
+        # Preserve every assistant/tool-call pair. Compact all retrievable result
+        # kinds, including the latest answer; keeping only the final report intact
+        # could still make the complete request impossible to send.
         for message in request['messages']:
             if size() > limit and message.get('role') == 'assistant' and message.get('tool_calls') and message.get('content'):
                 message['content'] = 'Earlier tool request; use its paired results and immutable output artifact.'
                 omissions.append('older_assistant_tool_prose')
         tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']
-        for message in tool_messages[:-1]:
+        from agent.context_budget import compact_tool_reply
+        for message in tool_messages:
             if size() <= limit:
                 break
             try:
                 reply = json.loads(message['content'])
             except (ValueError, TypeError):
                 continue
-            if not isinstance(reply, dict) or not reply.get('artifact_id') or 'report' not in reply:
+            if not isinstance(reply, dict):
                 continue
-            report = reply['report']
-            message['content'] = json.dumps({'artifact_id': reply['artifact_id'], 'report': {
-                'scope': report.get('scope'), 'query': report.get('query'), 'details_omitted': True,
-                'detail_hint': 'Earlier report compacted; retrieve by kind=report and report_id or query fewer columns.'}},
-                ensure_ascii=False)
-            omissions.append('older_tool_report_details')
+            allowance = max(2048, limit-size()+len(message['content'].encode('utf-8'))-256)
+            candidate = json.dumps(compact_tool_reply(reply, allowance), ensure_ascii=False, separators=(',', ':'))
+            if len(candidate.encode('utf-8')) < len(message['content'].encode('utf-8')):
+                message['content'] = candidate
+                omissions.append('retrievable_tool_details')
         self.log.event('llm.context_compacted', previous_bytes=previous_size, request_bytes=size(),
                        limit_bytes=limit, omitted_fields=omissions, retained_tool_call_ids=[
                            m.get('tool_call_id') for m in request['messages'] if m.get('role') == 'tool'])

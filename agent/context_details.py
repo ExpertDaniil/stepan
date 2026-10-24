@@ -112,7 +112,9 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'facts': user.get('facts', []), 'measurements': profile.get('measured_search', user.get('recent_experiments', [])),
         'knowledge': profile.get('knowledge', {}),
         'representations': profile.get('feature_memory', {}), 'comparisons': profile.get('comparison_evidence', {}),
-        'analyses': profile.get('analysis_history', user.get('analysis_history', []))}
+        'analyses': profile.get('analysis_history', user.get('analysis_history', [])),
+        'recipes': deepcopy(profile.get('recipes', [])),
+        'research_landscape': deepcopy(profile.get('research_landscape', {}))}
     if profile.get('scientific_protocol'):
         sections['scientific_protocol'] = deepcopy(profile['scientific_protocol'])
         sections['fit_diagnostics'] = deepcopy(profile['scientific_protocol'].get('fit_diagnostics', []))

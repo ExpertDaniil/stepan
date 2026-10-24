@@ -229,6 +229,14 @@ records active work actually shown to the provider. `research.admission_reconsid
 links model claims to controller-computed scope without declaring model prose verified.
 
 
+`llm.request_budget_checked.packing_target_bytes` — целевой размер упаковки:
+на первом tool-turn он оставляет до 16 KiB под ответы, далее равен hard limit.
+Это best-effort резерв; отправка всегда проверяется по `limit_bytes` и wire bytes.
+`llm.context_compacted.omitted_fields` различает подробности каталога/семейств,
+seed knowledge и `retrievable_tool_details`. При сокращении ответа сохраняются
+tool-call пары, scope, опорные числа, ID и ссылка на полные данные; текстовые страницы
+показывают скорректированный UTF-8 `next_offset` и отсутствие complete-read IDs.
+
 `llm.wire_request_budget_checked` проверяет фактические сериализованные HTTP bytes
 перед отправкой, без headers/секретов. `llm.request_budget_checked` включает effective
 limits и размеры messages/tools/прочих полей. `research.memory_selected/read` показывает

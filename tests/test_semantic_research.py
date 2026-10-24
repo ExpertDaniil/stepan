@@ -132,6 +132,16 @@ class FrozenContextTests(unittest.TestCase):
                             context, g.artifacts, g.log)
         self.assertEqual(json.loads(page['text'])['description'], 'before fork')
 
+    def test_catalogue_details_removed_from_display_remain_in_the_frozen_snapshot(self):
+        g = self.h.g
+        context = self.context()
+        user = json.loads(context['messages'][1]['content'])
+        page = read_details({'reference_id': context['metadata']['detail_artifact_id'],
+                             'section': 'recipes', 'limit_bytes': 6000}, context, g.artifacts, g.log)
+        snapshot = g.artifacts.read_json(context['metadata']['detail_artifact_id'])
+        self.assertEqual(snapshot['sections']['recipes'], user['profile_summary']['recipes'])
+        self.assertIn('parameters', page['text'])
+
     def test_serialized_budget_survives_tools_feedback_final_and_repair(self):
         g = self.h.g
         context = self.context()

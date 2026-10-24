@@ -288,6 +288,9 @@ def validate_investigation(investigation, context, evidence, columns, schemas, *
     projection = user.get('profile_summary', user)
     view = projection.get('semantic_task', {})
     delivered = set(evidence) | set(metadata.get('delivered_evidence_ids', []))
+    # These fit-only records are already shown in the issued scientific context.
+    # Accept the same sources for analysis as Researcher.propose accepts for plans.
+    delivered.update(r['artifact_id'] for r in projection.get('scientific_protocol', {}).get('fit_diagnostics', []))
     delivered.update(q['record_id'] for field in ('quantities', 'relations') for q in view.get(field, []))
     delivered.update(q['record_id'] for q in projection.get('research_memory', {}).get('semantic_records', []))
     if view.get('model_id'):

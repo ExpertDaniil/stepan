@@ -76,3 +76,30 @@ python3 scripts/check.py
 For an already running process the imported code remains the old implementation;
 the change is intended for the next launch. Do not treat a source update as proof
 that the current process recovered.
+
+## Follow-up verification: GResearchContext, 24 October 2026
+
+At `db75175`, the runtime schema already includes ResearchAction-v1 and the four
+metadata fields graph_request_max_bytes, detail_artifact_id, detail_scope and
+semantic_contract. Both classification and regression G03 contexts pass this
+schema. A dedicated regression also checks that unknown metadata still fails;
+the validator remains strict. These are synthetic state-machine checks, not
+replays of the user's two unprovided task runs.
+
+Executing the previously unrun regressions exposed a separate packing failure:
+a batch of four analysis replies and one knowledge reply remained at 99,192
+bytes after packing, above 98,304. Every earlier reply had already been visited
+with a 2,048-byte allowance before the later knowledge example was projected.
+The packer never revisited those earlier replies when the final batch still
+exceeded the complete-body limit.
+
+Packing now performs at most two bounded passes, with 2,048 then 512 byte minimum
+display allowances. The second pass runs only while the request is still too
+large. Existing service artifacts, paired tool-call IDs, scope, support counts,
+exact task/base content and complete observations remain protected; retrievable
+group details have explicit omission markers. Irreducible content still produces
+an explicit context error instead of raising the configured limit.
+
+Current verification results: [validation-gresearchcontext.json](validation-gresearchcontext.json).
+The flat ZIP is checked to contain the same current schema in stepan_resources.py;
+an old ZIP or a mixture of versions can retain the earlier schema error.

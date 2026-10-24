@@ -11,6 +11,30 @@ from agent.llm.gateway import Gateway
 from agent.semantic_planning import validate_investigation
 
 
+class ResearchContextSchemaTests(unittest.TestCase):
+    def test_runtime_metadata_passes_for_both_tasks_and_unknown_fields_still_fail(self):
+        from tests.graph_helpers import GraphHarness
+        from agent.semantic_planning import build_task_model, unknown_model
+        for kind in ('regression', 'classification'):
+            with self.subTest(kind=kind):
+                h = GraphHarness(kind, research_mode='adaptive')
+                try:
+                    g = h.g
+                    model = build_task_model(unknown_model(), '', h.h.profile['summary'], g.schemas, g.spec)
+                    art = g.artifacts.write_json('task/context-schema-model.json', model, 'task_semantic_model')
+                    g.spec.update(semantic_model_id=model['model_id'], semantic_model_artifact_id=art['artifact_id'])
+                    ticket = h.issue()
+                    context = g.artifacts.read_json(ticket['work_order']['context_id'])
+                    self.assertTrue({'graph_request_max_bytes', 'detail_artifact_id', 'detail_scope',
+                        'semantic_contract'} <= set(context['metadata']))
+                    g.schemas.validate(context, 'GResearchContext')
+                    context['metadata']['unknown_runtime_flag'] = True
+                    with self.assertRaises(AgentError):
+                        g.schemas.validate(context, 'GResearchContext')
+                finally:
+                    h.close()
+
+
 class ContextPressureTests(unittest.TestCase):
     def setUp(self):
         self.events = []

@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-24",
+  "branch": "feat/final-data-research",
+  "base_remote_commit": "db75175f90aedb6c1d3898e5b1a0838209c46b4e",
+  "verified_base_files": 411,
+  "python": "3.12.14",
+  "schema_checks": [
+    {
+      "kind": "regression",
+      "GResearchContext": "passed",
+      "semantic_contract_present": true,
+      "unknown_metadata_rejected": true,
+      "synthetic": true,
+      "estimator_training": false
+    },
+    {
+      "kind": "classification",
+      "GResearchContext": "passed",
+      "semantic_contract_present": true,
+      "unknown_metadata_rejected": true,
+      "synthetic": true,
+      "estimator_training": false
+    }
+  ],
+  "regression": {
+    "case": "parallel analysis batch retains scope/support/observations",
+    "before_fix_packed_bytes": 99192,
+    "before_bytes": 162637,
+    "limit_bytes": 98304,
+    "after_bytes": 97776
+  },
+  "focused": {
+    "command": "python3 -m unittest tests.test_context_pressure tests.test_semantic_research tests.test_feature_admission tests.test_prediction_contracts -q",
+    "tests": 69,
+    "passed": 69,
+    "seconds": 9.155
+  },
+  "context_pressure_tests": {
+    "tests": 16,
+    "passed": 16,
+    "included_in_focused_and_full": true
+  },
+  "package": {
+    "runtime_files": 89,
+    "bytes": 598790,
+    "sha256": "c495fd8bf9ce401b885a39c152a1f56c592c03457a1dfca9d3084264bd0cedb1",
+    "flat_root_files": 72,
+    "byte_identical_runtime_modules": 69,
+    "byte_identical_resources": 19,
+    "official_requirements_equal": true,
+    "embedded_GResearchContext_schema_matches_source": true
+  },
+  "static": {
+    "validation": "static_only; no agent imports, regression execution, fitting or API calls",
+    "python_files_parsed": 132,
+    "runtime_modules": 69,
+    "runtime_resources": 19,
+    "schema_declaration_equality": true,
+    "resolved_schema_references": 170,
+    "new_json_examples_checked": 4,
+    "original_contract_examples_checked": 86,
+    "flat_module_names_unique": true,
+    "official_requirements_equal": true,
+    "schema_sha256": "89086b86b7049a44f9e0207b593453e599aae274d4353db113e6575cd9e39e32",
+    "new_regression_methods_written": 26,
+    "json_files_parsed": 187,
+    "adaptive_prompt_bytes": 15088,
+    "research_action_schema_bytes": 8853,
+    "analysis_tool_schema_bytes": 4692
+  },
+  "full_suite": {
+    "command": "python3 scripts/check.py --jobs 3",
+    "tests": 463,
+    "passed": 450,
+    "unique_nonpassing": 13,
+    "seconds": 453.354,
+    "nonpassing_ids": [
+      "tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_expired_tuning_authorization_does_not_poison_catalogue_fallback",
+      "tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tuning_rebase_preserves_axes_that_were_not_authorized",
+      "tests.test_adaptive_research.AdaptiveResearchTests.test_local_tuning_requires_authorization_and_respects_axes_count_and_time",
+      "tests.test_dialogue_progress.TuningProgressTests.test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning",
+      "tests.test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression",
+      "tests.test_optuna_search.OptunaSearchTests.test_completed_trial_reaches_optuna_and_research_memory",
+      "tests.test_optuna_search.OptunaSearchTests.test_custom_source_is_preserved_and_never_replaced_by_a_catalogue_factory",
+      "tests.test_optuna_search.OptunaSearchTests.test_declared_increase_region_is_sampled_jointly_and_anchor_is_unchanged",
+      "tests.test_optuna_search.OptunaSearchTests.test_expired_authorization_proposes_no_new_work",
+      "tests.test_optuna_search.OptunaSearchTests.test_optimizer_tell_failure_preserves_the_committed_evaluation",
+      "tests.test_optuna_search.OptunaSearchTests.test_pending_duplicate_does_not_release_another_trials_claim",
+      "tests.test_optuna_search.OptunaSearchTests.test_verified_history_warms_only_the_same_fixed_pipeline_and_resumes_study"
+    ],
+    "new_nonpassing_vs_previous": [
+      "tests.test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression"
+    ],
+    "optuna_dependency_nonpassing": 12,
+    "notes": "Twelve known missing-Optuna scenarios plus one packaged regression run-state assertion (degraded vs completed). The run-state assertion does not establish its root cause."
+  },
+  "limits": [
+    "The user supplied no traceback or task-run files for the reported GResearchContext failures; the exact failing field/commit in those runs is unconfirmed",
+    "Synthetic regression/classification contexts and pressure fixtures verify schema and packing behavior, not live LLM quality or completion of the two original tasks",
+    "Mandatory irreducible task/base content can still legitimately exceed a configured context limit and produce an explicit error",
+    "Optuna, native CatBoost, the official pinned container and live API are not verified in this environment; no packages were installed"
+  ],
+  "packaged_regression_recheck": {
+    "command": "python3 -m unittest tests.test_end_to_end.EndToEndTests.test_readable_flat_platform_copy_runs_regression -v",
+    "tests": 1,
+    "passed": 1,
+    "seconds": 53.286,
+    "scope": "Fresh isolated repeat of the sole new full-suite failure; no source change. Cause of the earlier degraded state was not established."
+  },
+  "demonstrations": [
+    {
+      "kind": "regression",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 4,
+      "GResearchContext_errors": 0,
+      "unfinished_jobs": 0,
+      "scripted_llm": true,
+      "actual_training_evaluation_and_CSV": true
+    },
+    {
+      "kind": "classification",
+      "state": "completed",
+      "output_rows": 48,
+      "evaluated_configurations": 4,
+      "GResearchContext_errors": 0,
+      "unfinished_jobs": 0,
+      "scripted_llm": true,
+      "actual_training_evaluation_and_CSV": true
+    }
+  ]
+}

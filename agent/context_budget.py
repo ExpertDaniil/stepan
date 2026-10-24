@@ -247,20 +247,24 @@ def compact_research_request(request, limit, log=None, *, stage="request"):
             message['content'] = 'Earlier tool request; use its paired results and immutable output artifact.'
             omissions.append('older_assistant_tool_prose')
     tool_messages = [m for m in request['messages'] if m.get('role') == 'tool']
-    for message in tool_messages:
-        if size() <= limit:
-            break
-        try:
-            reply = json.loads(message['content'])
-        except (ValueError, TypeError):
-            continue
-        if not isinstance(reply, dict):
-            continue
-        allowance = max(2048, limit-size()+len(message['content'].encode('utf-8'))-256)
-        candidate = json.dumps(compact_tool_reply(reply, allowance), ensure_ascii=False, separators=(',', ':'))
-        if len(candidate.encode('utf-8')) < len(message['content'].encode('utf-8')):
-            message['content'] = candidate
-            omissions.append('retrievable_tool_details')
+    # A coarse first pass can leave a batch just above the total ceiling.
+    # Revisit earlier retrievable replies once with a smaller allowance after
+    # later replies (e.g. a large knowledge example) have also been projected.
+    for minimum_reply_bytes in (2048, 512):
+        for message in tool_messages:
+            if size() <= limit:
+                break
+            try:
+                reply = json.loads(message['content'])
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(reply, dict):
+                continue
+            allowance = max(minimum_reply_bytes, limit-size()+len(message['content'].encode('utf-8'))-256)
+            candidate = json.dumps(compact_tool_reply(reply, allowance), ensure_ascii=False, separators=(',', ':'))
+            if len(candidate.encode('utf-8')) < len(message['content'].encode('utf-8')):
+                message['content'] = candidate
+                omissions.append('retrievable_tool_details')
     result = {'previous_bytes': previous_size, 'request_bytes': size(), 'limit_bytes': limit,
               'omitted_fields': omissions, 'retained_tool_call_ids': [
                   m.get('tool_call_id') for m in request['messages'] if m.get('role') == 'tool']}

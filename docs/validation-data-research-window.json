@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-24",
+  "branch": "feat/final-data-research",
+  "base_commit": "b0617b6",
+  "tested_commit": "1c8b3b4faf9bfc9f67136443f2967d9a22f90011",
+  "published_before_full_check": true,
+  "environment": {
+    "os": "Ubuntu 24.04 (WSL)",
+    "python": "3.12.3",
+    "packages": {
+      "numpy": "1.26.4",
+      "scipy": "1.12.0",
+      "pandas": "2.2.3",
+      "scikit-learn": "1.5.2",
+      "catboost": "1.2.8",
+      "optuna": "4.2.1",
+      "joblib": "1.4.2",
+      "threadpoolctl": "3.6.0",
+      "psutil": "6.1.1"
+    },
+    "runtime_requirements_changed": false
+  },
+  "full_check": {
+    "command": "python scripts/check.py --jobs 3",
+    "cases": 480,
+    "passed": 480,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "wall_seconds": 703.072,
+    "parallel_jobs": 3,
+    "group_exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "result": "passed"
+  },
+  "previous_full_checks": [
+    {
+      "tested_commit": "07f22e286cb495e9435c4083ecebbc586baa897e",
+      "cases": 477,
+      "passed": 472,
+      "unique_failing_cases": 5,
+      "failed_subcases": 7,
+      "errors": 0,
+      "skipped": 0,
+      "wall_seconds": 522.45,
+      "cause": "Existing fixtures expected immediate tuning or stop, intentionally forbidden by the new default.",
+      "baseline_comparison": {
+        "commit": "b0617b6",
+        "cases": 5,
+        "passed": 5,
+        "wall_seconds": 86.839
+      },
+      "resolution": "Only the two tuning/lifecycle fixture helpers explicitly disable the policy; their assertions are preserved. Dedicated enabled-policy scenarios cover both controllers."
+    },
+    {
+      "tested_commit": "b84db1f2c854b3c3e18437b895fdd8d590234b90",
+      "cases": 479,
+      "passed": 479,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "wall_seconds": 550.426
+    }
+  ],
+  "policy_checks": {
+    "module": "tests.test_data_research_window",
+    "cases": 17,
+    "passed": 17,
+    "wall_seconds": 46.009,
+    "overlaps_full_suite": true,
+    "coverage": [
+      "Default 1800-second boundary, shared clock, shorter runs and explicit disable.",
+      "Enabled defaults in platform and development profiles.",
+      "Gateway schema, context compaction and dispatcher admission.",
+      "No Optuna, resumed trials or emergency model sweeps during the window.",
+      "Fixed model parameters in feature actions.",
+      "Actual feature training followed by Optuna in graphless, graph and refinement-enabled flows.",
+      "API exhaustion retains verified CSV, with no early tuning in either controller.",
+      "Global deadline and final-output reserve prevail; final refit cannot complete an interrupted window.",
+      "Custom source timing identity retained, including old contexts with the optional identity absent."
+    ]
+  },
+  "extra_refinement_run": {
+    "configuration": {
+      "GRAPH_ENABLED": 1,
+      "GRAPH_REFINEMENT_ENABLED": 1,
+      "TIME_BUDGET_SECONDS": 35,
+      "DATA_RESEARCH_MIN_SECONDS": 4
+    },
+    "synthetic_train_rows": 120,
+    "synthetic_test_rows": 16,
+    "live_api": false,
+    "actual_model_training": true,
+    "exit_code": 0,
+    "run_state": "completed",
+    "errors": [],
+    "observed_phase_events": [
+      "research.data_phase_started",
+      "research.data_phase_completed"
+    ],
+    "resolved_issue": "Generated custom base lost code_artifact_id in the refinement timing probe. Both the memory record and timing probe now preserve source identity."
+  },
+  "limits": [
+    "API responses are explicitly mocked; real model training and independent metric calculation use synthetic tasks.",
+    "No paid live API call, full three-hour competition run or MLE-bench score is claimed.",
+    "The protected phase measures wall time. Declared custom pipeline feature steps are required, but arbitrary Python semantics are not proven."
+  ]
+}

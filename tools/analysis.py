@@ -4,7 +4,7 @@ import json
 import threading
 import time
 from copy import deepcopy
-from contextlib import nullcontext
+from contextlib import nullcontext, contextmanager
 
 from agent.contracts import Schemas, canonical
 from agent.errors import AgentError
@@ -169,7 +169,24 @@ class AnalysisService:
                     row['query'].pop('code', None)
             return result
 
+    @contextmanager
+    def query_slot(self, context=None):
+        deadline = (context or {}).get('_tool_deadline')
+        acquired = self.lock.acquire() if deadline is None else self.lock.acquire(timeout=max(0, deadline-time.monotonic()))
+        if not acquired:
+            raise AgentError('ANALYSIS_TIMEOUT', 'Analysis lock wait reached the tool deadline')
+        previous = getattr(self, 'query_context', None)
+        try:
+            self.query_context = context
+            yield
+        finally:
+            self.query_context = previous
+            self.lock.release()
+
     def _check_time(self, started):
+        deadline = (getattr(self, 'query_context', None) or {}).get('_tool_deadline')
+        if deadline is not None and time.monotonic() >= deadline:
+            raise AgentError('ANALYSIS_TIMEOUT', 'Analysis reached the tool deadline reserved before the final decision')
         if not self.budget.snapshot()['search_allowed']:
             raise AgentError('SEARCH_CLOSED', 'Analysis cannot consume the final publication reserve')
         if self.budget.phase_remaining() < 1:
@@ -241,7 +258,7 @@ class AnalysisService:
     def analyze(self, query, context=None):
         # Serialize bounded analyses and cache writes; no SQL connection crosses
         # into these research threads. Return copies so peers cannot edit evidence.
-        with self.lock:
+        with self.query_slot(context):
             self.query_context = context
             with self.budget.analysis_slot() if hasattr(self.budget, 'analysis_slot') else nullcontext():
                 try:

@@ -162,8 +162,12 @@ def validate_action(action, catalog):
             raise AgentError('INVALID_RESEARCH_ACTION', 'Stop cannot execute code or start tuning')
         return
     if kind == 'pipeline':
-        if action['recipe_id'] != CUSTOM_RECIPE or not action['code'] or action['tuning'] is not None:
-            raise AgentError('INVALID_RESEARCH_ACTION', 'A custom pipeline needs explicit source and the custom recipe ID')
+        if action['recipe_id'] != CUSTOM_RECIPE:
+            raise AgentError('INVALID_RESEARCH_ACTION', 'A custom pipeline needs recipe_id='+CUSTOM_RECIPE)
+        if not action['code']:
+            raise AgentError('INVALID_RESEARCH_ACTION', 'A custom pipeline needs explicit Python source in code')
+        if action['tuning'] is not None:
+            raise AgentError('INVALID_RESEARCH_ACTION', 'Pipeline tuning belongs to background search; declare SEARCH_SPACE in code')
     elif kind == 'tune' and action['recipe_id'] == CUSTOM_RECIPE:
         if not action['tuning'] or not action['tuning'].get('search_space'):
             raise AgentError('INVALID_RESEARCH_ACTION', 'Custom tuning needs an explicit typed search_space')

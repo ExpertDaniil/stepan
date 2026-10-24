@@ -87,7 +87,10 @@ def compact_memory(memory, *, base_experiment_id=None, question='', max_bytes=12
 
 def compact_updates(value):
     """Keep recent measurements/activity; exact updates can be read by their ID."""
-    result = deepcopy(value)
+    result = deepcopy({k: v for k, v in value.items() if k != 'solution_catalog'})
+    # Source/parameter documents are read by the gateway from the authorized
+    # immutable snapshot, never copied into every API request.
+    result.pop('solution_catalog', None)
     original_count = len(result.get('results', []))
     result['results'] = result.get('results', [])[-4:]
     result['omitted_result_count'] = result.get('omitted_result_count', 0)+original_count-len(result['results'])

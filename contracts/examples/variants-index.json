@@ -90,5 +90,9 @@
   {
     "file": "examples/research-action-semantics.json",
     "schema": "ResearchAction"
+  },
+  {
+    "file": "examples/solution-read.json",
+    "schema": "SolutionRead"
   }
 ]

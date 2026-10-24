@@ -14,6 +14,112 @@ READ_SCHEMA = {'type': 'object', 'properties': {
     'limit_bytes': {'type': 'integer', 'minimum': 256, 'maximum': 6000}},
     'required': ['reference_id', 'section'], 'additionalProperties': False}
 
+SOLUTION_SCHEMA = {'type': 'object', 'properties': {
+    'experiment_id': {'type': 'string', 'minLength': 1},
+    'view': {'enum': ['pipeline', 'code', 'result', 'features', 'diagnostics']},
+    'offset': {'type': 'integer', 'minimum': 0},
+    'limit_bytes': {'type': 'integer', 'minimum': 256, 'maximum': 6000}},
+    'required': ['experiment_id'], 'additionalProperties': False}
+
+
+def solution_record(store, artifacts, experiment_id):
+    """Dispatcher-only snapshot; the reader never consults live SQLite."""
+    exp = store.get(experiment_id)
+    ev = store.experiment_evaluation(experiment_id)
+    trusted = ev and ev['valid'] and not ev['violations'] and exp['state'] == 'evaluated'
+    docs = {'code': deepcopy(artifacts.meta(exp['plan']['code_artifact_id']))}
+    if trusted:
+        docs['diagnostics'] = deepcopy(artifacts.meta(ev['diagnostics_artifact_id']))
+    return {'experiment_id': experiment_id, 'state': exp['state'], 'plan': deepcopy(exp['plan']),
+        'metric': deepcopy(ev['primary_metric']) if trusted else None,
+        'execution_error': deepcopy(exp.get('error')), 'documents': docs}
+
+
+def read_solution(query, context, artifacts, log):
+    """One experiment ID, no reference IDs or document-section routing by the LLM."""
+    metadata = context['metadata']
+    frozen = metadata.get('detail_scope')
+    if not frozen:
+        raise AgentError('MEMORY_SCOPE_DENIED', 'No scoped solution snapshot is available')
+    catalog = {}
+    # Newest delivered snapshots override old state; never open a sibling's ID.
+    for aid in reversed(metadata.get('authorized_feedback_ids', [])):
+        update = artifacts.read_json(aid)
+        if update.get('branch_id') != (frozen.get('branch_id') or 'legacy') or any(
+                update.get(k) != frozen.get(k) for k in ('dataset_id', 'task_spec_id', 'validation_id')):
+            raise AgentError('MEMORY_SCOPE_DENIED', 'Solution feedback outside this task/branch/validation')
+        for eid, record in update.get('solution_catalog', {}).items():
+            catalog.setdefault(eid, record)
+        requested = query['experiment_id']
+        if requested in catalog or (requested == 'best' and (update.get('best_solution') or {}).get('experiment_id') in catalog):
+            break
+    snapshot = artifacts.read_json(metadata['detail_artifact_id'])
+    if snapshot['scope'] != frozen or frozen['run_id'] != artifacts.run_id:
+        raise AgentError('MEMORY_SCOPE_DENIED', 'Solution snapshot scope mismatch')
+    for section, record in snapshot['sections'].items():
+        if section.startswith('experiment/'):
+            catalog.setdefault(record['experiment_id'], record)
+    eid = query['experiment_id']
+    if eid == 'best':
+        measured = [v for v in catalog.values() if v.get('metric')]
+        if not measured:
+            raise AgentError('SOLUTION_UNAVAILABLE', 'No measured solution in this scope')
+        eid = max(measured, key=lambda v: v['metric']['value']*(1 if v['metric']['direction'] == 'maximize' else -1))['experiment_id']
+    if eid not in catalog:
+        raise AgentError('MEMORY_SCOPE_DENIED', 'Experiment is not visible in this task/branch snapshot',
+                         details={'available_experiment_ids': list(catalog)[:16], 'hint': 'Use experiment_id=best for the scoped incumbent.'})
+    record = catalog[eid]
+    plan, metric = record['plan'], record.get('metric')
+    if any(plan.get(k) != frozen.get(k) for k in ('dataset_id', 'task_spec_id', 'validation_id')):
+        raise AgentError('MEMORY_SCOPE_DENIED', 'Solution plan identity differs from the issued task/validation')
+    view = query.get('view', 'pipeline')
+    if view not in SOLUTION_SCHEMA['properties']['view']['enum']:
+        raise AgentError('INVALID_MEMORY_READ', 'Unknown solution view')
+    def document(name):
+        from agent.artifacts import file_sha256
+        meta = record.get('documents', {}).get(name)
+        if meta is None:
+            # Compatibility with context documents produced before this reader.
+            meta = snapshot.get('documents', {}).get(name+'/'+eid)
+        if meta is None:
+            if name == 'code':
+                raise AgentError('SOLUTION_UNAVAILABLE', 'Source code was not retained in this scoped snapshot')
+            return None
+        path = artifacts.resolve(meta['artifact_id'])
+        if file_sha256(path) != meta['sha256']:
+            raise AgentError('MEMORY_SOURCE_CHANGED', 'Immutable solution document changed on disk')
+        return artifacts.read_json(meta['artifact_id']) if name == 'diagnostics' else path.read_text(encoding='utf-8')
+    if view == 'code':
+        value = document('code')
+    elif view == 'diagnostics':
+        value = document('diagnostics')
+    elif view == 'features':
+        value = {'feature_steps': plan['feature_steps'],
+                 'feature_program': plan['model']['hyperparameters'].get('feature_program')}
+    elif view == 'result':
+        value = {k: record.get(k) for k in ('experiment_id', 'state', 'metric', 'execution_error')}
+    else:
+        value = {'experiment_id': eid, 'state': record['state'], 'metric': metric,
+            'recipe_id': plan['recipe_id'], 'hyperparameters': plan['model']['hyperparameters'],
+            'feature_steps': plan['feature_steps'], 'code': document('code'),
+            'seed': plan['seed'], 'execution_error': record.get('execution_error')}
+    body = (value if view == 'code' and isinstance(value, str) else canonical(value)).encode('utf-8')
+    offset, maximum = query.get('offset', 0), query.get('limit_bytes', 6000)
+    if (isinstance(offset, bool) or not isinstance(offset, int) or offset < 0 or offset > len(body)
+            or (offset < len(body) and body[offset] & 0xC0 == 0x80)
+            or isinstance(maximum, bool) or not isinstance(maximum, int) or not 256 <= maximum <= 6000):
+        raise AgentError('INVALID_MEMORY_READ', 'Invalid page bounds; follow next_offset')
+    fragment = body[offset:offset+maximum].decode('utf-8', errors='ignore')
+    end = offset+len(fragment.encode('utf-8'))
+    log.event('research.solution_read', experiment_id=eid, view=view, offset_bytes=offset,
+              returned_bytes=end-offset, scope=frozen)
+    return {'experiment_id': eid, 'view': view, 'reference_id': metadata['detail_artifact_id'],
+        'section': 'solution/'+eid+'/'+view, 'scope': frozen, 'offset': offset,
+        'next_offset': end if end < len(body) else None, 'total_bytes': len(body), 'text': fragment,
+        'evidence_ids': [eid] if offset == 0 and end == len(body) else [], 'idea_ids': [],
+        'next_read': ({'experiment_id': eid, 'view': view, 'offset': end, 'limit_bytes': maximum}
+                      if end < len(body) else None)}
+
 
 def scope_for(spec, artifacts):
     return {'run_id': artifacts.run_id, 'task_spec_id': spec.get('task_spec_id'),
@@ -68,8 +174,15 @@ def read_details(query, context, artifacts, log):
             raise AgentError('MEMORY_SOURCE_CHANGED', 'Immutable context source changed on disk')
         snapshot['sections'][section] = (artifacts.read_json(doc['artifact_id']) if doc['format'] == 'json'
             else artifacts.resolve(doc['artifact_id']).read_text(encoding='utf-8'))
+    if section == 'detail_index':
+        snapshot['sections'][section] = {'reference_id': query['reference_id'],
+            'sections': sorted(set(snapshot['sections']) | set(snapshot.get('documents', {}))),
+            'solution_tool': 'read_solution(experiment_id="best", view="pipeline")'}
     if section not in snapshot['sections']:
-        raise AgentError('INVALID_MEMORY_READ', 'Unknown section; use detail_index')
+        raise AgentError('INVALID_MEMORY_READ', 'Unknown section for this document', details={
+            'reference_id': query['reference_id'], 'available_sections': sorted(k for k in snapshot['sections'] if '/' not in k),
+            'context_reference_id': metadata.get('detail_artifact_id'),
+            'hint': 'For experiment code/results use read_solution with only experiment_id; for available sections read detail_index.'})
     offset, maximum = query.get('offset', 0), query.get('limit_bytes', 4000)
     if (isinstance(offset, bool) or not isinstance(offset, int) or offset < 0
             or isinstance(maximum, bool) or not isinstance(maximum, int) or not 256 <= maximum <= 6000):
@@ -150,7 +263,7 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
     if store is not None:
         for eid in sections['experiments']:
             exp = store.get(eid)
-            sections['experiment/'+eid] = {'experiment_id': eid, 'state': exp['state'], 'plan': exp['plan'], 'execution_error': exp.get('error')}
+            sections['experiment/'+eid] = solution_record(store, artifacts, eid)
             meta = artifacts.meta(exp['plan']['code_artifact_id'])
             documents['code/'+eid] = {'artifact_id': meta['artifact_id'], 'sha256': meta['sha256'], 'format': 'text'}
             ev = store.experiment_evaluation(eid)
@@ -166,6 +279,12 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
                 if execution:
                     meta = execution['meta']
                     documents['execution/'+eid] = {'artifact_id': meta['artifact_id'], 'sha256': meta['sha256'], 'format': 'json'}
+    measured = [r for k, r in sections.items() if k.startswith('experiment/') and r.get('metric')]
+    if measured:
+        best = max(measured, key=lambda r: r['metric']['value']*(1 if r['metric']['direction'] == 'maximize' else -1))
+        profile['research_incumbent'] = {'experiment_id': best['experiment_id'], 'metric': best['metric'],
+            'recipe_id': best['plan']['recipe_id'], 'read': {'experiment_id': best['experiment_id'], 'view': 'pipeline'},
+            'instruction': 'Strongest visible measured solution. The assignment base records graph lineage; improve this solution or a justified alternative.'}
     for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses', 'quantities', 'relations', 'research_feedback'):
         for index, item in enumerate(sections.get(name, [])):
             sections[name+'/'+str(index)] = item

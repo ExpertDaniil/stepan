@@ -162,8 +162,8 @@ class Orchestrator:
                 memory = build_research_memory(self.store, self.artifacts, ids)
             series = [s for d in memory['decisions'] for s in d.get('tuning_series', [])]
             latest = measured[-8:]
-            best = self.store.best()
-            incumbent = next((v for v in measured if v['experiment_id'] == best), None)
+            incumbent = max(measured, key=lambda v: v['primary_metric']['value']*(
+                1 if v['primary_metric']['direction'] == 'maximize' else -1), default=None)
             if incumbent and incumbent not in latest:
                 latest.insert(0, incumbent)
             for result in latest[:-2]:
@@ -192,6 +192,9 @@ class Orchestrator:
                         'researcher_id': exp['plan']['researcher_id'], 'recipe_id': exp['plan']['recipe_id'],
                         'plan_id': exp['plan']['plan_id']})
             from agent.evidence import comparison_context
+            from agent.context_details import solution_record
+            solution_catalog = {r['experiment_id']: solution_record(self.store, self.artifacts, r['experiment_id'])
+                                for r in latest}
             mailbox.publish(scope, {'branch_id': scope, 'dataset_id': self.spec['dataset_id'],
                 'task_spec_id': self.spec['task_spec_id'], 'validation_id': self.validation['validation_id'],
                 'comparison_evidence': comparison_context(self.store, self.artifacts, ids),
@@ -199,10 +202,15 @@ class Orchestrator:
                 'pending_experiments': pending_experiments[-4:],
                 'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
                 'results': latest, 'omitted_result_count': len(measured)-len(latest),
+                'solution_catalog': solution_catalog,
+                'best_solution': ({'experiment_id': incumbent['experiment_id'], 'recipe_id': incumbent['recipe_id'],
+                    'metric': incumbent['primary_metric'], 'read': {'experiment_id': incumbent['experiment_id'], 'view': 'pipeline'}}
+                    if incumbent else None),
                 'fit_diagnostics': fit_diagnostics,
                 'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
                 'instruction': 'New controller measurements available at request dispatch. Compare only compatible protocols. '
-                    'The immutable assignment base remains unchanged; cite these results when choosing the next action.'})
+                    'The assignment base is graph lineage, not necessarily the best solution. '
+                    'Use read_solution(experiment_id="best") for the strongest visible executable version.'})
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
         if self.budget.data_research_snapshot()['active']:

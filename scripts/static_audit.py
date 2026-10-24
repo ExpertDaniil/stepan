@@ -114,7 +114,8 @@ def audit(root, official_archive=None):
     for module, name, definition in [('agent/research_actions.py', 'ACTION_SCHEMA', 'ResearchAction'),
                                       ('tools/knowledge.py', 'KNOWLEDGE_SCHEMA', 'KnowledgeQuery'),
                                       ('tools/analysis.py', 'ANALYSIS_SCHEMA', 'AnalysisQuery'),
-                                      ('agent/context_details.py', 'READ_SCHEMA', 'MemoryRead')]:
+                                      ('agent/context_details.py', 'READ_SCHEMA', 'MemoryRead'),
+                                      ('agent/context_details.py', 'SOLUTION_SCHEMA', 'SolutionRead')]:
         node = next(n for n in trees[module].body if isinstance(n, ast.Assign)
                     and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
         if data_value(node.value, declarations) != schema['$defs'][definition]:

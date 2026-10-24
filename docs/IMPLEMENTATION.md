@@ -1,4 +1,5 @@
 > Current default: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md): independent version-owned Optuna and executable submissions.
+> Direct scoped solution reads and dialogue time reserve: [RESEARCH-LOGISTICS.md](RESEARCH-LOGISTICS.md).
 > Previous research interface and compatibility: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
 > Compact protocol and optional data window supersede historical default descriptions below.
 

@@ -89,7 +89,8 @@ class DialogueBudgetTests(unittest.TestCase):
 
 class DialogueGatewayTests(unittest.TestCase):
     def setUp(self):
-        self.h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, llm_max_calls=3)
+        self.h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, llm_max_calls=3,
+                              background_tuning_enabled=False)
 
     def tearDown(self):
         self.h.close()
@@ -143,7 +144,7 @@ class DialogueGatewayTests(unittest.TestCase):
 
 class TuningProgressTests(unittest.TestCase):
     def test_multiple_authorized_trials_finish_while_the_other_peer_is_still_reasoning(self):
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800, background_tuning_enabled=False)
         release = threading.Event()
         try:
             c, g = h.controller, h.g

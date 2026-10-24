@@ -1,4 +1,7 @@
 > Current version queue and pipeline.* events: [BACKGROUND-PIPELINES.md](BACKGROUND-PIPELINES.md).
+> `research.solution_read` records experiment/view/scope/page bytes; `llm.dialogue_time_reserved`
+> records the final response window. `llm.tool_phase_closed.reason=final_time_reserve`
+> closes tool requests before that window, including after a provider timeout.
 > Earlier context projections and verification: [OPEN-INVESTIGATION.md](OPEN-INVESTIGATION.md).
 > Compact protocol and optional data window supersede historical default descriptions below.
 

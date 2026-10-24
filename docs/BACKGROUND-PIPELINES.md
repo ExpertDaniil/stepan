@@ -57,7 +57,9 @@ def make_pipeline(task_spec, params):
 
 Слоты выдаются отдельным заданиям. Общий CPU budget — до 7 логических CPU с
 учётом affinity/cgroup; 1 CPU сохраняется доступным для fit-only анализа.
-Один worker получает до BACKGROUND_CPU_THREADS, несколько делят бюджет.
+CPU share резервируется по MAX_WORKERS заранее: при 8 CPU и двух workers —
+по 3 потока. Первый процесс не забирает share будущего второго. При MAX_WORKERS=1
+worker может получить до BACKGROUND_CPU_THREADS (по умолчанию 6).
 RAM ограничена минимумом 28 GiB и 80% физического/cgroup лимита. Per-job предел
 остаётся TRAIN_MEMORY_MB. Память анализа учитывается отдельно. Watchdog RSS и
 лимиты потоков — кооперативные ограничения, общий hard limit обеспечивает среда.
@@ -86,6 +88,11 @@ DATA_RESEARCH_MIN_SECONDS=0
 требуется, если он использует adaptive/compact. `BACKGROUND_TUNING_ENABLED=0`
 или явный `RESEARCH_PROTOCOL=legacy` сохраняет предыдущий цикл. Новый режим
 рассчитан на GRAPH_ENABLED=1; catalog/code остаются совместимыми.
+
+Исправления реального запуска и новый read_solution: [RESEARCH-LOGISTICS.md](RESEARCH-LOGISTICS.md).
+Default LLM_RESEARCH_DIALOGUE_SECONDS теперь 900. Явное старое значение 360 в .env
+продолжает действовать. Инструментальные API-запросы и анализ ограничены отдельным
+окном перед резервом финального ответа; это не гарантия доступности провайдера.
 
 Результаты анализов адресуются через analyses_index, analysis_result/ARTIFACT_ID
 и analysis_code/ARTIFACT_ID. Исходники не копируются дважды в читаемые отчёты.

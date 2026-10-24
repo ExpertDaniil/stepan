@@ -53,6 +53,9 @@ def compact_tool_reply(value, maximum):
         if page['text'].encode('utf-8') != original:
             page['next_offset'] = page.get('offset', 0)+len(page['text'].encode('utf-8'))
             page['details_omitted'] = True
+            if page.get('experiment_id') and page.get('view'):
+                page['next_read'] = {'experiment_id': page['experiment_id'], 'view': page['view'],
+                    'offset': page['next_offset'], 'limit_bytes': (page.get('next_read') or {}).get('limit_bytes', 6000)}
             if 'evidence_ids' in result:
                 result['evidence_ids'], result['idea_ids'] = [], []
         return result

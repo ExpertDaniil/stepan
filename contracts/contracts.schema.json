@@ -15843,6 +15843,37 @@
         "decision_rule"
       ],
       "additionalProperties": false
+    },
+    "SolutionRead": {
+      "type": "object",
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "enum": [
+            "pipeline",
+            "code",
+            "result",
+            "features",
+            "diagnostics"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit_bytes": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 6000
+        }
+      },
+      "required": [
+        "experiment_id"
+      ],
+      "additionalProperties": false
     }
   },
   "description": "Use $ref #/$defs/Cxx_Request or #/$defs/Cxx_Response for a specific endpoint. Endpoint routing is external to JSON Schema."

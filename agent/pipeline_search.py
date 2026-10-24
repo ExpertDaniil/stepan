@@ -157,8 +157,10 @@ class VersionSearch:
             if available_cpu < 1 or available_memory < 256:
                 return False
             total_cpu = c.budget.cpu_capacity
+            # Reserve a fair CPU share even when the second candidate arrives
+            # later. A running estimator cannot safely surrender its threads.
             cpu = max(1, min(available_cpu, c.config.background_cpu_threads,
-                (total_cpu-1)//max(1, c.config.max_workers) if self.jobs or len(self.queue) > 1 else total_cpu-1))
+                max(1, (total_cpu-int(total_cpu > 1))//max(1, c.config.max_workers))))
             memory = max(256, min(available_memory, c.config.train_memory_mb,
                 (c.budget.memory_capacity-c.budget.analysis_memory)//max(1, c.config.max_workers)))
             if not initial:

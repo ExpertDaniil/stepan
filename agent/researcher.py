@@ -29,7 +29,9 @@ class Researcher:
         investigation_check = None
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
-                                        "tool_schema_ids": (['analyze_data', 'run_analysis', 'read_memory'] + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
+                                        "tool_schema_ids": (['analyze_data', 'run_analysis', 'read_memory']
+                                            + (['read_solution'] if context['metadata'].get('pipeline_execution') else [])
+                                            + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds,
                                         "attempt_limit": self.config.llm_research_tool_turns + 2 if adaptive else 4}, self.gateway.complete)["data"]

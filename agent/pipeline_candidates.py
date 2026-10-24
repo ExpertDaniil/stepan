@@ -47,19 +47,42 @@ def normalize_candidate(action):
         if source:
             declarations = declared_settings(source)
             result['hyperparameters'] = {**declarations.get('DEFAULT_PARAMS', {}), **result['hyperparameters']}
+            # Accept the previous wire format, but never start a researcher-owned
+            # tuning series. Only the declared domain moves into the version.
+            tuning = result.get('tuning')
+            if tuning is not None:
+                if not isinstance(tuning, dict):
+                    raise AgentError('INVALID_TUNING_SPACE', 'tuning must be an object or null')
+                if set(tuning)-{'search_space', 'parameters', 'max_trials', 'budget_seconds'}:
+                    raise AgentError('INVALID_TUNING_SPACE', 'Unknown tuning fields; declare typed axes in SEARCH_SPACE')
+                space = tuning.get('search_space')
+                if space is not None:
+                    if not isinstance(space, dict) or not space:
+                        raise AgentError('INVALID_TUNING_SPACE', 'Provide a nonempty search_space')
+                    if 'SEARCH_SPACE' in declarations and canonical(declarations['SEARCH_SPACE']) != canonical(space):
+                        raise AgentError('INVALID_TUNING_SPACE', 'Conflicting SEARCH_SPACE and tuning.search_space; keep one domain')
+                    if 'SEARCH_SPACE' not in declarations:
+                        result['code'] = source.rstrip()+'\n\nSEARCH_SPACE = '+repr(space)+'\n'
+                elif 'SEARCH_SPACE' not in declarations:
+                    raise AgentError('INVALID_TUNING_SPACE', 'Custom tuning needs SEARCH_SPACE or tuning.search_space')
+                names = tuning.get('parameters')
+                if names is not None and set(names) != set(space or declarations.get('SEARCH_SPACE', {})):
+                    raise AgentError('INVALID_TUNING_SPACE', 'parameters must match the declared search axes')
+                result['tuning'] = None
     return result
 
 
 def automatic_space(catalog, plan, source):
     """Freeze representation; tune model axes only. Custom source opts in once."""
     params = plan['model']['hyperparameters']
-    if plan['recipe_id'] == 'python-pipeline-v1' and 'base_recipe_id' not in params:
+    from agent.feature_schema import FACTORY_SOURCE
+    wrapped = plan['recipe_id'] == 'python-pipeline-v1' and source.strip() == FACTORY_SOURCE.strip()
+    if plan['recipe_id'] == 'python-pipeline-v1' and not wrapped:
         space = declared_settings(source).get('SEARCH_SPACE', {})
         if space:
             from agent.tuning_space import normalize_space
             space = normalize_space(catalog, plan, {'search_space': space})
         return {name: (('model', 'hyperparameters', name), domain) for name, domain in space.items()}
-    wrapped = plan['recipe_id'] == 'python-pipeline-v1'
     recipe = params['base_recipe_id'] if wrapped else plan['recipe_id']
     fixed = params['model_parameters'] if wrapped else params
     path = ('model', 'hyperparameters', 'model_parameters') if wrapped else ('model', 'hyperparameters')

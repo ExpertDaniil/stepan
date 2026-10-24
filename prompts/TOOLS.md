@@ -1,3 +1,16 @@
+# Executable background-search mode
+
+For a solution, use `read_solution({"experiment_id":"best"})` or an exact experiment ID.
+Default view is pipeline (code + effective parameters + features + metric). Other
+views are code, result, features and diagnostics. Follow next_read for a long output;
+it pins the actual experiment ID even if the leader changes. Do not invent section
+paths or use a feedback artifact as a source-code reference. `read_memory` is for
+task definitions and non-solution reports; section=detail_index lists valid sections.
+When submitting pipeline code, declare DEFAULT_PARAMS and optional SEARCH_SPACE;
+omit tuning, investigation, test_plan and research_notes in this mode. Later legacy
+tuning/scientific examples do not add requirements to executable mode.
+
+
 # Tools v1
 
 Runtime generates a complete tool catalogue, including the current JSON input schemas,

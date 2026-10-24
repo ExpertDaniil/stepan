@@ -348,6 +348,8 @@ class Gateway:
             expected['properties'] = {k:v for k,v in expected['properties'].items() if k in fields}
             expected['properties']['action']['enum'] = ['pipeline', 'features', 'catalog', 'research', 'stop']
             expected['required'] = ['action']
+            expected['properties']['tuning'] = {'type': 'null',
+                'description': 'Background search is controller-owned. Declare SEARCH_SPACE in code; omit tuning.'}
         user = json.loads(context['messages'][1]['content']) if payload['response_schema_id'] == 'ResearchAction-v1' else {}
         if payload['response_schema_id'] == 'ResearchAction-v1':
             from agent.data_research import attach_context
@@ -436,6 +438,14 @@ class Gateway:
             tools.append({'type': 'function', 'function': {'name': 'read_memory',
                 'description': 'Read frozen branch/task/validation-scoped details using detail_index.reference_id and section. Follow next_offset in UTF-8 bytes; list sections support section/index. Does not open arbitrary artifacts or files.',
                 'parameters': READ_SCHEMA}})
+        if 'read_solution' in payload['tool_schema_ids']:
+            from agent.context_details import SOLUTION_SCHEMA
+            tools.append({'type': 'function', 'function': {'name': 'read_solution',
+                'description': 'Read an executable solution by experiment_id, or best for the strongest visible measured solution. '
+                    'Default pipeline view returns code, effective parameters, features and metric together. '
+                    'Use code/result/features/diagnostics for a smaller exact view. No reference_id or section needed. '
+                    'Follow next_read for long outputs. Only this task/branch and delivered results are accessible.',
+                'parameters': SOLUTION_SCHEMA}})
         if 'search_knowledge' in payload['tool_schema_ids']:
             from tools.knowledge import KNOWLEDGE_SCHEMA
             if self.knowledge is None:
@@ -488,14 +498,34 @@ class Gateway:
         tool_cache, force_decision = {}, False
         schema_by_name = {tool['function']['name']: tool['function']['parameters'] for tool in tools}
         completion_id = "completion-" + uuid.uuid4().hex[:12]
+        # Token/call reservations alone cannot protect wall time. Bound tool
+        # requests (including provider latency and concurrency waits) separately.
+        now = time.monotonic()
+        final_seconds = (min(max(10.0, (deadline-now)*.25, 2*self.budget.reasoning_estimate()), max(0, deadline-now)*.45)
+                         if dialogue_id is not None else 0)
+        tool_deadline = deadline-final_seconds
+        context['_tool_deadline'] = tool_deadline
+        if dialogue_id is not None:
+            self.log.event('llm.dialogue_time_reserved', dialogue_id=dialogue_id,
+                           final_seconds_reserved=round(final_seconds, 3),
+                           tool_window_seconds=round(max(0, tool_deadline-now), 3))
         for attempt in range(1, payload["attempt_limit"] + 1):
             self.check_availability()
             left = deadline-time.monotonic()
             if left < 1:
                 raise AgentError('SEARCH_PHASE_BUDGET_EXHAUSTED' if phase_limited else 'LLM_OPERATION_TIMEOUT',
                                  "LLM operation deadline reached before a new attempt")
-            if not self.semaphore.acquire(timeout=left):
+            if dialogue_id is not None and not force_decision and time.monotonic() >= tool_deadline:
+                force_decision = True
+                self.log.event('llm.tool_phase_closed', context_id=payload['context_artifact_id'],
+                    reason='final_time_reserve', attempt=attempt, final_capacity_retained=True)
+            waiting = left if force_decision or dialogue_id is None else max(.001, tool_deadline-time.monotonic())
+            if not self.semaphore.acquire(timeout=waiting):
+                if dialogue_id is not None and time.monotonic() >= tool_deadline and time.monotonic() < deadline:
+                    force_decision = True
+                    continue
                 raise AgentError("LLM_OPERATION_TIMEOUT", "Timed out waiting for LLM concurrency slot")
+            terminal = True
             try:
                 if tools and dialogue_id is not None and not force_decision and tool_seconds >= self.config.llm_research_tool_seconds:
                     force_decision = True
@@ -509,6 +539,7 @@ class Gateway:
                     # for final JSON and (when funded) one repair. Time is only
                     # an estimate; server latency can still consume the deadline.
                     allow_tools = bool(reserved_slots > 1 and tools and not force_decision and attempt <= payload['attempt_limit']-reserved_slots
+                                       and tool_deadline-time.monotonic() > 1
                                        and deadline-time.monotonic() > self.budget.reasoning_estimate()*reserved_slots)
                     try:
                         terminal = self.budget.prepare_dialogue_turn(dialogue_id, token_limit, allow_tools=allow_tools)
@@ -531,8 +562,15 @@ class Gateway:
                     self.log.event('llm.final_decision_requested', attempt=attempt, purpose=payload['purpose'], dialogue_id=dialogue_id)
                 elif tools:
                     request.update(tools=tools, parallel_tool_calls=dialogue_id is not None)
-                response, call_no = self._request(request, context, payload, attempt, deadline, dialogue_id)
+                request_deadline = tool_deadline if dialogue_id is not None and not terminal else deadline
+                response, call_no = self._request(request, context, payload, attempt, request_deadline, dialogue_id)
             except AgentError as exc:
+                if (dialogue_id is not None and not terminal and time.monotonic() >= tool_deadline
+                        and time.monotonic() < deadline and exc.code in {'LLM_OPERATION_TIMEOUT', 'LLM_UNAVAILABLE'}):
+                    force_decision = True
+                    self.log.event('llm.tool_phase_closed', context_id=payload['context_artifact_id'],
+                        reason='final_time_reserve', attempt=attempt, final_capacity_retained=True)
+                    continue
                 if exc.code == 'CONTEXT_TOO_LARGE' and calls and payload['response_schema_id'] == 'ResearchAction-v1':
                     # Preserve completed observations and roll over without inventing an
                     # LLM decision, training score or private reasoning transcript.
@@ -612,7 +650,7 @@ class Gateway:
                             for field in ('artifact_id', 'error'):
                                 if field in previous:
                                     result[field] = previous[field]
-                            if name == 'read_memory' and 'text' in previous:
+                            if name in {'read_memory', 'read_solution'} and 'text' in previous:
                                 result.update({k: deepcopy(v) for k, v in previous.items() if k not in {'reused', 'original_tool_call_id'}})
                             if name == 'analyze_data' and 'report' in previous:
                                 # The original reply can have been compacted in the
@@ -624,13 +662,25 @@ class Gateway:
                                 original_tool_call_id=original_id, operation_key=self._digest(key))
                             continue
                         new_calls += 1
-                        if item['error'] is not None:
+                        if dialogue_id is not None and time.monotonic() >= tool_deadline:
+                            force_decision = True
+                            result = {'error': {'code': 'TOOL_PHASE_CLOSED', 'message': 'Time is reserved for the final decision; use saved results.'}}
+                            trace = {'call_id': call['id'], 'name': name, 'status': 'time_reserve'}
+                        elif item['error'] is not None:
                             result = {'error': {'code': 'INVALID_TOOL_ARGUMENTS', 'message': item['error'][:600]},
                                       'instruction': 'Correct the arguments; do not repeat this identical invalid call.'}
                             trace = {'call_id': call['id'], 'name': name, 'status': 'invalid_arguments'}
                         elif name == 'write_code':
                             result = self.bus.call("C11", args, lambda p: write_code(p, self.artifacts), key="code/"+self._digest(args))
                             trace = {"call_id": call["id"], "name": name, "request_id": result["request_id"]}
+                        elif name == 'read_solution':
+                            from agent.context_details import read_solution
+                            try:
+                                result = read_solution(args, context, self.artifacts, self.log)
+                            except AgentError as error:
+                                result = {'error': error.as_dict()}
+                            trace = {'call_id': call['id'], 'name': name,
+                                     'experiment_id': result.get('experiment_id'), 'evidence_ids': result.get('evidence_ids', [])}
                         elif name == 'read_memory':
                             from agent.context_details import read_details
                             try:

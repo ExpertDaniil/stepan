@@ -55,7 +55,7 @@ def run_analysis(service, query, context=None):
     # The question is prose; identical computations across dialogues are cached.
     key = {k:v for k,v in query.items() if k != 'question'}
     digest = hashlib.sha256(canonical([service.validation_id, key]).encode()).hexdigest()
-    with service.lock, service.budget.analysis_slot() if hasattr(service.budget, 'analysis_slot') else nullcontext():
+    with service.query_slot(context), service.budget.analysis_slot() if hasattr(service.budget, 'analysis_slot') else nullcontext():
         service.query_context = context
         if digest in service.cache:
             response = deepcopy(service.cache[digest])
@@ -75,6 +75,8 @@ def run_analysis(service, query, context=None):
         if query.get('compare_test'):
             test, test_population, _ = service._sample('test', columns, None, started)
         timeout = min(60, service.budget.phase_remaining()-service.budget.reserve_seconds()-1)
+        if (context or {}).get('_tool_deadline') is not None:
+            timeout = min(timeout, context['_tool_deadline']-time.monotonic()-.1)
         if timeout < 1:raise AgentError('SEARCH_CLOSED', 'No analysis time before publication reserve')
         with tempfile.TemporaryDirectory(prefix='stepan-analysis-') as directory:
             directory = Path(directory)

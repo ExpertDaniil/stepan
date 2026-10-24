@@ -82,27 +82,35 @@ class ContextBuilder:
         # Conservative byte heuristic, not a claim about the provider tokenizer.
         from agent.context_budget import assembly_limit
         limit = assembly_limit(self.catalog.config, {}) if self.catalog.config.research_mode == 'adaptive' else payload["max_input_tokens"] * 3
-        if len(json.dumps(messages, ensure_ascii=False).encode()) > limit and user.get('scientific_protocol'):
-            from agent.scientific_research import compact_protocol
-            user['scientific_protocol'] = compact_protocol(user['scientific_protocol'])
-            messages[1]['content'] = json.dumps(user, ensure_ascii=False)
-        while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and recent:
-            recent.pop()
-            user["recent_experiments"] = recent
-            messages[1]["content"] = json.dumps(user, ensure_ascii=False)
         omitted_profile = []
-        for field in ("test_missing_fraction", "test_dtypes", "train_missing_fraction", "train_dtypes", "data_dictionary"):
-            if len(json.dumps(messages, ensure_ascii=False).encode()) > limit and field in compact_profile:
-                compact_profile.pop(field)
-                omitted_profile.append(field)
+        if self.catalog.config.research_mode == 'adaptive':
+            from agent.context_budget import compact_research_request
+            packed = compact_research_request({'messages': messages}, limit, self.log, stage='assembly')
+            omitted_profile = packed['omitted_fields']
+            user = json.loads(messages[1]['content'])
+            recent = user.get('recent_experiments', [])
+        else:
+            if len(json.dumps(messages, ensure_ascii=False).encode()) > limit and user.get('scientific_protocol'):
+                from agent.scientific_research import compact_protocol
+                user['scientific_protocol'] = compact_protocol(user['scientific_protocol'])
+                messages[1]['content'] = json.dumps(user, ensure_ascii=False)
+            while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and recent:
+                recent.pop()
+                user["recent_experiments"] = recent
                 messages[1]["content"] = json.dumps(user, ensure_ascii=False)
-        feature_memory = user.get('feature_memory', {})
-        while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and len(feature_memory.get('representations', [])) > 1:
-            feature_memory['representations'].pop()
-            feature_memory['omitted_representation_count'] += 1
-            messages[1]['content'] = json.dumps(user, ensure_ascii=False)
+            omitted_profile = []
+            for field in ("test_missing_fraction", "test_dtypes", "train_missing_fraction", "train_dtypes", "data_dictionary"):
+                if len(json.dumps(messages, ensure_ascii=False).encode()) > limit and field in compact_profile:
+                    compact_profile.pop(field)
+                    omitted_profile.append(field)
+                    messages[1]["content"] = json.dumps(user, ensure_ascii=False)
+            feature_memory = user.get('feature_memory', {})
+            while len(json.dumps(messages, ensure_ascii=False).encode()) > limit and len(feature_memory.get('representations', [])) > 1:
+                feature_memory['representations'].pop()
+                feature_memory['omitted_representation_count'] += 1
+                messages[1]['content'] = json.dumps(user, ensure_ascii=False)
         if len(json.dumps(messages, ensure_ascii=False).encode()) > limit:
-            raise AgentError("CONTEXT_TOO_LARGE", "Task and mandatory context exceed the configured limit")
+            self.reject_context(messages, limit, 'Task and mandatory context exceed the configured limit')
         metadata = {"schema_id": research_schema(self.catalog.config.research_mode), "researcher_id": payload["researcher_id"],
                     "recipe_ids": allowed, "round_no": self.round_no, "demo_spec": self.demo, **detail_metadata}
         art = self.artifacts.write_json("contexts/" + uuid.uuid4().hex[:12] + ".json",
@@ -114,6 +122,20 @@ class ContextBuilder:
         return {"context_id": art["artifact_id"], "context_version": self.round_no + 1,
                 "messages_artifact_id": art["artifact_id"], "estimated_input_tokens": len(json.dumps(messages, ensure_ascii=False).encode()) // 3,
                 "omitted_experiment_count": len(snapshot["recent_experiment_ids"]) - len(recent), "provider_prefix_cache_required": False}
+
+    def reject_context(self, messages, limit, message):
+        """Retain the failed input and actual byte contributors for diagnosis."""
+        from agent.context_budget import request_bytes
+        user = json.loads(messages[1]['content'])
+        profile = user.get('profile_summary', user)
+        details = {'context_bytes': request_bytes(messages), 'limit_bytes': limit,
+            'user_field_bytes': {k: request_bytes(v) for k, v in user.items()},
+            'profile_field_bytes': {k: request_bytes(v) for k, v in profile.items()}}
+        art = self.artifacts.write_json('contexts/rejected-'+uuid.uuid4().hex[:16]+'.json',
+            self.log.redactor.clean({'messages': messages, 'byte_diagnostics': details}), 'rejected_llm_context')
+        details['rejected_context_artifact_id'] = art['artifact_id']
+        self.log.event('context.rejected', **details)
+        raise AgentError('CONTEXT_TOO_LARGE', message, details=details)
 
     def build_graph(self, payload, graph):
         from copy import deepcopy
@@ -219,7 +241,7 @@ class ContextBuilder:
             experiment_ids=graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent])) if adaptive else {})
         messages = [{"role": "system", "content": system}, {"role": "user", "content": ""}]
         def size():
-            messages[1]["content"] = json.dumps(user, ensure_ascii=False)
+            messages[1]["content"] = json.dumps(user, ensure_ascii=False, separators=(',', ':')) if adaptive else json.dumps(user, ensure_ascii=False)
             return len(json.dumps(messages, ensure_ascii=False).encode("utf-8"))
         byte_cap = graph["policy"]["context"]["max_api_request_bytes"]
         reserve = min(byte_cap//4, graph["policy"]["context"]["safety_tokens"]*3)
@@ -227,36 +249,45 @@ class ContextBuilder:
         from agent.context_budget import assembly_limit
         limit = assembly_limit(self.catalog.config, {'graph_binding': graph['binding'],
             'graph_request_max_bytes': byte_cap}) if adaptive else min(payload["max_input_tokens"]*3, byte_cap-reserve)
-        # Frozen details are readable; preserve core and relevant definitions.
         omitted = []
-        for field in ("test_missing_fraction", "test_dtypes", "train_missing_fraction", "train_dtypes", "data_dictionary"):
-            if size() > limit and field in profile:
-                profile.pop(field);omitted.append(field)
-        protected = set(graph["donors"] + ([user["base_experiment_id"]] if user["base_experiment_id"] else []))
-        protected.update(f["source_id"] for f in facts[:3])
-        while size() > limit:
-            removable = next((i for i in range(len(facts)-1, -1, -1) if facts[i]["source_id"] not in protected), None)
-            if removable is None:
-                break
-            facts.pop(removable)
-        memory = user['profile_summary']['measured_search']
-        while size() > limit and len(memory.get('entries', [])) > 8:
-            memory['entries'].pop()
-            memory['omitted_count'] += 1
-        feature_memory = user['profile_summary'].get('feature_memory', {})
-        while size() > limit and len(feature_memory.get('representations', [])) > 1:
-            feature_memory['representations'].pop()
-            feature_memory['omitted_representation_count'] += 1
-        comparisons = user['profile_summary'].get('comparison_evidence', {})
-        while size() > limit and len(comparisons.get('comparisons', [])) > 1:
-            comparisons['comparisons'].pop()
-            comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
-        if size() > limit and user['profile_summary'].get('scientific_protocol'):
-            from agent.scientific_research import compact_protocol
-            user['profile_summary']['scientific_protocol'] = compact_protocol(user['profile_summary']['scientific_protocol'])
+        if adaptive:
+            from agent.context_budget import compact_research_request
+            size()  # Materialize the user message before the shared packer reads it.
+            packed = compact_research_request({'messages': messages}, limit, self.log, stage='assembly')
+            omitted = packed['omitted_fields']
+            user = json.loads(messages[1]['content'])
+            facts = user['facts']
+        else:
+            # Frozen details are readable; preserve core and relevant definitions.
+            omitted = []
+            for field in ("test_missing_fraction", "test_dtypes", "train_missing_fraction", "train_dtypes", "data_dictionary"):
+                if size() > limit and field in profile:
+                    profile.pop(field);omitted.append(field)
+            protected = set(graph["donors"] + ([user["base_experiment_id"]] if user["base_experiment_id"] else []))
+            protected.update(f["source_id"] for f in facts[:3])
+            while size() > limit:
+                removable = next((i for i in range(len(facts)-1, -1, -1) if facts[i]["source_id"] not in protected), None)
+                if removable is None:
+                    break
+                facts.pop(removable)
+            memory = user['profile_summary']['measured_search']
+            while size() > limit and len(memory.get('entries', [])) > 8:
+                memory['entries'].pop()
+                memory['omitted_count'] += 1
+            feature_memory = user['profile_summary'].get('feature_memory', {})
+            while size() > limit and len(feature_memory.get('representations', [])) > 1:
+                feature_memory['representations'].pop()
+                feature_memory['omitted_representation_count'] += 1
+            comparisons = user['profile_summary'].get('comparison_evidence', {})
+            while size() > limit and len(comparisons.get('comparisons', [])) > 1:
+                comparisons['comparisons'].pop()
+                comparisons['omitted_comparison_count'] = comparisons.get('omitted_comparison_count', 0)+1
+            if size() > limit and user['profile_summary'].get('scientific_protocol'):
+                from agent.scientific_research import compact_protocol
+                user['profile_summary']['scientific_protocol'] = compact_protocol(user['profile_summary']['scientific_protocol'])
         if size() > limit:
-            raise AgentError("CONTEXT_TOO_LARGE", "Mandatory branch identity, measured base/history, code, recipe and task contract do not fit",
-                             details={'context_bytes': size(), 'limit_bytes': limit})
+            self.reject_context(messages, limit,
+                'Mandatory branch identity, measured base/history, code, recipe and task contract do not fit')
         metadata = {"schema_id": research_schema(self.catalog.config.research_mode), "researcher_id": payload["researcher_id"],
                     "recipe_ids": allowed, "round_no": self.round_no, "demo_spec": self.demo, "graph_binding": graph["binding"],
                     "graph_request_max_bytes": byte_cap, **detail_metadata}

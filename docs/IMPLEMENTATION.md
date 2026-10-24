@@ -17,6 +17,11 @@ worker JobSpec получил optional `input_tables` с path/hash manifests. О
 
 # Реализация и соответствие ТЗ
 
+Общий упаковщик C08/C10 и точный учёт отложенных peer:
+[CONTEXT-ASSEMBLY-FIX.md](CONTEXT-ASSEMBLY-FIX.md). Adaptive ContextBuilder теперь
+использует ту же политику сокращения, что Gateway, включая историю анализов.
+Этот фикс проверен статически; новые регрессии не запускались.
+
 Научный цикл: [SCIENTIFIC-RESEARCH.md](SCIENTIFIC-RESEARCH.md).
 `ScientificResearch` строит dispatcher-owned проекцию эпизода и preflight;
 `FitDiagnostics` создаёт отдельные bounded jobs через Runner. Их результаты

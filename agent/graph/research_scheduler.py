@@ -6,6 +6,21 @@ from agent.contracts import canonical
 from agent.errors import AgentError
 
 
+def record_stall(controller, work, signature, generation, *, defer_reason=None):
+    """Count one actual outcome; an explicit deferral is not a second failure."""
+    key = (work['branch_id'], work['researcher_id'])
+    old = controller.research_stalls.get(key, {})
+    count = old.get('count', 0)+1 if old.get('generation') == generation and old.get('signature') == signature else 1
+    controller.research_stalls[key] = {'generation': generation, 'signature': signature,
+                                     'count': count, 'deferred': defer_reason is not None}
+    deferred = defer_reason is not None or count >= 2
+    if deferred:
+        controller.log.event('research.peer_deferred', branch_id=key[0], researcher_id=key[1],
+            reason=defer_reason or 'Repeated action without a new measurement', signature=signature,
+            repetitions=count, resume_when='new_controller_feedback', heuristic=defer_reason is None)
+    return deferred
+
+
 def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
     from agent.graph.controller import (advance_authorized_tuning, bind_trusted, issue,
                                         local_for_ticket, stop_ticket, feature_seed_for_ticket, publish_activity)
@@ -24,19 +39,10 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
 
     def blocked(branch, peer):
         record = controller.research_stalls.get((branch, peer))
-        return record is not None and record['generation'] == generation(branch) and record['count'] >= 2
+        return record is not None and record['generation'] == generation(branch) and (record.get('deferred') or record['count'] >= 2)
 
-    def repeated(work, signature):
-        key = (work['branch_id'], work['researcher_id'])
-        old = controller.research_stalls.get(key, {})
-        current = generation(work['branch_id'])
-        count = old.get('count', 0)+1 if old.get('generation') == current and old.get('signature') == signature else 1
-        controller.research_stalls[key] = {'generation': current, 'signature': signature, 'count': count}
-        if count >= 2:
-            controller.log.event('research.peer_deferred', branch_id=key[0], researcher_id=key[1],
-                reason='Repeated action without a new measurement', signature=signature, repetitions=count,
-                resume_when='new_controller_feedback', heuristic=True)
-        return count >= 2
+    def repeated(work, signature, *, defer_reason=None):
+        return record_stall(controller, work, signature, generation(work['branch_id']), defer_reason=defer_reason)
 
     def submit(ticket):
         work = ticket['work_order']
@@ -63,7 +69,8 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                 raise
             controller.record_research_feedback(peer, branch, 'context_unavailable', str(error), code=error.code)
             controller.research_round_outcomes.append('failed')
-            repeated(work, 'failure:CONTEXT_TOO_LARGE');repeated(work, 'failure:CONTEXT_TOO_LARGE')
+            controller.degraded = True
+            repeated(work, 'failure:CONTEXT_TOO_LARGE', defer_reason='Context could not fit the byte budget; retry after new measured feedback')
             controller.log.exception('research.context_failed', error, researcher_id=peer, branch_id=branch)
             return
         if controller.local_search.has_series(peer, branch):
@@ -141,10 +148,9 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                         controller.log.exception('research.proposal_failed', error, work_order_id=work['work_order_id'])
                     else:
                         controller.log.event('research.phase_budget_reached', work_order_id=work['work_order_id'], code=code)
-                    deferred = repeated(work, 'failure:'+code)
                     if code in {'SEARCH_PHASE_BUDGET_EXHAUSTED', 'RESEARCH_CANCELLED', 'CONTEXT_TOO_LARGE'}:
-                        repeated(work, 'failure:'+code)
-                    elif not deferred:
+                        repeated(work, 'failure:'+code, defer_reason='Research is unavailable in the current context/budget generation: '+code)
+                    elif not repeated(work, 'failure:'+code):
                         activity = True
                         released.append(work)
                     continue
@@ -152,7 +158,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
                     stop_ticket(controller, ticket, proposal.get('stop_reason') or 'Researcher requested stop')
                     controller.research_round_outcomes.append('stop')
                     # A stop is respected until another peer supplies new evidence.
-                    repeated(work, 'stop');repeated(work, 'stop')
+                    repeated(work, 'stop', defer_reason='Researcher explicitly requested stop until new measured feedback')
                     continue
                 try:
                     plan = controller.prepare_adaptive_proposal(proposal['plan'], work['branch_id'],

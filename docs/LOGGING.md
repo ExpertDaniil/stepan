@@ -237,6 +237,14 @@ seed knowledge и `retrievable_tool_details`. При сокращении отв
 tool-call пары, scope, опорные числа, ID и ссылка на полные данные; текстовые страницы
 показывают скорректированный UTF-8 `next_offset` и отсутствие complete-read IDs.
 
+`context.compacted` применяет ту же политику при ранней сборке C08. В
+`omitted_fields` видны `analysis_history_investigations`, `feedback_message_details`,
+`duplicate_fact_plan_details` и `historical_parameter_details`. `context.rejected`
+сохраняет `rejected_context_artifact_id`, `context_bytes`, `limit_bytes`,
+`user_field_bytes` и `profile_field_bytes` при невозможности упаковать обязательные данные.
+`research.peer_deferred.repetitions` считает реальные исходы по одному;
+`heuristic=false` означает явную остановку/недоступность текущего контекста или бюджета.
+
 `llm.wire_request_budget_checked` проверяет фактические сериализованные HTTP bytes
 перед отправкой, без headers/секретов. `llm.request_budget_checked` включает effective
 limits и размеры messages/tools/прочих полей. `research.memory_selected/read` показывает

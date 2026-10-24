@@ -114,7 +114,8 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'representations': profile.get('feature_memory', {}), 'comparisons': profile.get('comparison_evidence', {}),
         'analyses': profile.get('analysis_history', user.get('analysis_history', [])),
         'recipes': deepcopy(profile.get('recipes', [])),
-        'research_landscape': deepcopy(profile.get('research_landscape', {}))}
+        'research_landscape': deepcopy(profile.get('research_landscape', {})),
+        'research_feedback': deepcopy(profile.get('research_feedback', []))}
     if profile.get('scientific_protocol'):
         sections['scientific_protocol'] = deepcopy(profile['scientific_protocol'])
         sections['fit_diagnostics'] = deepcopy(profile['scientific_protocol'].get('fit_diagnostics', []))
@@ -145,7 +146,7 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
                 if execution:
                     meta = execution['meta']
                     documents['execution/'+eid] = {'artifact_id': meta['artifact_id'], 'sha256': meta['sha256'], 'format': 'json'}
-    for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses', 'quantities', 'relations'):
+    for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses', 'quantities', 'relations', 'research_feedback'):
         for index, item in enumerate(sections.get(name, [])):
             sections[name+'/'+str(index)] = item
     art = artifacts.write_json('research/context-details-'+uuid.uuid4().hex[:16]+'.json',

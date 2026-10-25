@@ -110,8 +110,13 @@ class EnsembleCoordinator:
             c.log.event('ensemble.review_deferred',reason='complete_oof_refit_output_do_not_fit',members=len(rows));return
         candidate_hash=hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()
         if candidate_hash in self.attempted:return
-        ticket=rows[0]['version']['ticket']
-        plan.update(researcher_id=ticket['work_order']['researcher_id'],parent_ids=[r['experiment_id'] for r in rows])
+        rows=rows[:len(plan['model']['hyperparameters']['members'])]
+        plan['feature_steps'][0]['members']=[r['experiment_id'] for r in rows]
+        from agent.pipeline_candidates import execution_ticket
+        from agent.graph.controller import bind_trusted
+        ticket=execution_ticket(c,rows[0]['version']['ticket'],rows[0]['experiment_id'],
+            donors=[r['experiment_id'] for r in rows[1:]])
+        plan=bind_trusted(plan,ticket)
         service.add(plan,ticket)
         self.attempted.add(candidate_hash)
         c.log.event('ensemble.candidate_queued',members=len(plan['model']['hyperparameters']['members']),

@@ -224,7 +224,10 @@ class VersionSearch:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.PRUNED)
                 return False
             ticket = execution_ticket(c, version['ticket'], None if initial else version['initial_experiment_id'])
-            from agent.graph.controller import lineage_for
+            from agent.graph.controller import bind_trusted, lineage_for
+            # The execution order is authoritative for both typed lineage and
+            # C12 parents. A copied warmup/anchor can name another peer's leader.
+            plan = bind_trusted(plan, ticket)
             reply = c.graph.invoke('G04', {'work_order_id': ticket['work_order']['work_order_id'],
                 'proposal': {'proposal_id': 'execution-'+uuid.uuid4().hex[:16], 'researcher_id': plan['researcher_id'],
                     'decision': 'propose', 'plan': plan, 'stop_reason': None},

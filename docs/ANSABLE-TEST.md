@@ -141,6 +141,14 @@ simultaneously in Qwen's active context or that any compression is semantically 
 
 ## Current verification boundary
 
+Runtime traceback follow-up: background submissions now bind C12 parent_ids
+through the existing bind_trusted helper to the exact execution work order,
+matching typed lineage. Composite recipes explicitly authorize visible, measured
+representation donors on the same task/protocol as idea_donor edges; graph v1's
+unsupported fitted-model ensemble compiler remains disabled. Budget trimming also
+trims the recorded member IDs. This fix was reviewed from source without running
+tests or ML jobs, as requested by the user.
+
 Some component checks were run before the user's stop request, including small
 CPU neural fits, OOF ensemble serialization and specialist context construction.
 They do not cover the final snapshot. An early classification smoke exposed a

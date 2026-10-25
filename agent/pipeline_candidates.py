@@ -136,7 +136,7 @@ def execution_capacity():
     return max(1, cpu), memory
 
 
-def execution_ticket(controller, template, parent=None):
+def execution_ticket(controller, template, parent=None, *, donors=None):
     """Controller-only execution order. Never occupies an equal research peer."""
     import uuid
     graph = controller.graph
@@ -149,7 +149,22 @@ def execution_ticket(controller, template, parent=None):
                 expires_elapsed_ms=graph.elapsed()+max(1, int(controller.budget.remaining()*1000)))
     if parent:
         work.update(base_experiment_id=parent, base_solution_id=graph.experiment_solution(parent),
-                    allowed_donor_experiment_ids=[])
+                    action='improve', allowed_donor_experiment_ids=[])
+    if donors is not None:
+        # Composite pipelines reuse measured representations as idea donors;
+        # graph v1 does not compile fitted models through ensemble_member edges.
+        selected = list(dict.fromkeys(eid for eid in donors if eid != work['base_experiment_id']))
+        visible = set(graph.visible_history(work['branch_id']))
+        for eid in selected:
+            exp = controller.store.get(eid)
+            ev = controller.store.experiment_evaluation(eid)
+            if (eid not in visible or exp['state'] != 'evaluated' or not ev or
+                    not ev['valid'] or ev['violations'] or any(
+                        exp['plan'][key] != controller.spec[key]
+                        for key in ('task_spec_id', 'dataset_id')) or
+                    exp['plan']['validation_id'] != controller.validation['validation_id']):
+                raise AgentError('DONOR_NOT_ALLOWED', 'Background representation donor must be visible and measured on this task/protocol')
+        work.update(action='transfer' if selected else 'improve', allowed_donor_experiment_ids=selected)
     graph.schemas.validate(work, 'GWorkOrder')
     with controller.store.transaction():
         graph.db.execute('INSERT INTO g_work_orders VALUES(?,?,?,?,?,?,?,?,?)',

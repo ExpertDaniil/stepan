@@ -131,6 +131,8 @@ class VersionSearch:
         return study
 
     def eligible(self):
+        if not self.c.budget.data_research_snapshot()['tuning_allowed']:
+            return []
         rows = []
         for v in self.versions.values():
             if not v['initial_metric'] or not v['space'] or v['paused'] or v['pending'] or v['retry_at'] > time.monotonic():
@@ -406,9 +408,9 @@ class VersionSearch:
                 break
 
 
-def search(controller, root, accepted):
+def search(controller, root, accepted, *, warmups=()):
     """Research futures and version-owned train processes share one dispatcher loop."""
-    from agent.graph.controller import issue, stop_ticket, publish_activity, finish
+    from agent.graph.controller import issue, stop_ticket, publish_activity, finish, warmup_ticket
     c = controller
     service = VersionSearch(c)
     c.pipeline_search = service
@@ -426,12 +428,20 @@ def search(controller, root, accepted):
             'WHERE b.run_id=? AND b.experiment_id=? ORDER BY w.rowid LIMIT 1', (c.store.run_id, eid)).fetchone()
         if row:
             service.add(exp['plan'], {'work_order': c.graph.order(row[0])}, evaluated=eid)
+    for peer,recipe,params in warmups:
+        if not c.budget.snapshot()['search_allowed']:break
+        plan,ticket=warmup_ticket(c,root,peer,recipe,params)
+        service.add(plan,ticket)
+        stop_ticket(c,ticket,'Startup version queued independently of research')
+        c.log.event('search.catalog_warmup_queued',researcher_id=peer,recipe_id=recipe)
+    c.budget.start_data_research()
     peers = c.graph.metadata('researcher_ids')
     pending = {}
     recovery = PeerRecovery()
     pool = ResearchExecutor(max_workers=len(peers), thread_name_prefix='researcher')
     reason = 'time_reserve'
     try:
+        service.fill()
         while c.budget.snapshot()['search_allowed']:
             service.poll()
             if c.science:

@@ -468,6 +468,10 @@ def search(controller):
         from agent.specialists import startup
         specialist_warmups=startup(controller.catalog)
         warmups=[(recipe,params) for _,recipe,params in specialist_warmups]
+        # Startup models share the version queue/leases with research. In
+        # particular, a slow CPU network must not block all five dialogues.
+        from agent.pipeline_search import search as pipeline_search
+        return pipeline_search(controller,root,accepted,warmups=specialist_warmups)
     owners = {}
     feature_parameters = {feature["parameter"] for feature in graph.constructor.registry["features"].values()}
     for warmup_index, (recipe, params) in enumerate(warmups):

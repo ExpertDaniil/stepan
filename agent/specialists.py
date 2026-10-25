@@ -155,6 +155,10 @@ def attach_context(builder,user,graph,peer):
             candidates.append((ev['primary_metric']['value']*(1 if ev['primary_metric']['direction']=='maximize' else -1),
                 {'experiment_id':eid,'metric':ev['primary_metric'],'representation':representation}))
     reference=max(candidates,key=lambda x:x[0])[1] if candidates else None
+    if reference is None:
+        _,recipe,params=startup(builder.catalog)[int(peer.rsplit('-',1)[-1])-1]
+        reference={'experiment_id':None,'metric':None,'status':'unmeasured_startup_configuration',
+            'representation':{'base_recipe_id':recipe,'model_parameters':params}}
     if reference:
         art=builder.artifacts.write_json('contexts/specialist-'+__import__('uuid').uuid4().hex+'.json',reference,'research_context_details')
         role['reference_artifact_id']=art['artifact_id']

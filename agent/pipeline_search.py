@@ -253,7 +253,7 @@ class VersionSearch:
                 cancel_queued(c, eid, 'Training reserve no longer fits')
                 if trial is not None:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
-                version['paused'] = 'initial_unaffordable' if initial else None
+                version['paused'] = None
                 version['retry_at'] = time.monotonic()+1
                 return False
             allocation = c.lease(eid, 'train', plan['resources'])
@@ -389,9 +389,13 @@ class VersionSearch:
         dispatched = 0
         while len(self.jobs) < self.c.config.max_workers and self.c.budget.snapshot()['search_allowed'] and dispatched < self.c.config.max_workers*2:
             dispatched += 1
-            initial = bool(self.queue)
-            if initial and self.queue[0]['retry_at'] > time.monotonic():break
-            version = self.queue.pop(0) if initial else self.choose()
+            # A cooling or temporarily unaffordable initial must not block all
+            # other representations and their existing studies.
+            ready = next((i for i,v in enumerate(self.queue) if not v['paused']
+                and v['retry_at'] <= time.monotonic()
+                and self.c.budget.can_train(v['anchor'])['allowed']), None)
+            initial = ready is not None
+            version = self.queue.pop(ready) if initial else self.choose()
             if version is None:
                 break
             started = self.start(version, initial=initial)
@@ -501,15 +505,19 @@ def search(controller, root, accepted):
                 break
             time.sleep(.1)
     finally:
+        import sys
+        interrupted = sys.exc_info()[1]
+        cleanup_reason = ('User interrupted research' if isinstance(interrupted,KeyboardInterrupt) else
+            'Research failed; retain verified output' if interrupted is not None else 'Publication reserve reached')
         c.researcher.gateway.stop_research()
         for future, ticket in pending.items():
             future.cancel()
-            c.graph.abandon(ticket['work_order']['work_order_id'], 'Research deadline reached')
+            c.graph.abandon(ticket['work_order']['work_order_id'], cleanup_reason)
         pool.shutdown(wait=False, cancel_futures=True)
         if c.science:c.science.diagnostics.shutdown()
         c.error_research.save()
         for job, _, _, _ in list(service.jobs.values()):
-            c.cancel_job(job, 'Publication reserve reached')
+            c.cancel_job(job, cleanup_reason)
         if service.jobs:
             service.poll()
         service.save()

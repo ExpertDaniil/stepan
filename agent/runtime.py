@@ -143,6 +143,26 @@ def bootstrap(config, started, task_path, run_id, root, log):
                 controller.cleanup()
             except Exception as cleanup_error:
                 log.exception("run.cleanup_error", cleanup_error)
+        if isinstance(exc, KeyboardInterrupt):
+            # Ctrl-C/SIGTERM is an explicit cancellation, not an unhandled ML
+            # failure or proof that the three-hour deadline was exhausted.
+            champion = None
+            if submission:
+                try:
+                    champion = submission.require_output()
+                except AgentError:
+                    pass
+            retained = bool(champion or (submission and submission.require_emergency()))
+            store.set_run_state('degraded' if retained else 'failed')
+            log.event('run.interrupted',level='WARNING',reason=str(exc) or 'KeyboardInterrupt',
+                retained_verified_output=retained,
+                output_path=submission.spec['output']['path'] if retained else None,
+                score=champion['primary_metric']['value'] if champion else None,
+                run_seconds_remaining=budget.remaining())
+            if champion:
+                summary=write_summary(root,store,budget,config,champion,'degraded')
+                artifacts.register(summary,'run_summary','text/markdown')
+            return 130
         if submission and submission.require_emergency():
             store.set_run_state('degraded')
             log.exception('run.bootstrap_degraded', exc)

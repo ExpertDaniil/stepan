@@ -89,10 +89,11 @@ class DurationModel:
 
     def estimate(self, plan, phase="train"):
         params=plan['model']['hyperparameters']
-        if plan['model']['family']=='custom' and params.get('members'):
+        if (plan['model']['family']=='custom' and params.get('members')
+                and not self.samples[self.sample_key(plan)]):
             folds=params.get('folds',3)
             members=[{**plan,'model':{'family':'custom','hyperparameters':m}} for m in params['members']]
-            return sum(folds*self.estimate(m,'train')+self.estimate(m,phase) for m in members)
+            return sum((folds+1)*self.estimate(m,phase) for m in members)
         if plan['model']['family']=='custom' and params.get('base_recipe_id') and not self.samples[self.sample_key(plan)]:
             # Do not compare an owned model's work to the empty custom recipe.
             # Reuse the measured native family as a cold representation prior.

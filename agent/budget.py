@@ -165,7 +165,9 @@ class Budget:
         with self.lock:
             estimate = self.duration.estimate(plan)
             reserve = self.candidate_reserve(plan)
-            allowed = (not self.search_stopped and estimate <= self.config.experiment_timeout_seconds
+            timeout = min(self.config.experiment_timeout_seconds,
+                          plan.get('resources', {}).get('timeout_seconds', self.config.experiment_timeout_seconds))
+            allowed = (not self.search_stopped and estimate <= timeout
                        and self.remaining() >= estimate + reserve + 1
                        and (self.phase_deadline is None or self.phase_remaining() >= estimate + reserve + 1))
             return {"allowed": allowed, "estimated_seconds": estimate, "reserve_seconds": reserve,

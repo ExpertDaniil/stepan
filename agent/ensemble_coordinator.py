@@ -3,6 +3,7 @@ from copy import deepcopy
 import hashlib
 import json
 import time
+from itertools import combinations
 from agent.contracts import canonical
 from agent.artifacts import file_sha256
 from agent.errors import AgentError
@@ -15,22 +16,29 @@ class EnsembleCoordinator:
         self.c=controller;self.attempted=set();self.last_review=0.;self.last_signature=None
 
     def candidates(self,service):
-        c=self.c;best={}
+        c=self.c;choices={}
         for v in service.versions.values():
-            eid=v.get('best_experiment_id')
-            if not eid:continue
-            exp=c.store.get(eid);plan=exp['plan'];ev=c.store.experiment_evaluation(eid)
-            if (exp['state']!='evaluated' or not ev or not ev['valid'] or ev['violations'] or
-                plan['validation_id']!=c.validation['validation_id'] or plan['dataset_id']!=c.spec['dataset_id']):continue
-            code=c.artifacts.resolve(plan['code_artifact_id'])
-            if file_sha256(code)!=c.artifacts.meta(plan['code_artifact_id'])['sha256']:continue
-            representation=member(plan,code.read_text(encoding='utf-8'))
-            if not representation:continue
-            key=representation['base_recipe_id'];quality=service.quality(ev['primary_metric'])
-            if key not in best or quality>best[key]['quality']:
-                best[key]={'experiment_id':eid,'representation':representation,'quality':quality,
-                    'metric':ev['primary_metric'],'version':v}
-        return sorted(best.values(),key=lambda r:r['quality'],reverse=True)[:5]
+            for eid in dict.fromkeys([v.get('best_experiment_id'),v.get('initial_experiment_id')]):
+                if not eid:continue
+                exp=c.store.get(eid);plan=exp['plan'];ev=c.store.experiment_evaluation(eid)
+                if (exp['state']!='evaluated' or not ev or not ev['valid'] or ev['violations'] or
+                    plan['validation_id']!=c.validation['validation_id'] or any(
+                        plan[k]!=c.spec[k] for k in ('task_spec_id','dataset_id'))):continue
+                code=c.artifacts.resolve(plan['code_artifact_id'])
+                if file_sha256(code)!=c.artifacts.meta(plan['code_artifact_id'])['sha256']:continue
+                representation=member(plan,code.read_text(encoding='utf-8'))
+                if not representation:continue
+                key=representation['base_recipe_id'];quality=service.quality(ev['primary_metric'])
+                choices.setdefault(key,{})[eid]={'experiment_id':eid,'representation':representation,'quality':quality,
+                    'metric':ev['primary_metric'],'version':v,
+                    'estimated_cost':sum(c.budget.duration.estimate(plan,p) for p in ('train','refit'))}
+        # A bounded current frontier, not a lifetime exclusion: retain both the
+        # strongest and cheapest measured configuration of each architecture.
+        selected={}
+        for rows in choices.values():
+            for row in (max(rows.values(),key=lambda r:r['quality']),min(rows.values(),key=lambda r:r['estimated_cost'])):
+                selected[row['experiment_id']]=row
+        return sorted(selected.values(),key=lambda r:r['quality'],reverse=True)
 
     def prediction(self,eid):
         import pandas as pd
@@ -86,10 +94,6 @@ class EnsembleCoordinator:
         signature=hashlib.sha256(canonical([[r['experiment_id'],r['representation']] for r in rows]).encode()).hexdigest()
         if signature==self.last_signature:return
         self.last_review=time.monotonic()
-        report=self.context(rows)
-        self.last_signature=signature
-        art=c.artifacts.write_json('ensembles/complementarity-'+signature+'.json',report,'ensemble_analysis')
-        c.context.ensemble_status={'artifact_id':art['artifact_id'],**report}
         # Proposed pipelines stay optional; no score is fabricated from a fitted
         # weight search on the same selection rows. Worker performs fresh OOF.
         params={'members':[r['representation'] for r in rows],'folds':c.config.ensemble_folds}
@@ -101,16 +105,27 @@ class EnsembleCoordinator:
         plan.update(code_artifact_id=source['artifact_id'],hypothesis='Test complementary architecture representations with fit-only OOF weights.',
             expected_effect='Measure the complete ensemble on the frozen outer protocol; standalone fallback stays available.',
             feature_steps=[{'step':'cross_fitted_ensemble','members':[r['experiment_id'] for r in rows]}])
-        # A smaller pair is allowed when the full committee cannot be released.
-        while len(plan['model']['hyperparameters']['members'])>=2:
-            admission=c.budget.can_train(plan)
-            if admission['allowed']:break
-            plan['model']['hyperparameters']['members'].pop()
-        else:
+        affordable=[]
+        for size in range(min(5,len(rows)),1,-1):
+            for committee in combinations(rows,size):
+                if len({r['representation']['base_recipe_id'] for r in committee})!=size:continue
+                plan['model']['hyperparameters']['members']=[r['representation'] for r in committee]
+                decision=c.budget.can_train(plan)
+                if decision['allowed']:
+                    affordable.append((sum(r['quality'] for r in committee)/size,-decision['estimated_seconds'],committee,decision))
+            if affordable:break
+        if not affordable:
             c.log.event('ensemble.review_deferred',reason='complete_oof_refit_output_do_not_fit',members=len(rows));return
+        _,_,committee,admission=max(affordable,key=lambda r:r[:2])
+        rows=list(committee)
+        plan['model']['hyperparameters']['members']=[r['representation'] for r in rows]
         candidate_hash=hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()
-        if candidate_hash in self.attempted:return
-        rows=rows[:len(plan['model']['hyperparameters']['members'])]
+        if candidate_hash in self.attempted:
+            self.last_signature=signature
+            return
+        report=self.context(rows)
+        art=c.artifacts.write_json('ensembles/complementarity-'+signature+'.json',report,'ensemble_analysis')
+        c.context.ensemble_status={'artifact_id':art['artifact_id'],**report}
         plan['feature_steps'][0]['members']=[r['experiment_id'] for r in rows]
         from agent.pipeline_candidates import execution_ticket
         from agent.graph.controller import bind_trusted
@@ -118,6 +133,7 @@ class EnsembleCoordinator:
             donors=[r['experiment_id'] for r in rows[1:]])
         plan=bind_trusted(plan,ticket)
         service.add(plan,ticket)
+        self.last_signature=signature
         self.attempted.add(candidate_hash)
         c.log.event('ensemble.candidate_queued',members=len(plan['model']['hyperparameters']['members']),
             representation_signature=candidate_hash,estimated_seconds=admission['estimated_seconds'],

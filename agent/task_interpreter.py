@@ -51,19 +51,12 @@ def recover_contract(task, profile, artifacts):
     root = Path(task['task_root']).resolve()
     if not (root/output_path).resolve().is_relative_to(root):
         return None
-    from agent.task_rules import metric_text
-    metric_lines = metric_text(text)
-    patterns = {'rmse': r'\brmse\b', 'mae': r'\bmae\b', 'r2': r'\br2\b',
-                'f1_macro': r'macro[ _-]*f1|f1[ _-]*macro', 'f1_weighted': r'weighted[ _-]*f1|f1[ _-]*weighted',
-                'accuracy': r'\baccuracy\b', 'log_loss': r'log[ _-]*loss', 'roc_auc': r'roc[ _-]*auc'}
-    metrics = [k for k,p in patterns.items() if re.search(p, metric_lines, re.I)]
-    metric_id = metrics[0] if len(metrics) == 1 else None
+    from agent.task_rules import infer_metric
+    metric_id = infer_metric(text)
     regression = bool(re.search(r'регресси|\bregression\b', text, re.I)) or metric_id in {'rmse', 'mae', 'r2'}
     classification = bool(re.search(r'классификац|\bclassification\b', text, re.I)) or metric_id in {'f1_macro', 'f1_weighted', 'accuracy'}
     if regression == classification or re.search(r'probabilit|вероятност', '\n'.join(line for line in text.splitlines() if target in line), re.I):
         return None
-    if len(metrics) > 1:
-        metric_id = None  # Output may be known even while metric remains disputed.
     y = read_table(artifacts.resolve(profile['train_artifact_id']), dtype={target: str} if classification else None)[target]
     if y.isna().any():
         return None
@@ -118,12 +111,44 @@ class TaskInterpreter:
             draft = recovered['draft']
         return {"draft": draft, "evidence": ["Source task artifact: " + self.task["task_text_artifact_id"]], "unresolved_fields": []}
 
+    def deployment_facts(self, spec):
+        """Label-free train/test facts; failures leave the facts empty, never the run."""
+        cached = getattr(self, '_deployment_facts', None)
+        if cached is not None:
+            return cached
+        from agent.data_facts import deployment_facts
+        from tools.data import read_table
+        try:
+            train = read_table(self.artifacts.resolve(self.profile['train_artifact_id']))
+            test = read_table(self.artifacts.resolve(self.profile['test_artifact_id']))
+            facts = deployment_facts(train, test, spec.get('target_columns') or [spec['target_column']],
+                                     spec.get('excluded_features', []))
+        except Exception as error:
+            facts = {'errors': ['tables: '+type(error).__name__+': '+str(error)[:200]],
+                     'future_period': None, 'duplicates': None}
+        self._deployment_facts = facts
+        self.artifacts.write_json('task/deployment-facts.json', facts, 'deployment_facts')
+        self.gateway.log.event('validation.deployment_facts', **facts)
+        return facts
+
     def choose_validation(self, spec):
+        """Data facts first, then explicit task declarations, then the LLM; never fatal."""
+        from agent.data_facts import scenario_proposal
         from agent.task_rules import validation_requirement, bind_requirement
+        facts = self.deployment_facts(spec)
+        observed = scenario_proposal(facts, self.config.seed)
+        if observed:
+            self.gateway.log.event('validation.data_scenario', proposal=observed)
+            return observed
         full = self.artifacts.read_json(self.profile['profile_artifact_id'])
-        requirement = validation_requirement(self.task['task_text'],
-            [c for c in full['train_columns'] if c not in spec.get('target_columns', [spec['target_column']])],
-            full.get('data_dictionary', []))
+        try:
+            requirement = validation_requirement(self.task['task_text'],
+                [c for c in full['train_columns'] if c not in spec.get('target_columns', [spec['target_column']])],
+                full.get('data_dictionary', []))
+        except AgentError as error:
+            # Conflicting prose is evidence to record, not a reason to submit a constant.
+            self.gateway.log.event('validation.contract_conflict', code=error.code, message=str(error)[:300])
+            requirement = None
         if requirement and (requirement['column'] or requirement['strategy'] in {'random_holdout', 'stratified_holdout'}):
             proposal = {'strategy': requirement['strategy'], 'seed': self.config.seed,
                 'parameters': {'valid_fraction': .2, **({'column': requirement['column']} if requirement['column'] else {})},
@@ -134,15 +159,17 @@ class TaskInterpreter:
             from agent.semantic_planning import load_task_model
             proposal = self.ask("ValidationProposal-v1", "result_analysis", "validation.md",
                             {"task_markdown": self.task["task_text"], "task_spec": spec, "profile": self.profile["summary"],
-                             'semantic_task': load_task_model(spec, self.artifacts)})
-            return bind_requirement(proposal, requirement)
+                             'semantic_task': load_task_model(spec, self.artifacts), 'data_facts': facts})
         except Exception as error:
-            # A date alone is not a temporal scenario. Fallback is explicit and
-            # recorded; scenario evidence is handled by the protocol resolver.
             self.gateway.log.event('validation.bootstrap_unavailable', code=getattr(error, 'code', type(error).__name__))
-            if requirement:
-                raise AgentError('VALIDATION_SCENARIO_UNRESOLVED',
-                    'Provider unavailable and explicit deployment constraints remain unresolved; retain the emergency output') from error
-            return {'strategy': 'random_holdout' if spec['task_kind'] == 'regression' else 'stratified_holdout',
-                    'seed': self.config.seed, 'parameters': {'valid_fraction': .2},
-                    'reason': 'Provider unavailable; no scenario inferred from dtype or names.'}
+            return self.default_validation(spec, 'Provider unavailable; no scenario inferred from dtype or names.')
+        try:
+            return bind_requirement(proposal, requirement)
+        except AgentError as error:
+            self.gateway.log.event('validation.contract_conflict', code=error.code, message=str(error)[:300],
+                                   proposal=proposal, requirement=requirement)
+            return proposal
+
+    def default_validation(self, spec, reason):
+        return {'strategy': 'random_holdout' if spec['task_kind'] == 'regression' else 'stratified_holdout',
+                'seed': self.config.seed, 'parameters': {'valid_fraction': .2}, 'reason': reason}

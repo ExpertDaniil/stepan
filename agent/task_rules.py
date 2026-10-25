@@ -26,6 +26,49 @@ def metric_text(text):
     return '\n'.join(result)
 
 
+METRIC_PATTERNS = {'rmse': r'\brmse\b', 'mae': r'\bmae\b', 'r2': r'\br2\b|\br\^?2\b|\br-squared\b',
+    'f1_macro': r'macro[ _-]*f1|f1[ _-]*macro|average\s*=\s*["\']macro', 'f1_weighted': r'weighted[ _-]*f1|f1[ _-]*weighted',
+    'accuracy': r'\baccuracy\b', 'log_loss': r'log[ _-]*loss', 'roc_auc': r'roc[ _-]*auc'}
+
+
+def _mentioned(text):
+    found = []
+    for metric, pattern in METRIC_PATTERNS.items():
+        match = re.search(pattern, text, re.I)
+        if match:
+            found.append((match.start(), metric))
+    return [metric for _, metric in sorted(found)]
+
+
+def infer_metric(text):
+    """The single primary metric declared in prose, or None when it stays ambiguous.
+
+    Precedence: an explicit "metric:" label, a line that calls a metric primary or
+    main, a line about the metric that names exactly one, then the whole text when
+    it names exactly one. Several metrics without a primary marker stay unresolved.
+    """
+    labelled = _mentioned(metric_text(text))
+    if len(set(labelled)) == 1:
+        return labelled[0]
+    lines = [line for _, line in plain_lines(text) if line]
+    for line in lines:
+        # The metric nearest to "primary/main" in the first such line is primary:
+        # "Macro F1 выбрана основной, потому что Accuracy..." names Macro F1.
+        marker = re.search(r'основн|главн|primary|main\b', line, re.I)
+        if not marker:
+            continue
+        spans = [(min(abs(m.start()-marker.start()), abs(m.end()-marker.start())), metric)
+                 for metric, pattern in METRIC_PATTERNS.items() for m in re.finditer(pattern, line, re.I)]
+        if spans:
+            return min(spans)[1]
+    about = [_mentioned(line) for line in lines if re.search(r'метрик|metric', line, re.I)]
+    about = [found for found in about if found]
+    if about and len(set(about[0])) == 1:
+        return about[0][0]
+    overall = _mentioned(text)
+    return overall[0] if len(set(overall)) == 1 else None
+
+
 def validation_requirement(text, columns, dictionary=()):
     """Resolve only declared deployment and declared column roles.
 

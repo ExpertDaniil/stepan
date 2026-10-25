@@ -691,5 +691,89 @@
       }
     },
     "requires": "lightgbm"
+  },
+  {
+    "id": "strong-regressor-v1",
+    "family": "strong",
+    "task_kind": "regression",
+    "requires": "lightgbm",
+    "description": "LightGBM with inner early stopping; under a temporal protocol a fit-only entity key and strictly earlier target history are kept when the inner check supports them.",
+    "parameters": {
+      "learning_rate": {
+        "type": "float",
+        "default": 0.05,
+        "min": 0.01,
+        "max": 0.2
+      },
+      "colsample_bytree": {
+        "type": "float",
+        "default": 0.7,
+        "min": 0.3,
+        "max": 1.0
+      },
+      "num_leaves": {
+        "type": "int",
+        "default": 63,
+        "min": 15,
+        "max": 255
+      },
+      "min_child_samples": {
+        "type": "int",
+        "default": 20,
+        "min": 5,
+        "max": 200
+      },
+      "reg_lambda": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0.0,
+        "max": 30.0
+      }
+    }
+  },
+  {
+    "id": "strong-classifier-v1",
+    "family": "strong",
+    "task_kind": "classification",
+    "requires": "lightgbm",
+    "description": "Hessian-guarded LightGBM with inner early stopping on duplicate-aware groups, class weighting and inner-confirmed F1 decision offsets.",
+    "parameters": {
+      "learning_rate": {
+        "type": "float",
+        "default": 0.05,
+        "min": 0.01,
+        "max": 0.2
+      },
+      "colsample_bytree": {
+        "type": "float",
+        "default": 0.7,
+        "min": 0.3,
+        "max": 1.0
+      },
+      "num_leaves": {
+        "type": "int",
+        "default": 31,
+        "min": 15,
+        "max": 127
+      },
+      "min_child_samples": {
+        "type": "int",
+        "default": 30,
+        "min": 5,
+        "max": 200
+      },
+      "reg_lambda": {
+        "type": "float",
+        "default": 5.0,
+        "min": 0.0,
+        "max": 30.0
+      },
+      "class_weight_power": {
+        "type": "float",
+        "default": 0.5,
+        "min": 0.0,
+        "max": 1.0
+      }
+    }
   }
 ]

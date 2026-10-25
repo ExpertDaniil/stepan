@@ -42,6 +42,8 @@ class DurationModel:
             features += numeric * (numeric + 1) / 2
         if family == "catboost":
             size = params.get("iterations", 800) * 2 ** params.get("depth", 6)
+        elif family == "lightgbm":
+            size = params.get("n_estimators", 300) * params.get("num_leaves", 31)
         elif family == "hist_gradient":
             size = params.get("max_iter", 300) * params.get("max_leaf_nodes", 15)
         elif family in {"random_forest", "extra_trees"}:

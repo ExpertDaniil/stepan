@@ -29,10 +29,17 @@ def main():
     from joblib import parallel_backend
     # Initialize declared libraries before closing IO, as in the pipeline worker.
     import ast, importlib
+    from tools.runtime_guard import preload_native
+    declared = set()
     for node in ast.walk(ast.parse(code)):
         if isinstance(node, ast.Import):
-            for alias in node.names:importlib.import_module(alias.name)
-        elif isinstance(node, ast.ImportFrom):importlib.import_module(node.module)
+            for alias in node.names:
+                importlib.import_module(alias.name)
+                declared.add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            importlib.import_module(node.module)
+            declared.add(node.module)
+    preload_native(declared)
     with data.open('rb') as stream:X, y, test, metadata = pickle.load(stream)
     # The watchdog lives in trusted code and uses peak RSS, independent of PID namespace.
     done = threading.Event()

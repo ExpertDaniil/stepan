@@ -14,6 +14,11 @@ def preprocessing_policy(recipe_id):
         return {'numeric_missing': 'native_nan', 'categorical_encoding': 'native_string_categories',
                 'categorical_missing_value': MISSING_CATEGORY,
                 'numeric_scaling': False, 'missing_indicators': False}
+    if recipe_id.startswith('strong-'):
+        return {'numeric_missing': 'native_nan', 'categorical_encoding': 'native_fit_only_categories',
+                'high_cardinality': 'fit_frequency_above_1000_levels', 'iso_dates': 'timestamp_and_calendar_parts',
+                'unknown_category': 'native_nan', 'numeric_scaling': False, 'missing_indicators': False,
+                'entity_history': 'temporal protocol only; fit-only key, strictly earlier targets, inner-checked'}
     if recipe_id.startswith(('hist-native-', 'lightgbm-')):
         return {'numeric_missing': 'native_nan', 'categorical_encoding': 'native_mask_fit_only_codes',
                 'high_cardinality': 'fit_frequency_above_254_categories', 'unknown_category': 'native_nan',

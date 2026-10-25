@@ -174,7 +174,7 @@ class Catalog:
     def warmup_choices(self):
         suffix = "regressor-v1" if self.kind == "regression" else "classifier-v1"
         choices = []
-        for family in ("hist-native", "lightgbm", "catboost", "extra-trees", "linear", "hist-gradient"):
+        for family in ("strong", "hist-native", "lightgbm", "catboost", "extra-trees", "linear", "hist-gradient"):
             key = family + "-" + suffix
             if key not in self.recipes:
                 continue

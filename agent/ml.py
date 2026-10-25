@@ -223,6 +223,11 @@ def build_pipeline(recipe_id, task_spec, params):
     if recipe_id.startswith("catboost-"):
         model = CatBoostFrameModel(regression, params, threads, seed)
         return Pipeline([("interactions", NumericInteractions()), ("model", model)]) if interactions else model
+    if recipe_id.startswith('strong-'):
+        from agent.strong import StrongTabularModel
+        if interactions:
+            raise ValueError('The strong recipe owns its representation; numeric_interactions is unsupported')
+        return StrongTabularModel(task_spec=task_spec, parameters=params, cpu_threads=threads, seed=seed)
     if recipe_id.startswith(('hist-native-', 'lightgbm-')):
         model = NativeHistogramModel(regression, params, threads, seed,
             'hist' if recipe_id.startswith('hist-native-') else 'lightgbm')

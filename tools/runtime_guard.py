@@ -31,6 +31,8 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
             modules.add('sklearn.linear_model')
         elif base_recipe_id.startswith(('hist-gradient-', 'random-forest-', 'extra-trees-')):
             modules.add('sklearn.ensemble')
+        elif base_recipe_id.startswith('lightgbm-'):
+            modules.add('lightgbm')
     for name in sorted(modules):
         try:
             importlib.import_module(name)
@@ -39,6 +41,63 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
             # handling. A required absent import still fails there normally.
             if exc.name != name.split('.')[0]:
                 raise
+    preload_native(modules)
+
+
+# ctypes resolves C symbols lazily: the first call of each LGBM_*/XG* function
+# raises a ctypes.dlsym audit event, which the sealed guard must refuse. Resolve
+# the installed library's own declared API (never generated code) beforehand.
+NATIVE_CTYPES_PACKAGES = {'lightgbm': ('lightgbm.basic', 'LGBM_'), 'xgboost': ('xgboost.core', 'XG')}
+
+
+def _resolve_ctypes_api(package, owner, prefix):
+    import ast
+    import importlib
+    module = importlib.import_module(owner)
+    library = getattr(module, '_LIB', None)
+    if library is None:
+        return 0
+    root = Path(importlib.import_module(package).__file__).resolve().parent
+    names = set()
+    for source in root.rglob('*.py'):
+        try:
+            tree = ast.parse(source.read_text(encoding='utf-8'))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+        names.update(node.attr for node in ast.walk(tree)
+                     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                     and node.value.id == '_LIB' and node.attr.startswith(prefix))
+    resolved = 0
+    for name in sorted(names):
+        try:
+            getattr(library, name)
+            resolved += 1
+        except AttributeError:
+            pass  # Optional C APIs keep their normal installed-version error.
+    return resolved
+
+
+def preload_native(modules):
+    """Load native ctypes APIs and sklearn's threadpool controller before sealing."""
+    import importlib
+    roots = {name.split('.')[0] for name in modules if name}
+    for package, (owner, prefix) in NATIVE_CTYPES_PACKAGES.items():
+        if package not in roots:
+            continue
+        try:
+            _resolve_ctypes_api(package, owner, prefix)
+        except ModuleNotFoundError:
+            pass
+    try:
+        # Its first construction uses ctypes.dlopen/dlsym; later calls reuse it.
+        importlib.import_module('sklearn.utils.parallel')._get_threadpool_controller()
+    except (ModuleNotFoundError, AttributeError):
+        pass
+
+
+# Buffer helpers used by already loaded native libraries; loaders stay blocked.
+CTYPES_BUFFER_EVENTS = frozenset({'ctypes.create_string_buffer', 'ctypes.create_unicode_buffer', 'ctypes.addressof',
+                                  'ctypes.cdata', 'ctypes.cdata/buffer', 'ctypes.string_at', 'ctypes.wstring_at'})
 
 
 class PipelineGuard:
@@ -62,8 +121,11 @@ class PipelineGuard:
             return
         if threading.current_thread() is self.trusted_thread:
             return
-        if event.startswith(('socket.', 'subprocess.', 'ctypes.')) or event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}:
-            raise PermissionError('Generated pipeline cannot start processes or use network/native loaders')
+        if (event.startswith(('socket.', 'subprocess.')) or
+                (event.startswith('ctypes.') and event not in CTYPES_BUFFER_EVENTS) or
+                event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}):
+            raise PermissionError('Generated pipeline blocked audit event '+event+
+                                  ': processes, network and new native loaders are forbidden')
         if event == 'open':
             filename, mode, flags = args
             if isinstance(filename, int):

@@ -50,7 +50,8 @@ def bind_validation_policy(model, policy):
     for obj in objects:
         if id(obj) in seen:continue
         seen.add(id(obj))
-        if isinstance(obj,(CrossFitHistory,MacroF1DecisionClassifier)):
+        from agent.strong import StrongTabularModel
+        if isinstance(obj,(CrossFitHistory,MacroF1DecisionClassifier,StrongTabularModel)):
             obj.set_params(validation_policy=deepcopy(policy))
         else:
             # Keep the feature language independent of this module's imports.

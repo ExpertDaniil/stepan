@@ -4,6 +4,7 @@ This checks references and declared consistency, not the truth of LLM prose.
 It has no dataset-specific names, model calls, SQL writes or learned state.
 """
 from copy import deepcopy
+from pathlib import Path
 import hashlib
 import json
 
@@ -230,6 +231,32 @@ def relation_checks(relations, targets=()):
                       'include_target': False, 'checks': [check]},
             'status': 'advisory consequence of an unverified interpretation; attach investigation before execution'})
     return checks[:2]
+
+
+def validation_scenario(proposal, spec, artifacts):
+    """Freeze optional deployment evidence; dates alone do not select a split."""
+    scenario = deepcopy(proposal['parameters'].get('scenario'))
+    if scenario is None:
+        return {'deployment': 'unknown', 'verification': 'not_supplied',
+                'limitation': 'Alternative deployment scenarios have not been ruled out.'}
+    if not isinstance(scenario, dict) or set(scenario)-{'deployment', 'quote', 'time_column', 'entity_columns'}:
+        raise AgentError('INVALID_SPLIT', 'Invalid scenario fields')
+    deployment = scenario.get('deployment')
+    if deployment not in {'future_observations', 'new_entities', 'random_observations', 'unknown'}:
+        raise AgentError('INVALID_SPLIT', 'Unknown deployment scenario')
+    sources = [entry for entry in artifacts.entries.values() if entry['meta']['kind'] == 'task_description']
+    body = '\n'.join(Path(e['path']).read_text(encoding='utf-8') for e in sources)
+    quote = scenario.get('quote', '')
+    if not isinstance(quote, str) or (deployment != 'unknown' and (not quote.strip() or quote not in body)):
+        raise AgentError('INVALID_SPLIT', 'Scenario requires an exact task quotation')
+    strategy = proposal['strategy']
+    if deployment == 'future_observations' and (strategy != 'temporal_holdout' or scenario.get('time_column') != proposal['parameters'].get('column')):
+        raise AgentError('INVALID_SPLIT', 'Future-observation scenario requires its ordered temporal holdout')
+    if deployment == 'new_entities' and (strategy != 'group_holdout' or scenario.get('entity_columns') != [proposal['parameters'].get('column')]):
+        raise AgentError('INVALID_SPLIT', 'New-entity scenario requires its entity holdout')
+    return {**scenario, 'verification': 'quotation_matched; deployment_interpretation_unverified',
+            'semantic_model_id': spec.get('semantic_model_id'),
+            'limitation': 'A quotation supports review, not proof of entity identity or stationarity.'}
 
 
 def effective_model(model, records):

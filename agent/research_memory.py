@@ -27,7 +27,12 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
         trusted = exp['state'] == 'evaluated' and ev and ev['valid'] and not ev['violations']
         observation = {'experiment_id': ident, 'state': exp['state'],
                        'primary_metric': deepcopy(ev['primary_metric']) if trusted else None,
-                       'diagnostics_artifact_id': ev['diagnostics_artifact_id'] if trusted else None}
+                       'diagnostics_artifact_id': ev['diagnostics_artifact_id'] if trusted else None,
+                       'measurement_identity': {**{k: plan[k] for k in ('dataset_id', 'validation_id', 'task_spec_id')},
+                           'code_sha256': artifacts.meta(plan['code_artifact_id'])['sha256'],
+                           'configuration_sha256': hashlib.sha256(canonical(core).encode()).hexdigest()},
+                       'fit_seconds': exp.get('duration'),
+                       'limitation': 'One complete configuration under this protocol; no universal method verdict.'}
         configurations.setdefault(canonical(core), []).append(observation)
         observations_by_id[ident] = observation
     with artifacts.lock:

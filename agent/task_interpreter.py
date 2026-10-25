@@ -119,8 +119,10 @@ class TaskInterpreter:
 
     def choose_validation(self, spec):
         try:
+            from agent.semantic_planning import load_task_model
             return self.ask("ValidationProposal-v1", "result_analysis", "validation.md",
-                            {"task_markdown": self.task["task_text"], "task_spec": spec, "profile": self.profile["summary"]})
+                            {"task_markdown": self.task["task_text"], "task_spec": spec, "profile": self.profile["summary"],
+                             'semantic_task': load_task_model(spec, self.artifacts)})
         except Exception as error:
             # A date alone is not a temporal scenario. Fallback is explicit and
             # recorded; scenario evidence is handled by the protocol resolver.

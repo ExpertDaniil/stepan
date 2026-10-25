@@ -11786,6 +11786,10 @@
             "prediction_kind"
           ],
           "additionalProperties": false
+        },
+        "scenario": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       "required": [

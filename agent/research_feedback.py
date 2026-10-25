@@ -75,6 +75,18 @@ def compact_memory(memory, *, base_experiment_id=None, question='', max_bytes=12
         p[1].get('status') == 'conflicted',
         len(words & set(re.findall(r'\w+', canonical(p[1]).casefold()))), p[0]), reverse=True)[:8]
     result['semantic_records'] = [deepcopy(r) for _, r in selected]
+    by_id = {r['record_id']: r for r in semantics}
+    conflicts = []
+    for r in reversed(semantics):
+        other = by_id.get(r.get('conflicts_with'))
+        if not other:
+            continue
+        conflicts.append({'topic': r['content']['topic'], 'status': 'unresolved_contradiction',
+            'alternatives': [{'record_id': v['record_id'], 'kind': v['content']['kind'],
+                'statement': v['content']['statement'][:160], 'source_decision_artifact_id': v['source_decision_artifact_id'],
+                'verification': v['verification']} for v in (other, r)]})
+    result['conflicts'] = conflicts[:4]
+    result['omitted_conflict_count'] = len(conflicts)-len(result['conflicts'])
     # Prefer semantic evidence to old explanations. Never silently truncate IDs.
     for field in ('decisions', 'open_ideas', 'semantic_records'):
         while len(canonical(result).encode()) > max_bytes and result[field]:
@@ -82,6 +94,9 @@ def compact_memory(memory, *, base_experiment_id=None, question='', max_bytes=12
             counter = {'decisions': 'omitted_decision_count', 'open_ideas': 'omitted_idea_count',
                        'semantic_records': 'omitted_semantic_count'}[field]
             result[counter] += 1
+    while len(canonical(result).encode()) > max_bytes and result['conflicts']:
+        result['conflicts'].pop()
+        result['omitted_conflict_count'] += 1
     return result
 
 

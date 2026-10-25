@@ -173,10 +173,12 @@ class Evaluator:
         if not a or not b or set(a) & set(b) or len(a) + len(b) != len(frame):
             raise AgentError("INVALID_SPLIT", "Invalid row partition")
         from agent.confirmation import partition
+        from agent.semantic_planning import validation_scenario
+        scenario = validation_scenario(proposal, self.spec, self.artifacts)
         selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
         protocol = {"dataset_id": payload["dataset_id"], "metric": self.spec["metric"], "proposal": proposal,
                     "train_indices": a, "valid_indices": b, "evaluator_version": "sklearn-metrics-v2",
-                    'selection_indices': selection, 'confirmation_indices': confirmation,
+                    'selection_indices': selection, 'confirmation_indices': confirmation, 'scenario': scenario,
                     'confirmation_unavailable_reason': confirmation_reason,
                     'prediction_contract': {'target_columns': targets(self.spec), 'allowed_labels': self.spec['allowed_labels'],
                                             'prediction_kind': self.spec['metric']['prediction_kind']}}

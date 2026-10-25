@@ -33,6 +33,9 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None, parameters=None):
             modules.add('sklearn.ensemble')
     def inspect_parameters(params):
         recipe=params.get('base_recipe_id','')
+        if recipe:
+            # build_pipeline imports these constructors even for native models.
+            modules.update({'sklearn.dummy', 'sklearn.linear_model', 'sklearn.ensemble'})
         if recipe.startswith('catboost-'):modules.add('catboost')
         if recipe.startswith('lightgbm-'):modules.add('lightgbm')
         if recipe.startswith('tabular-net-'):modules.update({'torch','torch._dynamo'})
@@ -43,8 +46,10 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None, parameters=None):
             for node in ast.walk(feature_tree):
                 if isinstance(node,ast.Import):modules.update(a.name for a in node.names)
                 elif isinstance(node,ast.ImportFrom):modules.add(node.module)
+        if params.get('members'):
+            modules.update({'scipy.optimize', 'sklearn.metrics', 'sklearn.model_selection'})
         for member in params.get('members',[]):inspect_parameters(member)
-    inspect_parameters(parameters or {})
+    inspect_parameters({'base_recipe_id': base_recipe_id or '', **(parameters or {})})
     for name in sorted(modules):
         try:
             importlib.import_module(name)
@@ -56,6 +61,23 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None, parameters=None):
     if any(m=='torch' for m in modules):
         import torch
         torch.optim.AdamW(torch.nn.Linear(1,1).parameters())
+    if 'lightgbm' in modules:
+        # ctypes resolves symbols lazily. Resolve only the installed library's
+        # own declared C API before closing native loaders (never generated code).
+        from lightgbm import basic
+        native_tree = ast.parse(Path(basic.__file__).read_text(encoding='utf-8'))
+        symbols = {n.attr for n in ast.walk(native_tree) if isinstance(n, ast.Attribute)
+                   and isinstance(n.value, ast.Name) and n.value.id == '_LIB'
+                   and n.attr.startswith('LGBM_')}
+        for symbol in sorted(symbols):
+            try:
+                getattr(basic._LIB, symbol)
+            except AttributeError:
+                pass  # Optional C APIs retain their normal installed-version error.
+    # sklearn owns a separate lazy threadpool controller. Construct it after all
+    # native imports; its first construction uses ctypes.dlopen/dlsym too.
+    from sklearn.utils.parallel import _get_threadpool_controller
+    _get_threadpool_controller()
 
 
 class PipelineGuard:
@@ -79,8 +101,12 @@ class PipelineGuard:
             return
         if threading.current_thread() is self.trusted_thread:
             return
-        if event.startswith(('socket.', 'subprocess.', 'ctypes.')) or event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}:
-            raise PermissionError('Generated pipeline cannot start processes or use network/native loaders')
+        buffer_events = {'ctypes.create_string_buffer', 'ctypes.create_unicode_buffer', 'ctypes.addressof'}
+        if (event.startswith(('socket.', 'subprocess.')) or
+                (event.startswith('ctypes.') and event not in buffer_events) or
+                event in {'os.system', 'os.exec', 'os.posix_spawn', 'os.fork'}):
+            raise PermissionError('Generated pipeline blocked audit event: '+event+
+                                  ' (process/network/native loader access is forbidden)')
         if event == 'open':
             filename, mode, flags = args
             if isinstance(filename, int):

@@ -51,8 +51,9 @@ class Catalog:
                 size = len(canonical(params).encode())
             except (TypeError, ValueError) as error:
                 raise AgentError('INVALID_PLAN', 'Custom parameters must be finite JSON') from error
-            if any(not isinstance(k, str) or k.startswith('_') for k in params) or size > 16000:
-                raise AgentError('INVALID_PLAN', 'Custom parameters must be finite JSON with no reserved names, at most 16 KiB')
+            limit=524288 if self.config.ensemble_research_enabled else 16000
+            if any(not isinstance(k, str) or k.startswith('_') for k in params) or size > limit:
+                raise AgentError('INVALID_PLAN', 'Custom parameters must be finite JSON with no reserved names; byte limit='+str(limit))
             return deepcopy(params)
         if set(params) - set(recipe["parameters"]):
             raise AgentError("INVALID_PLAN", "Unknown hyperparameter", details={"unknown": sorted(set(params) - set(recipe["parameters"]))})
@@ -108,6 +109,8 @@ class Catalog:
                     description = 'Numeric NaN reaches CatBoost; categorical missing values become __MISSING__ strings.'
                 elif recipe_id.startswith(('hist-native-', 'lightgbm-')):
                     description = 'Native numeric NaN and explicit categorical mask; fit-only codes up to 254 levels, fit frequency above; unknown native categories become NaN.'
+                elif recipe_id.startswith('tabular-net-'):
+                    description = 'Fit-only standardized numeric features, missing tokens and categorical embeddings; small CPU Transformer/MLP trained from scratch.'
                 else:
                     encoding = 'one-hot encoding and numeric scaling' if family == 'linear' else 'ordinal categorical encoding'
                     description = 'Fit-only median numeric imputation (no missing indicators), then '+encoding+'. Numeric NaN does not reach the estimator.'

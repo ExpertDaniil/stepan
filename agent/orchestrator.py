@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 import hashlib
 import json
 import math
@@ -206,6 +207,9 @@ class Orchestrator:
                 'task_spec_id': self.spec['task_spec_id'], 'validation_id': self.validation['validation_id'],
                 'comparison_evidence': comparison_context(self.store, self.artifacts, ids),
                 'measurement_generation': generation, 'activity': activity,
+                'budget':self.budget.snapshot(),
+                'architecture_clusters': deepcopy(getattr(self.context,'pipeline_status',{}).get('clusters',[])),
+                'ensemble': deepcopy(getattr(self.context,'ensemble_status',None)),
                 'pending_experiments': pending_experiments[-4:],
                 'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
                 'results': latest, 'omitted_result_count': len(measured)-len(latest),
@@ -387,7 +391,7 @@ class Orchestrator:
             if eid in self.failed_refits:continue
             ev = self.store.experiment_evaluation(eid)
             if not ev or not ev['valid'] or ev['violations'] or not comparable(ev['primary_metric'], reference):continue
-            ready = champion and champion['experiment_id'] == eid
+            ready = (champion and champion['experiment_id'] == eid) or self.submission.reusable(eid)
             cost = 0 if ready else (self.budget.duration.estimate(self.store.get(eid)['plan'], 'refit')
                                    +self.budget.output_reserve()+self.budget.confirmation_seconds)
             if ready or cost <= self.budget.remaining():
@@ -644,6 +648,22 @@ class Orchestrator:
             self.budget.set_final_plan(None)
             return
         experiment = self.store.get(ident)
+        reusable = self.submission.reusable(ident)
+        if reusable:
+            evaluation = self.store.experiment_evaluation(ident)
+            report = self.submission.validate_output({'task_spec_id': self.spec['task_spec_id'],
+                'candidate_artifact_id': reusable['submission_artifact_id'], 'reference_test_artifact_id': self.spec['test_artifact_id']})
+            payload = {'experiment_id': ident, 'evaluation_id': evaluation['evaluation_id'],
+                'candidate_artifact_id': reusable['submission_artifact_id'], 'validation_report_id': report['validation_report_id'],
+                'candidate_sha256': report['candidate_sha256'], 'expected_champion_version': champion['champion_version'] if champion else 0}
+            confirmation = getattr(self.submission, 'final_confirmation', None)
+            if confirmation and confirmation['chosen_experiment_id'] == ident:
+                payload['confirmation_report_id'] = confirmation['artifact_id']
+            self.call('C21', payload, self.submission.publish,
+                key='reuse/'+ident+'/'+str(payload['expected_champion_version']))
+            self.log.event('submission.verified_output_reused', experiment_id=ident)
+            self.update_final_reserve()
+            return
         self.budget.set_final_plan(experiment["plan"])
         predicted = self.budget.duration.estimate(experiment["plan"], "refit")
         if champion and self.budget.remaining() < predicted + self.budget.output_reserve():

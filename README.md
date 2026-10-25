@@ -13,6 +13,11 @@
 
 # AutoML Agent · Adaptive Research
 
+Experimental `ansable_test`: [architecture specialists, background Optuna clusters
+and fit-only ensembles](docs/ANSABLE-TEST.md). Enable source runs with
+`ENSEMBLE_RESEARCH_ENABLED=1 GRAPH_PEERS=5`; the flat experimental package enables
+this profile by default. Final snapshot testing was deferred at the user's request.
+
 Обязательный этап данных: [DATA-RESEARCH-WINDOW.md](docs/DATA-RESEARCH-WINDOW.md).
 После стартовых моделей первые 30 минут трёхчасового адаптивного поиска отданы
 анализу и преобразованиям данных. Optuna и резервный перебор параметров в этот

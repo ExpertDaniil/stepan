@@ -251,6 +251,12 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'recipes': deepcopy(profile.get('recipes', [])),
         'research_landscape': deepcopy(profile.get('research_landscape', {})),
         'research_feedback': deepcopy(profile.get('research_feedback', []))}
+    if profile.get('specialist'):
+        sections['specialist']=deepcopy(profile['specialist'])
+        reference=profile['specialist'].get('reference_artifact_id')
+        if reference:sections['specialist_reference']=artifacts.read_json(reference)
+    if profile.get('pipeline_search'):sections['pipeline_search']=deepcopy(profile['pipeline_search'])
+    if profile.get('ensemble'):sections['ensemble']=deepcopy(profile['ensemble'])
     if profile.get('scientific_protocol'):
         sections['scientific_protocol'] = deepcopy(profile['scientific_protocol'])
         sections['fit_diagnostics'] = deepcopy(profile['scientific_protocol'].get('fit_diagnostics', []))

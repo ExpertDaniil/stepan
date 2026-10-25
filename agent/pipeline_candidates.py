@@ -76,7 +76,8 @@ def automatic_space(catalog, plan, source):
     """Freeze representation; tune model axes only. Custom source opts in once."""
     params = plan['model']['hyperparameters']
     from agent.feature_schema import FACTORY_SOURCE
-    wrapped = plan['recipe_id'] == 'python-pipeline-v1' and source.strip() == FACTORY_SOURCE.strip()
+    from agent.specialists import FACTORY_SOURCE as SPECIALIST_SOURCE
+    wrapped = plan['recipe_id'] == 'python-pipeline-v1' and source.strip() in {FACTORY_SOURCE.strip(),SPECIALIST_SOURCE.strip()}
     if plan['recipe_id'] == 'python-pipeline-v1' and not wrapped:
         space = declared_settings(source).get('SEARCH_SPACE', {})
         if space:
@@ -87,6 +88,7 @@ def automatic_space(catalog, plan, source):
     fixed = params['model_parameters'] if wrapped else params
     path = ('model', 'hyperparameters', 'model_parameters') if wrapped else ('model', 'hyperparameters')
     excluded = {'numeric_interactions', 'target_transform', 'class_weight', 'strategy'}
+    if catalog.config.ensemble_research_enabled:excluded.discard('class_weight')
     result = {}
     for name, domain in catalog.recipes[recipe]['parameters'].items():
         if name in excluded or name not in fixed:

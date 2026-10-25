@@ -8,6 +8,12 @@ class DurationModel:
     @staticmethod
     def sample_key(plan):
         family = plan['model']['family']
+        params=plan['model']['hyperparameters']
+        if family=='custom' and params.get('base_recipe_id'):
+            import hashlib
+            from agent.contracts import canonical
+            representation=[params['base_recipe_id'],params.get('feature_program'),params.get('representation_source')]
+            return 'representation:'+hashlib.sha256(canonical(representation).encode()).hexdigest()
         if family == 'custom':
             import hashlib
             from agent.contracts import canonical
@@ -35,6 +41,10 @@ class DurationModel:
     def work(self, plan, phase):
         params = plan["model"]["hyperparameters"]
         family = plan["model"]["family"]
+        if family=='custom' and params.get('base_recipe_id'):
+            return self.work(self.member_plan(plan,params),phase)
+        if family=='custom' and params.get('members'):
+            return sum(self.work(self.member_plan(plan,m),phase) for m in params['members'])*(params.get('folds',3)+1)
         rows = self.rows[phase]
         features = self.features
         if params.get("numeric_interactions"):
@@ -44,6 +54,10 @@ class DurationModel:
             size = params.get("iterations", 800) * 2 ** params.get("depth", 6)
         elif family == "hist_gradient":
             size = params.get("max_iter", 300) * params.get("max_leaf_nodes", 15)
+        elif family=='lightgbm':
+            size=params.get('n_estimators',300)*params.get('num_leaves',31)
+        elif family=='tabular_net':
+            size=params.get('epochs',12)*params.get('width',32)**2*(features if params.get('architecture','transformer')=='transformer' else 1)
         elif family in {"random_forest", "extra_trees"}:
             leaf = max(1, params.get("min_samples_leaf", 1))
             depth = min(params.get("max_depth") or rows, max(1, math.log2(max(2, rows / leaf))))
@@ -74,6 +88,15 @@ class DurationModel:
         })
 
     def estimate(self, plan, phase="train"):
+        params=plan['model']['hyperparameters']
+        if plan['model']['family']=='custom' and params.get('members'):
+            folds=params.get('folds',3)
+            members=[{**plan,'model':{'family':'custom','hyperparameters':m}} for m in params['members']]
+            return sum(folds*self.estimate(m,'train')+self.estimate(m,phase) for m in members)
+        if plan['model']['family']=='custom' and params.get('base_recipe_id') and not self.samples[self.sample_key(plan)]:
+            # Do not compare an owned model's work to the empty custom recipe.
+            # Reuse the measured native family as a cold representation prior.
+            return 1.5*self.estimate(self.member_plan(plan,params),phase)
         family = plan["model"]["family"]
         work = self.work(plan, phase)
         samples = list(self.samples[self.sample_key(plan)])
@@ -103,3 +126,11 @@ class DurationModel:
             if sample["censored"]:
                 seconds = max(seconds, (sample["overhead"] + sample["fit"] * work / sample["work"]) * 1.5)
         return max(1.0, seconds)
+
+    @staticmethod
+    def member_plan(parent,member):
+        recipe=member['base_recipe_id']
+        prefix=recipe.rsplit('-regressor-',1)[0].rsplit('-classifier-',1)[0]
+        family={'hist-native':'hist_gradient','hist-gradient':'hist_gradient','extra-trees':'extra_trees',
+                'random-forest':'random_forest','tabular-net':'tabular_net'}.get(prefix,prefix)
+        return {**parent,'recipe_id':recipe,'model':{'family':family,'hyperparameters':member['model_parameters']}}

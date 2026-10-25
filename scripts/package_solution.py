@@ -18,6 +18,7 @@ MAX_ZIP_BYTES = 100_000_000
 PLATFORM_ENV_RESOURCE = "recipes/platform-env.json"
 # Explicit public settings only. Never copy the build process environment or .env.
 PLATFORM_ENV_KEYS = frozenset({
+    "ENSEMBLE_RESEARCH_ENABLED", "ENSEMBLE_FOLDS", "ENSEMBLE_REVIEW_SECONDS",
     "AUTOML_PROFILE", "RESEARCH_MODE", "CATALOG_WARMUP_EXPERIMENTS", "RESEARCH_SERIES_SIZE",
     "LLM_MAX_CALLS", "LLM_MAX_OUTPUT_TOKENS", "LLM_MAX_OUTPUT_TOKENS_LIMIT",
     "LLM_BOOTSTRAP_OUTPUT_TOKENS", "LLM_MAX_TOTAL_OUTPUT_TOKENS", "LLM_TIMEOUT_SECONDS",
@@ -40,6 +41,7 @@ RESOURCE_FILES = (
     "prompts/researcher-adaptive.md",
     "prompts/researcher-adaptive-legacy.md",
     "prompts/researcher-pipeline.md",
+    "prompts/researcher-specialist.md",
     "prompts/TOOLS.md",
     "recipes/knowledge/manifest.json",
     "recipes/knowledge/cards.json",

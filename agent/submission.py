@@ -60,6 +60,33 @@ class Submission:
         target = Path(self.spec['output']['path'])
         return bool(self.emergency and target.is_file() and file_sha256(target) == self.emergency['output_sha256'])
 
+    def reusable(self, experiment_id):
+        """A former publication is ready only while its execution and CSV agree."""
+        from agent.config import ROOT
+        exp = self.store.get(experiment_id)
+        ev = self.store.experiment_evaluation(experiment_id)
+        if exp['state'] != 'evaluated' or not ev or not ev['valid'] or ev['violations']:
+            return None
+        path = self.artifacts.root/'experiments'/experiment_id/'execution.json'
+        if not path.is_file():
+            return None
+        execution = json.loads(path.read_text(encoding='utf-8'))
+        task = execution['task_spec']
+        if any(task.get(k) != self.spec.get(k) for k in ('task_spec_id', 'dataset_id', 'output')) or execution['plan'] != exp['plan']:
+            return None
+        if file_sha256(self.artifacts.resolve(exp['plan']['code_artifact_id'])) != execution['code_sha256']:
+            return None
+        if any(file_sha256(ROOT/name) != digest for name,digest in execution['runtime_sha256'].items()):
+            return None
+        for row in self.store.db.execute('SELECT record FROM publication_journal WHERE run_id=? ORDER BY rowid DESC', (self.store.run_id,)):
+            record = json.loads(row[0])['champion']
+            if record['experiment_id'] != experiment_id or record['evaluation_id'] != ev['evaluation_id']:
+                continue
+            source = self.artifacts.resolve(record['submission_artifact_id'])
+            if source.is_file() and file_sha256(source) == record['output_sha256']:
+                return record
+        return None
+
     @staticmethod
     def _stage_source(source, target, digest):
         target.parent.mkdir(parents=True, exist_ok=True)

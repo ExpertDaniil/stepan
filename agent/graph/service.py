@@ -65,7 +65,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         p = json.loads((ROOT / "recipes/graph-policy.json").read_text(encoding="utf-8"))
         p["constraint_mode"] = "catalog_strict" if self.config.research_mode == "catalog" else "generated_python"
         p['hard_decision_constraints'] = self.config.graph_hard_decisions
-        p.update(peer_count=min(self.config.graph_peers, self.config.max_workers), max_train_workers=min(self.config.graph_train_workers, self.config.max_workers),
+        p.update(peer_count=self.config.graph_peers if self.config.ensemble_research_enabled else min(self.config.graph_peers, self.config.max_workers), max_train_workers=min(self.config.graph_train_workers, self.config.max_workers),
                  max_live_branches=self.config.graph_max_live_branches, max_total_branches=self.config.graph_max_total_branches)
         from agent.pipeline_candidates import enabled
         if enabled(self.config):
@@ -233,7 +233,7 @@ class GraphService(WorkService, SearchPolicy, GraphExport, GraphRecovery):
         if (p["task_spec_id"], p["dataset_id"], p["validation_id"], p["protocol_sha256"]) != (self.spec["task_spec_id"], self.spec["dataset_id"], self.validation["validation_id"], self.validation["protocol_sha256"]):
             raise AgentError("STALE_VALIDATION", "Graph must use the trusted bootstrap protocol")
         peers = p["researcher_ids"]
-        if len(set(peers)) != len(peers) or len(peers) != p["policy"]["peer_count"] or len(peers) > self.config.max_workers or p["policy"]["max_train_workers"] > self.config.max_workers:
+        if len(set(peers)) != len(peers) or len(peers) != p["policy"]["peer_count"] or len(peers) > (5 if self.config.ensemble_research_enabled else self.config.max_workers) or p["policy"]["max_train_workers"] > self.config.max_workers:
             raise AgentError("INVALID_CONFIG", "Peer/execution limits disagree with C00")
         env = self.artifacts.read_json(p["environment_lock_artifact_id"])
         cat = self.artifacts.read_json(p["catalog_manifest_artifact_id"])

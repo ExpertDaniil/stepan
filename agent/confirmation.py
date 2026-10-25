@@ -65,7 +65,7 @@ def finalize(controller):
     if controller.budget.remaining() <= controller.budget.output_reserve()+1:
         controller.log.event('validation.confirmation_skipped', reason='finalization_time_reserve')
         return
-    best = controller.final_candidate()
+    best = controller.store.best()
     if best is None:
         return
     reference = controller.store.experiment_evaluation(best)['primary_metric']
@@ -74,16 +74,10 @@ def finalize(controller):
         eid = row[0]
         ev = controller.store.experiment_evaluation(eid)
         if eid not in controller.failed_refits and ev and ev['valid'] and not ev['violations'] and comparable(reference, ev['primary_metric']):
-            champion = controller.store.champion()
-            ready = champion and champion['experiment_id'] == eid
-            cost = controller.budget.duration.estimate(controller.store.get(eid)['plan'], 'refit')+controller.budget.output_reserve()
-            if not ready and cost > controller.budget.remaining():continue
             candidates.append((eid, ev['primary_metric']['value']))
     candidates.sort(key=lambda pair: pair[1], reverse=reference['direction'] == 'maximize')
     finalists = [eid for eid, _ in candidates[:2]]
     champion = controller.store.champion()
-    if champion and champion['experiment_id'] not in finalists:
-        finalists = [best, champion['experiment_id']]
     if len(finalists) < 2:
         controller.log.event('validation.confirmation_skipped', reason='fewer_than_two_finalists')
         return
@@ -125,9 +119,20 @@ def finalize(controller):
     reverse = reference['direction'] == 'maximize'
     # Ties retain primary ranking. No arbitrary epsilon or significance claim.
     chosen = sorted(scores, key=lambda s: s['value'], reverse=reverse)[0]['experiment_id']
+    validation_winner = chosen
+    ready = (champion and champion['experiment_id'] == chosen) or getattr(controller.submission, 'reusable', lambda _: None)(chosen)
+    cost = controller.budget.duration.estimate(controller.store.get(chosen)['plan'], 'refit')+controller.budget.output_reserve()
+    if not ready and cost > controller.budget.remaining():
+        # Measurement eligibility is independent of refit affordability. Keep
+        # the ready deliverable if the winning model cannot be released in time.
+        chosen = champion['experiment_id'] if champion else controller.affordable_final_candidate()
+        if chosen is None:
+            return
     report = {'validation_id': controller.validation['validation_id'], 'rows': len(indices),
         'metric_id': reference['metric_id'], 'direction': reference['direction'], 'finalists': scores,
-        'chosen_experiment_id': chosen, 'prior_champion_experiment_id': champion['experiment_id'] if champion else None,
+        'chosen_experiment_id': chosen, 'confirmation_metric_winner': validation_winner,
+        'release_constraint_applied': chosen != validation_winner,
+        'prior_champion_experiment_id': champion['experiment_id'] if champion else None,
         'expected_champion_version': champion['champion_version'] if champion else 0,
         'limitations': 'One comparison of adaptively chosen finalists on one withheld partition. '
             'No repeated CV, causal attribution, statistical significance or unlimited independent tests are claimed. '

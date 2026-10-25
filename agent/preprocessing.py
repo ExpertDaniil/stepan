@@ -4,6 +4,9 @@ MISSING_CATEGORY = '__MISSING__'
 
 
 def preprocessing_policy(recipe_id):
+    if recipe_id.startswith('tabular-net-'):
+        return {'numeric_missing':'fit_median_and_missing_token','categorical_encoding':'fit_only_embeddings; unknown=0',
+                'numeric_scaling':True,'missing_indicators':True,'weights':'from_scratch'}
     if recipe_id.startswith('python-pipeline-'):
         return {'numeric_missing': 'defined_by_source', 'categorical_encoding': 'defined_by_source',
                 'numeric_scaling': False, 'missing_indicators': 'defined_by_source'}

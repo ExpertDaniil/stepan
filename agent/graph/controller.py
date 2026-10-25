@@ -463,6 +463,11 @@ def search(controller):
     controller.store.set_run_state("searching")
     accepted, branch_id = 0, root
     warmups = controller.catalog.warmup_choices()[:controller.config.catalog_warmup_experiments]
+    specialist_warmups=None
+    if controller.config.ensemble_research_enabled:
+        from agent.specialists import startup
+        specialist_warmups=startup(controller.catalog)
+        warmups=[(recipe,params) for _,recipe,params in specialist_warmups]
     owners = {}
     feature_parameters = {feature["parameter"] for feature in graph.constructor.registry["features"].values()}
     for warmup_index, (recipe, params) in enumerate(warmups):
@@ -470,6 +475,7 @@ def search(controller):
             break
         owner_key = canonical([recipe, {name: value for name, value in params.items() if name not in feature_parameters}])
         owner = owners.setdefault(owner_key, peers[len(owners) % len(peers)])
+        if specialist_warmups:owner=specialist_warmups[warmup_index][0]
         controller.log.event("search.catalog_warmup", configurations=[{"recipe_id": recipe, "hyperparameters": params}], researcher_id=owner)
         plan, ticket = warmup_ticket(controller, root, owner, recipe, params)
         accepted += controller.run_training([plan], [ticket])

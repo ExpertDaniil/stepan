@@ -53,7 +53,7 @@ class Constructor:
         self.runtime_archive = self.snapshot_runtime(lock.read_bytes())
         requirements = self.artifacts.write_text("graph/requirements.lock.txt", lock.read_text(encoding="utf-8"), "requirements_lock")
         versions = {}
-        for package in ("numpy", "pandas", "scipy", "scikit-learn", "catboost", "lightgbm", "joblib"):
+        for package in ("numpy", "pandas", "scipy", "scikit-learn", "catboost", "lightgbm", "torch", "joblib"):
             try:
                 versions[package] = importlib.metadata.version(package)
             except importlib.metadata.PackageNotFoundError:

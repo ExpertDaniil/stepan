@@ -107,7 +107,7 @@ def execute(job, trusted_thread=None):
     guard = None
     if job.get('guard_generated'):
         from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
-        prepare_pipeline_imports(job['code_path'], job['hyperparameters'].get('base_recipe_id'))
+        prepare_pipeline_imports(job['code_path'], job['hyperparameters'].get('base_recipe_id'),job['hyperparameters'])
         guard = PipelineGuard(job['code_path'], trusted_thread=trusted_thread)
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))
@@ -169,6 +169,10 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
             prediction = predict(model, predict_x, task, 'train')
+            probabilities=None
+            if job.get('emit_probabilities') and callable(getattr(model,'predict_proba',None)):
+                from agent.ensemble import aligned_probabilities
+                probabilities=aligned_probabilities(model,predict_x,task['allowed_labels'])
             frame = pd.DataFrame(prediction, columns=validation_columns(task))
             frame.insert(0, '__row_index', valid_indices)
         else:
@@ -187,9 +191,13 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             frame = frame[task["output"]["columns"]]
     if guard:
         guard.active = False
+    if job['phase']=='train' and job.get('emit_probabilities') and probabilities is not None:
+        proba_frame=pd.DataFrame(probabilities,columns=task['allowed_labels'])
+        proba_frame.insert(0,'__row_index',predict_x.index.tolist())
+        proba_frame.to_csv(Path(job['prediction_path']).with_name('probabilities.csv'),index=False)
     from agent.feature_engineering import FeatureProgram
     from sklearn.pipeline import Pipeline
-    fitted = model.models_ if hasattr(model, 'models_') else [model]
+    fitted = model.models_ if len(targets(task))>1 else [model]
     execution = []
     from agent.ml import NumericInteractions
     for target_index, fitted_model in enumerate(fitted):
@@ -203,13 +211,20 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             seen.add(id(transformer))
             # Target-transform wrappers retain both their constructor template
             # and a fitted clone. Only the clone proves feature execution.
-            for field in ('estimator_', 'regressor_', 'best_estimator_'):
+            for field in ('estimator_', 'regressor_', 'best_estimator_', 'model_', '_fitted'):
                 fitted_child = getattr(transformer, '__dict__', {}).get(field)
                 if fitted_child is not None:
                     objects.append(fitted_child)
                     if hasattr(fitted_child, 'get_params'):
                         objects.extend(fitted_child.get_params(deep=True).values())
-            if isinstance(transformer, (FeatureProgram, NumericInteractions)) and hasattr(transformer, 'report_'):
+            objects.extend(m for m in getattr(transformer,'models_',[]) if m is not None)
+            from agent.learned_features import TargetStatistics, MetricDecisionClassifier
+            if isinstance(transformer, MetricDecisionClassifier) and hasattr(transformer, 'decision_report_'):
+                execution.append({'target_index': target_index, 'report': transformer.decision_report_,
+                                  'verification': 'owned_inner_fit_decision_executed', 'units': 'not_inferred'})
+            from agent.neural import TabularNetwork
+            from agent.ensemble import CrossFittedEnsemble
+            if isinstance(transformer, (FeatureProgram, NumericInteractions, TargetStatistics, TabularNetwork, CrossFittedEnsemble)) and hasattr(transformer, 'report_'):
                 item = {'target_index': target_index, 'report': transformer.report_,
                         'verification': 'owned_transformer_executed', 'units': 'not_inferred'}
                 execution.append(item)

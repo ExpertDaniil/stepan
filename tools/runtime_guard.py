@@ -7,7 +7,7 @@ import sysconfig
 import threading
 
 
-def prepare_pipeline_imports(code_path, base_recipe_id=None):
+def prepare_pipeline_imports(code_path, base_recipe_id=None, parameters=None):
     """Initialize declared allowed libraries before sealing generated execution.
 
     Only package imports run here, never the generated module or its functions.
@@ -31,6 +31,20 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
             modules.add('sklearn.linear_model')
         elif base_recipe_id.startswith(('hist-gradient-', 'random-forest-', 'extra-trees-')):
             modules.add('sklearn.ensemble')
+    def inspect_parameters(params):
+        recipe=params.get('base_recipe_id','')
+        if recipe.startswith('catboost-'):modules.add('catboost')
+        if recipe.startswith('lightgbm-'):modules.add('lightgbm')
+        if recipe.startswith('tabular-net-'):modules.update({'torch','torch._dynamo'})
+        source=params.get('representation_source')
+        if source:
+            from agent.specialists import validate_feature_source
+            feature_tree=validate_feature_source(source)
+            for node in ast.walk(feature_tree):
+                if isinstance(node,ast.Import):modules.update(a.name for a in node.names)
+                elif isinstance(node,ast.ImportFrom):modules.add(node.module)
+        for member in params.get('members',[]):inspect_parameters(member)
+    inspect_parameters(parameters or {})
     for name in sorted(modules):
         try:
             importlib.import_module(name)
@@ -39,6 +53,9 @@ def prepare_pipeline_imports(code_path, base_recipe_id=None):
             # handling. A required absent import still fails there normally.
             if exc.name != name.split('.')[0]:
                 raise
+    if any(m=='torch' for m in modules):
+        import torch
+        torch.optim.AdamW(torch.nn.Linear(1,1).parameters())
 
 
 class PipelineGuard:

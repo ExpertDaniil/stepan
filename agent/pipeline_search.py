@@ -32,7 +32,7 @@ class VersionSearch:
     def save(self):
         self.revision += 1
         rows = [{k: deepcopy(v[k]) for k in ('version_id', 'initial_experiment_id', 'initial_metric',
-            'best_experiment_id', 'best_metric', 'trials', 'paused', 'last_scheduled', 'errors')} for v in self.versions.values()]
+            'best_experiment_id', 'best_metric', 'trials', 'paused', 'last_scheduled', 'errors','pending','retry_at')} for v in self.versions.values()]
         histories = {}
         for version in self.versions.values():
             histories[version['version_id']] = {
@@ -49,8 +49,23 @@ class VersionSearch:
              'queued_initial_versions': [v['version_id'] for v in self.queue],
              'running': [{'version_id': v['version_id'], 'experiment_id': job.experiment_id, 'initial': initial}
                          for job, v, _, initial in self.jobs.values()]}, 'pipeline_search')
-        self.c.context.pipeline_status = {'artifact_id': art['artifact_id'], 'versions': rows[-8:],
+        clusters={}
+        for version in self.versions.values():
+            key=self.cluster_key(version)
+            cluster=clusters.setdefault(key,{'cluster_id':key,'versions':0,'trials':0,'running':0,'best_metric':None})
+            cluster['versions']+=1;cluster['trials']+=version['trials'];cluster['running']+=int(version['pending'])
+            if version['best_metric'] and (cluster['best_metric'] is None or self.quality(version['best_metric'])>self.quality(cluster['best_metric'])):
+                cluster['best_metric']=version['best_metric']
+        self.c.context.pipeline_status = {'artifact_id': art['artifact_id'], 'versions': rows[-8:], 'clusters':list(clusters.values()),
+            'queued_versions':[{'version_id':v['version_id'],'cluster_id':self.cluster_key(v),
+                'researcher_id':v['anchor']['researcher_id']} for v in self.queue[:8]],
+            'omitted_queued_versions':max(0,len(self.queue)-8),
             'instruction': 'Tuning runs independently. Submit improved executable representations; no need to wait for trials.'}
+
+    @staticmethod
+    def cluster_key(version):
+        params=version['anchor']['model']['hyperparameters']
+        return 'ensemble' if params.get('members') else params.get('base_recipe_id',version['anchor']['recipe_id'])
 
     def add(self, plan, ticket, *, evaluated=None):
         c = self.c
@@ -138,14 +153,18 @@ class VersionSearch:
         if not candidates:
             return None
         leader = max(candidates, key=lambda v: self.quality(v['best_metric']))
-        # A busy leader does not monopolise the second slot. Give every challenger
-        # a small probe before preferring the strongest measured version.
-        untested = [v for v in candidates if v['trials'] < 3]
-        if untested:
-            return min(untested, key=lambda v: (v['trials'], -self.quality(v['initial_metric'])))
-        if self.attempted % 5 == 4:
-            return min(candidates, key=lambda v: v['last_scheduled'])
-        return leader
+        scale = max(1., abs(self.quality(leader['best_metric'])))
+        costs = {v['version_id']: max(.1, self.c.budget.duration.estimate(v['anchor'], 'train')) for v in candidates}
+        reference_cost = sorted(costs.values())[len(costs)//2]
+        def priority(v):
+            gap = (self.quality(v['best_metric'])-self.quality(leader['best_metric']))/scale
+            uncertainty = 1/math.sqrt(1+v['trials'])
+            gain = max(0., self.quality(v['best_metric'])-self.quality(v['initial_metric']))/scale
+            age = min(.2, .02*math.log1p(max(0, self.attempted-v['last_scheduled'])))
+            cluster_trials=sum(other['trials'] for other in self.versions.values() if self.cluster_key(other)==self.cluster_key(v))
+            coverage=.25/math.sqrt(1+cluster_trials) if self.c.config.ensemble_research_enabled else 0.
+            return (gap+uncertainty+gain+age+coverage)/math.sqrt(1+costs[v['version_id']]/reference_cost)
+        return max(candidates, key=priority)
 
     def ask(self, version):
         trial = self.study(version).ask()
@@ -198,7 +217,7 @@ class VersionSearch:
             if not c.budget.can_train(plan)['allowed']:
                 # A costly sampled configuration is not proof that the complete
                 # representation has no affordable configurations left.
-                version['paused'] = 'initial_unaffordable' if initial else None
+                version['paused'] = None
                 version['retry_at'] = time.monotonic()+1
                 if trial is not None:
                     trial.set_user_attr('not_started', 'candidate_and_finalization_do_not_fit')
@@ -291,7 +310,7 @@ class VersionSearch:
             if self.quality(metric) > old_best+self.c.config.background_switch_margin:
                 for other in self.versions.values():
                     if other is not version and other['best_metric'] and self.quality(other['best_metric']) < self.quality(metric):
-                        other['paused'] = 'superseded_by_initial:'+version['version_id']
+                        other['priority_reduced_by'] = version['version_id']
                 self.c.log.event('pipeline.leader_replaced', version_id=version['version_id'],
                     experiment_id=eid, metric=metric, reason='New initial score exceeds previous tuned best')
         self.c.update_final_reserve()
@@ -309,9 +328,6 @@ class VersionSearch:
         c = self.c
         changed = False
         for key, (job, version, trial, initial) in list(self.jobs.items()):
-            if version['paused'] and version['paused'].startswith('superseded_by_initial:') and not initial and not job.event and job.process.poll() is None:
-                c.cancel_job(job, 'Superseded by a stronger initial pipeline version')
-                c.log.event('pipeline.execution_preempted', version_id=version['version_id'], experiment_id=job.experiment_id)
             if job.process.poll() is None and not job.event:
                 c._heartbeat_and_limits(job)
             if job.process.poll() is None and not job.event:
@@ -346,13 +362,14 @@ class VersionSearch:
                 c.record_research_feedback(version['anchor']['researcher_id'], version['ticket']['work_order']['branch_id'],
                     'pipeline_execution_failed', canonical(event.get('error')), code='PIPELINE_EXECUTION_FAILED')
             if initial:
-                version['paused'] = 'initial_execution_failed'
+                version['paused'] = None if event['state'] in {'timed_out','cancelled'} or (event.get('error') or {}).get('code') in {'JOB_MEMORY_LIMIT','JOB_TIMEOUT'} else 'deterministic_initial_failure'
+                if version['paused'] is None:self.queue.append(version)
             self.save()
         if changed:
             c.publish_research_updates()
 
     def fill(self):
-        if self.queue and self.jobs and (len(self.jobs) >= self.c.config.max_workers
+        if not self.c.config.ensemble_research_enabled and self.queue and self.jobs and (len(self.jobs) >= self.c.config.max_workers
                 or self.c.budget.snapshot()['cpu_threads_available'] <= int(not self.c.budget.analysis_active)):
             trials = [(job, v) for job, v, _, initial in self.jobs.values() if not initial and not job.event]
             if trials:
@@ -377,7 +394,8 @@ class VersionSearch:
             started = self.start(version, initial=initial)
             if not started:
                 if initial and not version['paused']:
-                    self.queue.insert(0, version)
+                    self.queue.append(version)
+                    continue
                 break
 
 
@@ -387,6 +405,10 @@ def search(controller, root, accepted):
     c = controller
     service = VersionSearch(c)
     c.pipeline_search = service
+    coordinator=None
+    if c.config.ensemble_research_enabled:
+        from agent.ensemble_coordinator import EnsembleCoordinator
+        coordinator=EnsembleCoordinator(c)
     c.budget.train_worker_limit = c.config.max_workers
     # Seed already evaluated startup versions, without new fits or LLM authorisations.
     for eid in c.graph.visible_history(root):
@@ -440,6 +462,10 @@ def search(controller, root, accepted):
                     state = recovery.failure(peer, error, generation)
                     c.error_research.checkpoint(peer, '', error, branch=root)
                     c.log.event('research.peer_recovery', **state)
+            if coordinator:
+                try:coordinator.review(service,root)
+                except (AgentError,ValueError,OSError,KeyError) as error:
+                    c.log.exception('ensemble.review_failed',error,retained_output=bool(c.store.champion()))
             for peer in peers:
                 if any(t['work_order']['researcher_id'] == peer for t in pending.values()):
                     continue

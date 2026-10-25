@@ -61,6 +61,9 @@ class Config:
     background_trial_seconds: int = 300
     background_cpu_threads: int = 6
     background_switch_margin: float = 0.0
+    ensemble_research_enabled: bool = False
+    ensemble_folds: int = 3
+    ensemble_review_seconds: int = 120
     python_analysis_enabled: bool = True
     data_research_min_seconds: int | None = 0  # Auto: one sixth of the run, up to 30 minutes.
     llm_max_calls: int | None = 32
@@ -142,6 +145,9 @@ class Config:
             research_mode=os.environ.get("RESEARCH_MODE", "adaptive"),
             research_protocol=os.environ.get("RESEARCH_PROTOCOL", "compact"),
             background_tuning_enabled=boolean('BACKGROUND_TUNING_ENABLED', True),
+            ensemble_research_enabled=boolean('ENSEMBLE_RESEARCH_ENABLED', False),
+            ensemble_folds=integer('ENSEMBLE_FOLDS',3,2,5),
+            ensemble_review_seconds=integer('ENSEMBLE_REVIEW_SECONDS',120,1,3600),
             background_max_trials=integer('BACKGROUND_MAX_TRIALS', 128, 1, 10000),
             background_trial_seconds=integer('BACKGROUND_TRIAL_SECONDS', 300, 5, 3600),
             background_cpu_threads=integer('BACKGROUND_CPU_THREADS', 6, 1, 7),
@@ -184,7 +190,7 @@ class Config:
             work_dir=Path(work_dir or os.environ.get("WORK_DIR", "runs")).resolve(),
             seed=integer("SEED", 42, 0, 2**31 - 1),
             graph_enabled=boolean("GRAPH_ENABLED", True),
-            graph_peers=integer("GRAPH_PEERS", min(2, integer("MAX_WORKERS", 2, 1, 2)), 1, 2),
+            graph_peers=integer("GRAPH_PEERS",5 if boolean('ENSEMBLE_RESEARCH_ENABLED',False) else min(2, integer("MAX_WORKERS", 2, 1, 2)), 1, 5),
             graph_train_workers=integer("GRAPH_TRAIN_WORKERS", 1, 1, 2),
             graph_max_live_branches=integer("GRAPH_MAX_LIVE_BRANCHES", 3, 1, 31),
             graph_max_total_branches=integer("GRAPH_MAX_TOTAL_BRANCHES", 15, 1, 255),
@@ -223,7 +229,9 @@ class Config:
             raise AgentError('INVALID_CONFIG', 'Reasoning controls require an explicitly selected provider protocol; proxy support is not inferred')
         if cfg.research_mode not in {"adaptive", "catalog", "code"} or cfg.console_format not in {"human", "json"}:
             raise AgentError("INVALID_CONFIG", "Unsupported RESEARCH_MODE or CONSOLE_LOG_FORMAT")
-        if cfg.graph_peers > cfg.max_workers or cfg.graph_train_workers > cfg.max_workers:
+        if cfg.ensemble_research_enabled and (cfg.research_mode!='adaptive' or not cfg.graph_enabled or not cfg.background_tuning_enabled or cfg.research_protocol=='legacy' or cfg.graph_peers!=5):
+            raise AgentError('INVALID_CONFIG','Ensemble specialists require adaptive background pipelines and exactly five architecture roles')
+        if (cfg.graph_peers > cfg.max_workers and not cfg.ensemble_research_enabled) or cfg.graph_train_workers > cfg.max_workers:
             raise AgentError("INVALID_CONFIG", "GRAPH_PEERS/GRAPH_TRAIN_WORKERS must not exceed MAX_WORKERS")
         if cfg.graph_max_live_branches > cfg.graph_max_total_branches:
             raise AgentError("INVALID_CONFIG", "Live graph limit must not exceed total graph limit")

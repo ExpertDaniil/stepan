@@ -9,7 +9,11 @@
     "agent/predictions.py",
     "agent/worker.py",
     "agent/feature_engineering.py",
-    "agent/feature_schema.py"
+    "agent/feature_schema.py",
+    "agent/learned_features.py",
+    "agent/specialists.py",
+    "agent/ensemble.py",
+    "agent/neural.py"
   ],
   "features": {
     "feature.class_weight": {

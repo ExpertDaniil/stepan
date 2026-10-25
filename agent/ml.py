@@ -223,6 +223,10 @@ def build_pipeline(recipe_id, task_spec, params):
     if recipe_id.startswith("catboost-"):
         model = CatBoostFrameModel(regression, params, threads, seed)
         return Pipeline([("interactions", NumericInteractions()), ("model", model)]) if interactions else model
+    if recipe_id.startswith('tabular-net-'):
+        from agent.neural import TabularNetwork
+        model=TabularNetwork(regression,params,threads,seed,task_spec.get('_fit_context'),task_spec.get('allowed_labels'))
+        return Pipeline([('interactions',NumericInteractions()),('model',model)]) if interactions else model
     if recipe_id.startswith(('hist-native-', 'lightgbm-')):
         model = NativeHistogramModel(regression, params, threads, seed,
             'hist' if recipe_id.startswith('hist-native-') else 'lightgbm')

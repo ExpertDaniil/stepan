@@ -177,6 +177,7 @@ class Researcher:
         record['investigation'] = proposed.get('investigation')
         record['investigation_check'] = investigation_check
         record['semantic_scope'] = context['metadata'].get('detail_scope')
+        if context['metadata'].get('specialist'):record['specialist']=context['metadata']['specialist']
         if record['semantic_updates']:
             self.log.event('research.semantic_update_saved', context_id=payload['context_id'],
                 updates=len(record['semantic_updates']), verification='model_statement_unverified',
@@ -195,7 +196,7 @@ class Researcher:
 
     def validate_adaptive(self, proposed, context, answer):
         if context['metadata'].get('pipeline_execution'):
-            return self.validate_executable(proposed, context)
+            return self.validate_executable(proposed, context, answer)
         program = None
         validate_action(proposed, self.catalog)
         from agent.data_research import require_action, require_feature_parameters
@@ -330,8 +331,11 @@ class Researcher:
                 validate_code(proposed['code'])
         return dict(user=user, program=program, memory=memory, evidence=evidence, knowledge=knowledge, protocol=protocol, landscape=landscape, investigation_check=investigation_check)
 
-    def validate_executable(self, proposed, context):
+    def validate_executable(self, proposed, context, answer=None):
         """Operational checks only; explanatory prose never gates an executable candidate."""
+        if context['metadata'].get('specialist'):
+            from agent.specialists import normalize_proposal
+            normalize_proposal(proposed,context,self.catalog,self.artifacts)
         validate_action(proposed, self.catalog)
         user = json.loads(context['messages'][1]['content'])
         detail = context['metadata'].get('detail_artifact_id')
@@ -358,6 +362,17 @@ class Researcher:
             automatic_space(self.catalog, {'recipe_id': proposed['recipe_id'],
                 'model': {'hyperparameters': proposed['hyperparameters']}}, proposed['code'])
         profile = user.get('profile_summary', user)
-        return dict(user=user, program=program, memory=profile.get('research_memory', {}), evidence=set(),
+        evidence={f['source_id'] for f in user.get('facts',[]) if f.get('source_id')}
+        evidence.update(context['metadata'].get('delivered_evidence_ids',[]))
+        for field in ('analysis_history','research_feedback'):
+            evidence.update(r['artifact_id'] for r in profile.get(field,[]) if r.get('artifact_id'))
+        for call in (answer or {}).get('tool_calls',[]):
+            if call.get('artifact_id'):evidence.add(call['artifact_id'])
+            evidence.update(call.get('evidence_ids',[]))
+        if proposed.get('semantic_updates'):
+            from agent.research_memory import validate_semantic_updates
+            validate_semantic_updates(proposed['semantic_updates'],profile.get('research_memory',{}),evidence,
+                self.feature_columns,context['metadata'].get('detail_scope'))
+        return dict(user=user, program=program, memory=profile.get('research_memory', {}), evidence=evidence,
             knowledge=profile.get('knowledge', {}), protocol={}, landscape=profile.get('research_landscape', {}),
             investigation_check={'verification': 'executable_interface_checked', 'warnings': []})

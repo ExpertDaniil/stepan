@@ -12092,6 +12092,43 @@
             },
             "pipeline_execution": {
               "type": "boolean"
+            },
+            "specialist": {
+              "type": "object",
+              "properties": {
+                "role_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "researcher_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "recipe_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "focus": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "availability": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reference_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "role_id",
+                "researcher_id",
+                "recipe_id",
+                "focus",
+                "availability"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

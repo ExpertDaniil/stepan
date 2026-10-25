@@ -28,7 +28,7 @@ def frozen_execution(artifacts, experiment, task_spec, phase):
     if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
         raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
     runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py',
-               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
+               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/learned_features.py', 'agent/neural.py', 'agent/specialists.py', 'agent/ensemble.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
                'tools/data.py', 'tools/runtime_guard.py']
     value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
              'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
@@ -185,6 +185,17 @@ class Runner:
             stream.close()
 
     def _start(self, payload, task_spec, experiment, phase):
+        task_spec = dict(task_spec)
+        validation_id = experiment['plan']['validation_id']
+        protocol_path = self.artifacts.safe_path('validation/'+validation_id+'.protocol.json')
+        if protocol_path.is_file():
+            protocol = json.loads(protocol_path.read_text(encoding='utf-8'))
+            digest = hashlib.sha256(canonical(protocol).encode()).hexdigest()
+            if validation_id != 'validation-'+digest[:16]:
+                raise AgentError('CANDIDATE_CHANGED', 'Frozen validation protocol changed')
+            proposal = protocol['proposal']
+            task_spec['_fit_context'] = {'strategy': proposal['strategy'], 'column': proposal['parameters'].get('column'),
+                                         'protocol_sha256': digest}
         lease = payload["lease"]
         held = self.budget.leases.get(lease["lease_id"])
         if not held or held["lease"]["fencing_token"] != lease["fencing_token"]:
@@ -208,6 +219,12 @@ class Runner:
                     "model_snapshot_max_bytes": self.snapshot_allowance(),
                     "result_path": str(directory / "result.json")}
         job_spec['preflight'] = phase == 'train' and experiment['plan']['plan_id'].startswith('candidate-')
+        if self.config.ensemble_research_enabled:
+            from agent.specialists import FACTORY_SOURCE as SPECIALIST_SOURCE
+            from agent.ensemble import FACTORY_SOURCE as ENSEMBLE_SOURCE
+            source=self.artifacts.resolve(experiment['plan']['code_artifact_id']).read_text(encoding='utf-8')
+            if source.strip() in {SPECIALIST_SOURCE.strip(),ENSEMBLE_SOURCE.strip()}:job_spec['preflight']=False
+            job_spec['emit_probabilities']=task_spec['task_kind']!='regression'
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))
@@ -356,6 +373,7 @@ class Runner:
             if path.suffix not in {".csv", ".log", ".joblib"} and path.name != "features.json":
                 continue
             kind = ('feature_execution' if path.name == 'features.json' else
+                    'validation_probabilities' if path.name=='probabilities.csv' else
                     ('fit_oof_predictions' if job.diagnostic else 'validation_predictions' if job.phase == 'train' else 'submission') if path == job.prediction_path else
                     'fitted_pipeline' if path.suffix == '.joblib' else 'execution_log')
             media = 'application/json' if path.name == 'features.json' else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'

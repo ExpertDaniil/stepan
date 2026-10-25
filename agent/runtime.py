@@ -23,7 +23,7 @@ from agent.runner import Runner
 from agent.store import Store
 from agent.submission import Submission
 from agent.task import resolve_spec
-from agent.task_interpreter import TaskInterpreter
+from agent.task_interpreter import TaskInterpreter, recover_contract
 from tools.data import profile_data
 from tools.files import read_task
 
@@ -64,10 +64,15 @@ def bootstrap(config, started, task_path, run_id, root, log):
                            lambda p: profile_data(p, artifacts))["data"]
         schemas = output_schemas(bus)
         artifacts.write_json("task/agent-output-schemas.json", schemas, "llm_schemas")
+        recovery = recover_contract(task, profile, artifacts)
+        if recovery:
+            submission = Submission(recovery['spec'], artifacts, store, log)
+            submission.publish_emergency(recovery)
         gateway = Gateway(config, budget, artifacts, bus, log, schemas)
         demo = demo_metadata(task["task_text"]) if config.llm_mode == "mock" else None
 
         interpreter = TaskInterpreter(config, artifacts, bus, gateway, task, profile, demo)
+        interpreter.recovered = recovery
         interpretation = bus.call("C02", {"task_text_artifact_id": task["task_text_artifact_id"],
                                            "candidate_paths": task["candidate_paths"], "tools_catalog_version": "tools-v1"}, interpreter.interpret)
         spec_result = bus.call("C04", {"interpretation_request_id": interpretation["request_id"],
@@ -83,7 +88,12 @@ def bootstrap(config, started, task_path, run_id, root, log):
         evaluator = Evaluator(spec, artifacts, store, log)
         proposal = interpreter.choose_validation(spec)
         validation = bus.call("C05", {"task_spec_id": spec["task_spec_id"], "dataset_id": spec["dataset_id"], "proposal": proposal}, evaluator.create_protocol)["data"]
-        submission = Submission(spec, artifacts, store, log)
+        if submission:
+            if any(spec[k] != recovery['spec'][k] for k in ('task_kind', 'target_column', 'output')):
+                raise AgentError('TASK_SPEC_CONFLICT', 'LLM interpretation disagrees with the recovered output contract')
+            submission.spec = spec
+        else:
+            submission = Submission(spec, artifacts, store, log)
         researcher = Researcher(bus, gateway, artifacts, spec, catalog, config, log,
                                 feature_columns=artifacts.read_json(profile['profile_artifact_id'])['train_columns'])
         controller = Orchestrator(config=config, bus=bus, budget=budget, artifacts=artifacts, store=store, runner=runner,
@@ -133,6 +143,12 @@ def bootstrap(config, started, task_path, run_id, root, log):
                 controller.cleanup()
             except Exception as cleanup_error:
                 log.exception("run.cleanup_error", cleanup_error)
+        if submission and submission.require_emergency():
+            store.set_run_state('degraded')
+            log.exception('run.bootstrap_degraded', exc)
+            log.event('run.finished', state='degraded', output_path=submission.spec['output']['path'],
+                      run_directory=str(root), score=None, reason='verified_emergency_output')
+            return 130 if isinstance(exc, KeyboardInterrupt) else 0
         store.set_run_state("failed")
         log.exception("run.failed", exc, code=getattr(exc, "code", "UNHANDLED_ERROR"))
         return 130 if isinstance(exc, KeyboardInterrupt) else 1

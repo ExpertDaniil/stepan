@@ -17,8 +17,9 @@ def read_training(path, spec):
 
 
 def prediction_kind(spec, phase='train'):
-    return (spec['metric']['prediction_kind'] if phase == 'train' else
-            spec['output'].get('prediction_kind', spec['metric']['prediction_kind']))
+    if phase != 'train' and spec['output'].get('prediction_kind'):
+        return spec['output']['prediction_kind']
+    return spec['metric']['prediction_kind']
 
 
 def validation_columns(spec):

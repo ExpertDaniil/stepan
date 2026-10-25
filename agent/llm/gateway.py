@@ -12,6 +12,17 @@ from tools.code import write_code
 DEFAULT_MODEL = "qwen/qwen3.8-27b"  # Permitted by the updated organizers' instructions.
 
 
+class UnavailableTransport:
+    def __init__(self, error):
+        self.error = error
+
+    def complete(self, request, timeout, context):
+        raise self.error
+
+    def close(self):
+        pass
+
+
 def request_model(mode):
     return os.environ.get("OPENAI_MODEL", "").strip() or (DEFAULT_MODEL if mode == "live" else "mock-only")
 
@@ -133,7 +144,12 @@ class Gateway:
     def __init__(self, config, budget, artifacts, bus, log, output_schemas, transport=None):
         self.config, self.budget, self.artifacts, self.bus, self.log = config, budget, artifacts, bus, log
         self.output_schemas = output_schemas
-        self.transport = transport or (MockTransport() if config.llm_mode == "mock" else OpenAITransport())
+        try:
+            self.transport = transport or (MockTransport() if config.llm_mode == "mock" else OpenAITransport())
+        except AgentError as error:
+            # Keep deterministic bootstrapping/training available without API
+            # configuration. Calls still fail explicitly; no alternate provider.
+            self.transport = UnavailableTransport(error)
         self.semaphore = threading.BoundedSemaphore(config.max_workers)
         self.daily_budget_exhausted = threading.Event()
         self.provider_credits_exhausted = threading.Event()

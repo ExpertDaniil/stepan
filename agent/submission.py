@@ -18,6 +18,67 @@ class Submission:
         self.spec, self.artifacts, self.store, self.log = spec, artifacts, store, log
         self.jobs, self.reports = {}, {}
         self.lock = threading.RLock()
+        self.emergency = None
+
+    def publish_emergency(self, recovery):
+        """Unscored contract insurance, using the ordinary output validator.
+
+        It never enters ranking, confirmation or Store as an evaluated model.
+        The first real evaluated publication replaces it without a fake score.
+        """
+        import numpy as np
+        import pandas as pd
+        y = recovery['target']
+        output = self.spec['output']
+        frame = pd.read_csv(self.artifacts.resolve(self.spec['test_artifact_id']),
+                            usecols=output['id_columns'], dtype=str, keep_default_na=False)[output['id_columns']]
+        if self.spec['task_kind'] == 'regression':
+            values = pd.to_numeric(y, errors='raise').to_numpy(dtype=float)
+            if not np.isfinite(values).all():
+                raise AgentError('TASK_SPEC_CONFLICT', 'Emergency numeric target must be finite')
+            value = float(np.mean(values))
+        else:
+            value = str(y.astype(str).value_counts().index[0])
+        frame[output['prediction_columns'][0]] = value
+        art = self.artifacts.write_text('submissions/emergency.csv', frame[output['columns']].to_csv(index=False), 'submission', 'text/csv')
+        report = self.validate_output({'task_spec_id': self.spec['task_spec_id'],
+            'reference_test_artifact_id': self.spec['test_artifact_id'], 'candidate_artifact_id': art['artifact_id']})
+        target = Path(output['path'])
+        staged = self._stage_source(self.artifacts.resolve(art['artifact_id']), target, report['candidate_sha256'])
+        try:
+            os.replace(staged, target)
+            self._sync_directory(target.parent)
+        finally:
+            staged.unlink(missing_ok=True)
+        self.emergency = {'submission_artifact_id': art['artifact_id'], 'output_sha256': report['candidate_sha256'],
+            'validation_report_id': report['validation_report_id'], 'provenance': recovery['provenance'],
+            'evaluation': None, 'status': 'verified_output_without_quality_estimate'}
+        self.artifacts.write_json('submissions/emergency-publication.json', self.emergency, 'submission_state')
+        self.log.event('submission.emergency_published', output_path=str(target), score=None, **self.emergency)
+
+    def require_emergency(self):
+        target = Path(self.spec['output']['path'])
+        return bool(self.emergency and target.is_file() and file_sha256(target) == self.emergency['output_sha256'])
+
+    @staticmethod
+    def _stage_source(source, target, digest):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.submission-', suffix='.tmp', delete=False) as handle:
+                temporary = Path(handle.name)
+                with source.open('rb') as incoming:
+                    shutil.copyfileobj(incoming, handle)
+                os.chmod(temporary, 0o644)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if file_sha256(temporary) != digest:
+                raise AgentError('CANDIDATE_CHANGED', 'Staged file hash mismatch')
+            return temporary
+        except BaseException:
+            if temporary:
+                temporary.unlink(missing_ok=True)
+            raise
 
     def change_state(self, ident, state):
         self.jobs[ident]["state"] = state
@@ -113,15 +174,7 @@ class Submission:
             target.parent.mkdir(parents=True, exist_ok=True)
             temporary = None
             try:
-                with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".submission-", suffix=".tmp", delete=False) as handle:
-                    temporary = Path(handle.name)
-                    with source.open("rb") as incoming:
-                        shutil.copyfileobj(incoming, handle)
-                    os.chmod(temporary, 0o644)  # Readable by the platform evaluator.
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                if file_sha256(temporary) != digest:
-                    raise AgentError("CANDIDATE_CHANGED", "Staged file hash mismatch")
+                temporary = self._stage_source(source, target, digest)
                 journal_id = self.store.prepare_publication({"champion": champion, "target_path": str(target), "sha256": digest,
                     'selection_basis': 'final_confirmation' if confirmed else 'research_validation',
                     'confirmation_artifact_id': confirmation_id})

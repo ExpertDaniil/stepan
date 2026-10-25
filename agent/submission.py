@@ -60,6 +60,48 @@ class Submission:
         target = Path(self.spec['output']['path'])
         return bool(self.emergency and target.is_file() and file_sha256(target) == self.emergency['output_sha256'])
 
+    def candidate_identity(self, experiment_id):
+        from agent.contracts import canonical
+        from agent.store import Store
+        exp = self.store.get(experiment_id)
+        plan = exp['plan']
+        code_hash = file_sha256(self.artifacts.resolve(plan['code_artifact_id']))
+        core = Store.fingerprint_core(plan, code_hash)
+        if code_hash != self.artifacts.meta(plan['code_artifact_id'])['sha256'] or hashlib.sha256(canonical(core).encode()).hexdigest() != exp['fingerprint']:
+            raise AgentError('CANDIDATE_CHANGED', 'Saved output no longer matches the measured pipeline')
+        test_hash = file_sha256(self.artifacts.resolve(self.spec['test_artifact_id']))
+        if test_hash != self.artifacts.meta(self.spec['test_artifact_id'])['sha256']:
+            raise AgentError('CANDIDATE_CHANGED', 'Reference test bytes changed')
+        train_hash = file_sha256(self.artifacts.resolve(self.spec['train_artifact_id']))
+        if train_hash != self.artifacts.meta(self.spec['train_artifact_id'])['sha256']:
+            raise AgentError('CANDIDATE_CHANGED', 'Reference training bytes changed')
+        return {'fingerprint': exp['fingerprint'], 'code_sha256': code_hash,
+                'task_spec_sha256': hashlib.sha256(canonical(self.spec).encode()).hexdigest(),
+                'validation_id': plan['validation_id'], 'test_sha256': test_hash, 'train_sha256': train_hash}
+
+    def ready_candidate(self, experiment_id):
+        """Previously committed publications are reusable only under the same identity."""
+        try:
+            identity = self.candidate_identity(experiment_id)
+            evaluation = self.store.experiment_evaluation(experiment_id)
+            if not evaluation or not evaluation['valid'] or evaluation['violations']:
+                return None
+            rows = self.store.db.execute("SELECT record FROM publication_journal WHERE run_id=? AND state='committed' ORDER BY rowid DESC", (self.store.run_id,))
+            for row in rows:
+                record = json.loads(row[0])
+                champion = record['champion']
+                if champion['experiment_id'] != experiment_id or champion['evaluation_id'] != evaluation['evaluation_id']:
+                    continue
+                if record.get('candidate_identity') != identity:
+                    continue  # Old records without identity need refit, never silent trust.
+                path = self.artifacts.resolve(champion['submission_artifact_id'])
+                if file_sha256(path) != champion['output_sha256']:
+                    continue
+                return champion
+        except (AgentError, OSError, KeyError, ValueError):
+            return None
+        return None
+
     @staticmethod
     def _stage_source(source, target, digest):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -176,6 +218,7 @@ class Submission:
             try:
                 temporary = self._stage_source(source, target, digest)
                 journal_id = self.store.prepare_publication({"champion": champion, "target_path": str(target), "sha256": digest,
+                    'candidate_identity': self.candidate_identity(payload['experiment_id']),
                     'selection_basis': 'final_confirmation' if confirmed else 'research_validation',
                     'confirmation_artifact_id': confirmation_id})
                 os.replace(temporary, target)

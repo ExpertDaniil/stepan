@@ -1,5 +1,8 @@
 # Data understanding release
 
+> Исторический отчёт о `de7a28c`. Продолжение и текущие исправления:
+> [DATA-UNDERSTANDING-UPDATE.md](DATA-UNDERSTANDING-UPDATE.md).
+
 Base: remote `feat/final-data-research`, `fa25a30f742ff132c04b6c462df25889bf79e99d`.
 The clean local `d9b1214` was compared file by file. Remote already contains its
 renewable diagnostic queue fixes and additional provenance checks; replacing those

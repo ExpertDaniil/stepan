@@ -333,6 +333,10 @@ class Researcher:
     def validate_executable(self, proposed, context):
         """Operational checks only; explanatory prose never gates an executable candidate."""
         validate_action(proposed, self.catalog)
+        from agent.data_research import require_action, require_feature_parameters
+        window = self.gateway.budget.data_research_snapshot()
+        require_action(proposed, window)
+        require_feature_parameters(proposed, self.catalog, window)
         user = json.loads(context['messages'][1]['content'])
         detail = context['metadata'].get('detail_artifact_id')
         if detail:

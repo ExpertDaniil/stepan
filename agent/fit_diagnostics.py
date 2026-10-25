@@ -271,7 +271,11 @@ class FitDiagnostics:
 
     def remaining(self):
         c = self.c
-        return min(c.config.time_budget_seconds*c.config.research_oof_budget_fraction-self.spent,
+        total = c.config.time_budget_seconds*c.config.research_oof_budget_fraction
+        progress = min(1., max(0., (time.monotonic()-c.budget.started)/c.config.time_budget_seconds))
+        # Reserve half of the allowance for later representations.
+        unlocked = total*(.5+.5*progress)
+        return min(unlocked-self.spent,
                    c.budget.remaining()-c.budget.reserve_seconds()-2, c.budget.phase_remaining()-2)
 
     def ensure(self, ids):

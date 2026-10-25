@@ -58,7 +58,7 @@ class PipelineBackgroundTests(unittest.TestCase):
         self.assertEqual(one, version_id(other, 'source-hash', space))
         self.assertNotEqual(one, version_id(other, 'changed-source', space))
 
-    def test_initial_winner_pauses_old_study_and_preserves_it(self):
+    def test_initial_winner_changes_priority_and_preserves_challenger(self):
         ticket, reply, payload, _ = self.h.result('researcher-1', {'alpha':1}, 10)
         search = VersionSearch(self.c)
         first = search.add(payload['proposal']['plan'], ticket, evaluated=reply['lead_submission']['experiment_id'])
@@ -67,7 +67,9 @@ class PipelineBackgroundTests(unittest.TestCase):
         second = search.add(second_plan, ticket)
         metric = {**first['best_metric'], 'value':9.0}
         search.measured(second, first['best_experiment_id'], metric, None, True)
-        self.assertTrue(first['paused'].startswith('superseded_by_initial:'))
+        self.assertIsNone(first['paused'])
+        self.assertEqual(first['deprioritized_by'], second['version_id'])
+        self.assertIn(first, search.eligible())
         self.assertEqual(first['best_metric']['value'], 10)
         self.assertEqual(second['best_metric']['value'], 9)
 

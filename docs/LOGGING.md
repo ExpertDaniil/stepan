@@ -30,6 +30,12 @@
 
 # Наблюдаемость
 
+`validation.contract_resolved` сохраняет явно заданный сценарий проверки.
+`pipeline.version_resumed` объясняет возврат после временного отказа;
+`pipeline.leader_replaced` меняет приоритет, сохраняя прежние версии доступными.
+`submission.ready_output_reused` означает проверку и публикацию прежнего CSV без
+нового обучения. C18.mode=`reuse_verified_output` отличает её от refit.
+
 `research.data_phase_started/completed/interrupted` показывают обязательный этап
 данных: минимум, фактически зачтённое время, остаток и доступность настройки.
 `research.data_phase_trial_rejected` объясняет отказ модельного опыта до запуска.

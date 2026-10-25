@@ -13,6 +13,8 @@
 
 # AutoML Agent · Adaptive Research
 
+Доработка после независимого обзора: [DATA-UNDERSTANDING-UPDATE.md](docs/DATA-UNDERSTANDING-UPDATE.md).
+
 Обязательный этап данных: [DATA-RESEARCH-WINDOW.md](docs/DATA-RESEARCH-WINDOW.md).
 После стартовых моделей первые 30 минут трёхчасового адаптивного поиска отданы
 анализу и преобразованиям данных. Optuna и резервный перебор параметров в этот

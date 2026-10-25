@@ -51,7 +51,8 @@ def recover_contract(task, profile, artifacts):
     root = Path(task['task_root']).resolve()
     if not (root/output_path).resolve().is_relative_to(root):
         return None
-    metric_lines = '\n'.join(line for line in text.splitlines() if re.search(r'^\s*(?:метрика|metric\s*:|основная метрика)', line, re.I))
+    from agent.task_rules import metric_text
+    metric_lines = metric_text(text)
     patterns = {'rmse': r'\brmse\b', 'mae': r'\bmae\b', 'r2': r'\br2\b',
                 'f1_macro': r'macro[ _-]*f1|f1[ _-]*macro', 'f1_weighted': r'weighted[ _-]*f1|f1[ _-]*weighted',
                 'accuracy': r'\baccuracy\b', 'log_loss': r'log[ _-]*loss', 'roc_auc': r'roc[ _-]*auc'}
@@ -118,15 +119,30 @@ class TaskInterpreter:
         return {"draft": draft, "evidence": ["Source task artifact: " + self.task["task_text_artifact_id"]], "unresolved_fields": []}
 
     def choose_validation(self, spec):
+        from agent.task_rules import validation_requirement, bind_requirement
+        full = self.artifacts.read_json(self.profile['profile_artifact_id'])
+        requirement = validation_requirement(self.task['task_text'],
+            [c for c in full['train_columns'] if c not in spec.get('target_columns', [spec['target_column']])],
+            full.get('data_dictionary', []))
+        if requirement and (requirement['column'] or requirement['strategy'] in {'random_holdout', 'stratified_holdout'}):
+            proposal = {'strategy': requirement['strategy'], 'seed': self.config.seed,
+                'parameters': {'valid_fraction': .2, **({'column': requirement['column']} if requirement['column'] else {})},
+                'reason': 'Explicit task deployment and column declarations; no feature-name inference.'}
+            self.gateway.log.event('validation.contract_resolved', requirement=requirement)
+            return bind_requirement(proposal, requirement)
         try:
             from agent.semantic_planning import load_task_model
-            return self.ask("ValidationProposal-v1", "result_analysis", "validation.md",
+            proposal = self.ask("ValidationProposal-v1", "result_analysis", "validation.md",
                             {"task_markdown": self.task["task_text"], "task_spec": spec, "profile": self.profile["summary"],
                              'semantic_task': load_task_model(spec, self.artifacts)})
+            return bind_requirement(proposal, requirement)
         except Exception as error:
             # A date alone is not a temporal scenario. Fallback is explicit and
             # recorded; scenario evidence is handled by the protocol resolver.
             self.gateway.log.event('validation.bootstrap_unavailable', code=getattr(error, 'code', type(error).__name__))
+            if requirement:
+                raise AgentError('VALIDATION_SCENARIO_UNRESOLVED',
+                    'Provider unavailable and explicit deployment constraints remain unresolved; retain the emergency output') from error
             return {'strategy': 'random_holdout' if spec['task_kind'] == 'regression' else 'stratified_holdout',
                     'seed': self.config.seed, 'parameters': {'valid_fraction': .2},
                     'reason': 'Provider unavailable; no scenario inferred from dtype or names.'}

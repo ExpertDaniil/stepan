@@ -4207,7 +4207,8 @@
             },
             "mode": {
               "enum": [
-                "refit_full_train"
+                "refit_full_train",
+                "reuse_verified_output"
               ]
             },
             "expected_champion_version": {
@@ -12190,7 +12191,8 @@
         },
         "mode": {
           "enum": [
-            "refit_full_train"
+            "refit_full_train",
+            "reuse_verified_output"
           ]
         },
         "expected_champion_version": {

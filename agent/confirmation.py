@@ -48,6 +48,22 @@ def partition(frame, valid, proposal, spec):
         return list(valid), [], 'partition_unavailable:'+type(error).__name__
 
 
+def select_finalists(controller, reference):
+    """Rank deliverable measured candidates, including previous verified outputs."""
+    candidates = []
+    champion = controller.store.champion()
+    for row in controller.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated'", (controller.store.run_id,)):
+        eid = row[0]
+        ev = controller.store.experiment_evaluation(eid)
+        if eid not in controller.failed_refits and ev and ev['valid'] and not ev['violations'] and comparable(reference, ev['primary_metric']):
+            ready = (champion and champion['experiment_id'] == eid) or bool(controller.submission.ready_candidate(eid))
+            cost = controller.budget.duration.estimate(controller.store.get(eid)['plan'], 'refit')+controller.budget.output_reserve()
+            if not ready and cost > controller.budget.remaining():continue
+            candidates.append((eid, ev['primary_metric']['value']))
+    candidates.sort(key=lambda pair: pair[1], reverse=reference['direction'] == 'maximize')
+    return [eid for eid, _ in candidates[:2]]
+
+
 def finalize(controller):
     if getattr(controller, 'confirmation_attempted', False):
         return
@@ -69,21 +85,10 @@ def finalize(controller):
     if best is None:
         return
     reference = controller.store.experiment_evaluation(best)['primary_metric']
-    candidates = []
-    for row in controller.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated'", (controller.store.run_id,)):
-        eid = row[0]
-        ev = controller.store.experiment_evaluation(eid)
-        if eid not in controller.failed_refits and ev and ev['valid'] and not ev['violations'] and comparable(reference, ev['primary_metric']):
-            champion = controller.store.champion()
-            ready = champion and champion['experiment_id'] == eid
-            cost = controller.budget.duration.estimate(controller.store.get(eid)['plan'], 'refit')+controller.budget.output_reserve()
-            if not ready and cost > controller.budget.remaining():continue
-            candidates.append((eid, ev['primary_metric']['value']))
-    candidates.sort(key=lambda pair: pair[1], reverse=reference['direction'] == 'maximize')
-    finalists = [eid for eid, _ in candidates[:2]]
+    finalists = select_finalists(controller, reference)
     champion = controller.store.champion()
-    if champion and champion['experiment_id'] not in finalists:
-        finalists = [best, champion['experiment_id']]
+    if champion and champion['experiment_id'] not in finalists and len(finalists) < 2:
+        finalists.append(champion['experiment_id'])
     if len(finalists) < 2:
         controller.log.event('validation.confirmation_skipped', reason='fewer_than_two_finalists')
         return

@@ -32,7 +32,8 @@ class VersionSearch:
     def save(self):
         self.revision += 1
         rows = [{k: deepcopy(v[k]) for k in ('version_id', 'initial_experiment_id', 'initial_metric',
-            'best_experiment_id', 'best_metric', 'trials', 'paused', 'last_scheduled', 'errors')} for v in self.versions.values()]
+            'best_experiment_id', 'best_metric', 'trials', 'paused', 'last_scheduled', 'errors',
+            'deprioritized_by', 'retryable_initial')} for v in self.versions.values()]
         histories = {}
         for version in self.versions.values():
             histories[version['version_id']] = {
@@ -59,13 +60,24 @@ class VersionSearch:
         space = automatic_space(c.catalog, plan, source)
         ident = version_id(plan, c.artifacts.meta(plan['code_artifact_id'])['sha256'], space)
         if ident in self.versions:
+            version = self.versions[ident]
+            changed = canonical(plan['model']['hyperparameters']) != canonical(version['anchor']['model']['hyperparameters'])
+            if version['paused'] and (version['paused'].startswith('superseded_by_initial:') or
+                    (not version['initial_metric'] and changed)):
+                version.update(paused=None, retry_at=0)
+                if not version['initial_metric']:
+                    version['anchor'], version['ticket'] = plan, ticket
+                    if version not in self.queue:self.queue.append(version)
+                c.log.event('pipeline.version_resumed', version_id=ident, reason='explicit_repair_or_resubmission')
+                self.save()
             c.log.event('pipeline.version_reused', version_id=ident)
-            return self.versions[ident]
+            return version
         version = {'version_id': ident, 'anchor': plan, 'ticket': ticket, 'space': space,
             'initial_experiment_id': evaluated, 'initial_metric': None, 'best_experiment_id': None,
             'best_metric': None, 'trials': 0, 'paused': None, 'last_scheduled': 0,
             'errors': 0, 'study': None, 'pending': False, 'retry_at': 0,
-            'batch_limit': c.config.background_max_trials, 'batch_best': None, 'blocked_inputs': {}}
+            'batch_limit': c.config.background_max_trials, 'batch_best': None, 'blocked_inputs': {},
+            'deprioritized_by': None, 'retryable_initial': False}
         if getattr(c, 'error_research', None):
             version['research_binding'] = c.error_research.bind(plan, ticket)
         self.versions[ident] = version
@@ -116,6 +128,8 @@ class VersionSearch:
         return study
 
     def eligible(self):
+        if self.c.budget.data_research_snapshot()['active']:
+            return []
         rows = []
         for v in self.versions.values():
             if not v['initial_metric'] or not v['space'] or v['paused'] or v['pending'] or v['retry_at'] > time.monotonic():
@@ -170,6 +184,8 @@ class VersionSearch:
 
     def start(self, version, *, initial=False):
         c = self.c
+        if c.budget.data_research_snapshot()['active'] and (not initial or not version['anchor'].get('feature_steps')):
+            return False
         trial = None
         plan = deepcopy(version['anchor'])
         try:
@@ -199,6 +215,7 @@ class VersionSearch:
                 # A costly sampled configuration is not proof that the complete
                 # representation has no affordable configurations left.
                 version['paused'] = 'initial_unaffordable' if initial else None
+                version['retryable_initial'] = initial
                 version['retry_at'] = time.monotonic()+1
                 if trial is not None:
                     trial.set_user_attr('not_started', 'candidate_and_finalization_do_not_fit')
@@ -232,6 +249,7 @@ class VersionSearch:
                 if trial is not None:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
                 version['paused'] = 'initial_unaffordable' if initial else None
+                version['retryable_initial'] = initial
                 version['retry_at'] = time.monotonic()+1
                 return False
             allocation = c.lease(eid, 'train', plan['resources'])
@@ -271,6 +289,10 @@ class VersionSearch:
                 {'code': getattr(error, 'code', type(error).__name__), 'message': str(error)[:600]})
             version['retry_at'] = failed['retry_at']
             version['blocked_inputs'][hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()] = failed['retry_at']
+            if initial:
+                version['paused'] = 'initial_execution_failed'
+                version['retryable_initial'] = getattr(error, 'code', '') in {
+                    'RESOURCE_BUSY', 'RESOURCE_LIMIT', 'JOB_TIMEOUT', 'JOB_MEMORY_LIMIT', 'PROCESS_START_FAILED'}
             if trial is not None and trial.number in {t.number for t in self.study(version).get_trials() if not t.state.is_finished()}:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
             c.record_research_feedback(plan['researcher_id'], version['ticket']['work_order']['branch_id'],
@@ -291,7 +313,9 @@ class VersionSearch:
             if self.quality(metric) > old_best+self.c.config.background_switch_margin:
                 for other in self.versions.values():
                     if other is not version and other['best_metric'] and self.quality(other['best_metric']) < self.quality(metric):
-                        other['paused'] = 'superseded_by_initial:'+version['version_id']
+                        # A better first fit changes priority, never proves that
+                        # another representation's search space is exhausted.
+                        other['deprioritized_by'] = version['version_id']
                 self.c.log.event('pipeline.leader_replaced', version_id=version['version_id'],
                     experiment_id=eid, metric=metric, reason='New initial score exceeds previous tuned best')
         self.c.update_final_reserve()
@@ -309,9 +333,6 @@ class VersionSearch:
         c = self.c
         changed = False
         for key, (job, version, trial, initial) in list(self.jobs.items()):
-            if version['paused'] and version['paused'].startswith('superseded_by_initial:') and not initial and not job.event and job.process.poll() is None:
-                c.cancel_job(job, 'Superseded by a stronger initial pipeline version')
-                c.log.event('pipeline.execution_preempted', version_id=version['version_id'], experiment_id=job.experiment_id)
             if job.process.poll() is None and not job.event:
                 c._heartbeat_and_limits(job)
             if job.process.poll() is None and not job.event:
@@ -347,20 +368,22 @@ class VersionSearch:
                     'pipeline_execution_failed', canonical(event.get('error')), code='PIPELINE_EXECUTION_FAILED')
             if initial:
                 version['paused'] = 'initial_execution_failed'
+                version['retryable_initial'] = event['state'] in {'timed_out', 'cancelled'} or (event.get('error') or {}).get('code') in {
+                    'JOB_TIMEOUT', 'JOB_MEMORY_LIMIT', 'RESOURCE_BUSY', 'PROCESS_START_FAILED'}
             self.save()
         if changed:
             c.publish_research_updates()
 
     def fill(self):
-        if self.queue and self.jobs and (len(self.jobs) >= self.c.config.max_workers
-                or self.c.budget.snapshot()['cpu_threads_available'] <= int(not self.c.budget.analysis_active)):
-            trials = [(job, v) for job, v, _, initial in self.jobs.values() if not initial and not job.event]
-            if trials:
-                job, version = min(trials, key=lambda pair: self.quality(pair[1]['best_metric']))
-                self.c.cancel_job(job, 'Priority first evaluation of a new executable version')
-                self.c.log.event('pipeline.execution_preempted', version_id=version['version_id'],
-                                 experiment_id=job.experiment_id, reason='new_initial_version')
-                return
+        now = time.monotonic()
+        for version in self.versions.values():
+            if version['paused'] and version['retryable_initial'] and version['retry_at'] <= now and not version['pending']:
+                if self.c.budget.can_train(version['anchor'])['allowed']:
+                    version['paused'] = None
+                    if version not in self.queue:self.queue.append(version)
+                    self.c.log.event('pipeline.version_resumed', version_id=version['version_id'], reason='transient_failure_rechecked')
+                else:
+                    version['retry_at'] = now+5
         if self.publish_due:
             if self.jobs or (getattr(self.c, 'science', None) and self.c.science.diagnostics.running):
                 return
@@ -369,9 +392,12 @@ class VersionSearch:
         dispatched = 0
         while len(self.jobs) < self.c.config.max_workers and self.c.budget.snapshot()['search_allowed'] and dispatched < self.c.config.max_workers*2:
             dispatched += 1
-            initial = bool(self.queue)
-            if initial and self.queue[0]['retry_at'] > time.monotonic():break
-            version = self.queue.pop(0) if initial else self.choose()
+            window = self.c.budget.data_research_snapshot()
+            ready = next((v for v in self.queue if v['retry_at'] <= time.monotonic()
+                and (not window['active'] or v['anchor'].get('feature_steps'))), None)
+            initial = ready is not None
+            version = ready if initial else self.choose()
+            if initial:self.queue.remove(version)
             if version is None:
                 break
             started = self.start(version, initial=initial)
@@ -385,6 +411,7 @@ def search(controller, root, accepted):
     """Research futures and version-owned train processes share one dispatcher loop."""
     from agent.graph.controller import issue, stop_ticket, publish_activity, finish
     c = controller
+    c.budget.start_data_research()
     service = VersionSearch(c)
     c.pipeline_search = service
     c.budget.train_worker_limit = c.config.max_workers
@@ -466,7 +493,8 @@ def search(controller, root, accepted):
                 retry_at = c.researcher.gateway.daily_retry_at
                 if provider_reason == 'llm_budget_exhausted' and retry_at is not None:
                     renewable = retry_at < c.budget.deadline-c.budget.reserve_seconds()-1
-            cooling_versions = any(v.get('retry_at', 0) > time.monotonic() and not v['paused'] for v in service.versions.values())
+            cooling_versions = any(v.get('retry_at', 0) > time.monotonic() and
+                (not v['paused'] or v.get('retryable_initial')) for v in service.versions.values())
             if not pending and not service.jobs and not service.queue and not service.eligible() and not diagnostic_pending and not renewable and not cooling_versions:
                 reason = 'prepared_work_exhausted_llm_paused' if provider_reason else 'research_and_background_exhausted'
                 break

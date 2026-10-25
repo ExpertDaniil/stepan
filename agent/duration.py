@@ -97,7 +97,8 @@ class DurationModel:
         if plan['model']['family']=='custom' and params.get('base_recipe_id') and not self.samples[self.sample_key(plan)]:
             # Do not compare an owned model's work to the empty custom recipe.
             # Reuse the measured native family as a cold representation prior.
-            return 1.5*self.estimate(self.member_plan(plan,params),phase)
+            factor=1.5 if params.get('feature_program') or params.get('representation_source') else 1.
+            return factor*self.estimate(self.member_plan(plan,params),phase)
         family = plan["model"]["family"]
         work = self.work(plan, phase)
         samples = list(self.samples[self.sample_key(plan)])

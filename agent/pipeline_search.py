@@ -131,6 +131,8 @@ class VersionSearch:
         return study
 
     def eligible(self):
+        if any(v.get('startup') and not v['initial_metric'] and not v['paused'] for v in self.versions.values()):
+            return []
         if not self.c.budget.data_research_snapshot()['tuning_allowed']:
             return []
         rows = []
@@ -230,6 +232,18 @@ class VersionSearch:
             # The execution order is authoritative for both typed lineage and
             # C12 parents. A copied warmup/anchor can name another peer's leader.
             plan = bind_trusted(plan, ticket)
+            # C12 deduplicates candidate identity across attempts. Reopen only
+            # transient terminal executions, after their process/lease is gone;
+            # keep the candidate plan and all previous job events immutable.
+            from agent.store import Store
+            fingerprint=hashlib.sha256(canonical(Store.fingerprint_core(plan,
+                c.artifacts.meta(plan['code_artifact_id'])['sha256'])).encode()).hexdigest()
+            previous=c.store.db.execute('SELECT experiment_id,state FROM experiments WHERE run_id=? AND fingerprint=?',
+                (c.store.run_id,fingerprint)).fetchone()
+            if previous and previous['state'] in {'timed_out','cancelled'}:
+                eid=previous['experiment_id']
+                if not any(j.experiment_id==eid for j in c.runner.active()):
+                    c.store.requeue(eid)
             reply = c.graph.invoke('G04', {'work_order_id': ticket['work_order']['work_order_id'],
                 'proposal': {'proposal_id': 'execution-'+uuid.uuid4().hex[:16], 'researcher_id': plan['researcher_id'],
                     'decision': 'propose', 'plan': plan, 'stop_reason': None},
@@ -249,8 +263,14 @@ class VersionSearch:
                 if trial is not None:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
                 version['errors'] += 1
+                if initial and exp['state'] in {'failed','invalid'}:
+                    version['paused']='deterministic_initial_failure'
+                version['retry_at']=time.monotonic()+15
                 return False
-            if not c.admit_training(plan, eid):
+            requested=deepcopy(plan['resources'])
+            plan=deepcopy(exp['plan'])
+            admission_plan={**plan,'resources':requested}
+            if not c.admit_training(admission_plan, eid):
                 from agent.graph.controller import cancel_queued
                 cancel_queued(c, eid, 'Training reserve no longer fits')
                 if trial is not None:
@@ -258,12 +278,15 @@ class VersionSearch:
                 version['paused'] = None
                 version['retry_at'] = time.monotonic()+1
                 return False
-            allocation = c.lease(eid, 'train', plan['resources'])
+            allocation = c.call('C13',{'operation':'acquire','owner_id':eid,'phase':'train',
+                'requested':requested,'lease_id':None,'fencing_token':None},c.budget.lease,
+                key='acquire/'+eid+'/train/'+str(exp['attempt_no']+1)+'/'+ticket['work_order']['work_order_id'])
             if not allocation['granted']:
                 from agent.graph.controller import cancel_queued
                 cancel_queued(c, eid, 'Retry candidate after an execution slot is free')
                 if trial is not None:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
+                version['retry_at']=time.monotonic()+1
                 return False
             lease = allocation['lease']
             try:
@@ -276,7 +299,7 @@ class VersionSearch:
             except Exception as error:
                 c.store.fail_start(eid, error)
                 c.call('C13', {'operation': 'release', 'owner_id': eid, 'phase': 'train',
-                    'requested': plan['resources'], 'lease_id': lease['lease_id'],
+                    'requested': requested, 'lease_id': lease['lease_id'],
                     'fencing_token': lease['fencing_token']}, c.budget.lease)
                 raise
             job = c.runner.jobs[value['job_id']]
@@ -295,6 +318,10 @@ class VersionSearch:
                 {'code': getattr(error, 'code', type(error).__name__), 'message': str(error)[:600]})
             version['retry_at'] = failed['retry_at']
             version['blocked_inputs'][hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()] = failed['retry_at']
+            if initial and (isinstance(error,(ValueError,TypeError,NameError)) or
+                    getattr(error,'code',None) in {'INVALID_PLAN','INVALID_CODE','INVALID_FEATURE_SOURCE',
+                        'LINEAGE_MISMATCH','DONOR_NOT_ALLOWED','SCHEMA_VALIDATION_FAILED','CANDIDATE_CHANGED'}):
+                version['paused']='deterministic_initial_failure'
             if trial is not None and trial.number in {t.number for t in self.study(version).get_trials() if not t.state.is_finished()}:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
             c.record_research_feedback(plan['researcher_id'], version['ticket']['work_order']['branch_id'],
@@ -431,10 +458,11 @@ def search(controller, root, accepted, *, warmups=()):
     for peer,recipe,params in warmups:
         if not c.budget.snapshot()['search_allowed']:break
         plan,ticket=warmup_ticket(c,root,peer,recipe,params)
-        service.add(plan,ticket)
+        version=service.add(plan,ticket)
+        version['startup']=True
         stop_ticket(c,ticket,'Startup version queued independently of research')
         c.log.event('search.catalog_warmup_queued',researcher_id=peer,recipe_id=recipe)
-    c.budget.start_data_research()
+    if not warmups:c.budget.start_data_research()
     peers = c.graph.metadata('researcher_ids')
     pending = {}
     recovery = PeerRecovery()
@@ -444,6 +472,8 @@ def search(controller, root, accepted, *, warmups=()):
         service.fill()
         while c.budget.snapshot()['search_allowed']:
             service.poll()
+            if all(not v.get('startup') or v['initial_metric'] or v['paused'] for v in service.versions.values()):
+                c.budget.start_data_research()
             if c.science:
                 c.science.diagnostics.ensure(c.graph.visible_history(root))
                 c.science.diagnostics.poll()

@@ -474,5 +474,222 @@
       }
     },
     "requires": null
+  },
+  {
+    "id": "hist-native-classifier-v1",
+    "task_kind": "classification",
+    "family": "hist_gradient",
+    "parameters": {
+      "max_iter": {
+        "type": "int",
+        "default": 300,
+        "min": 20,
+        "max": 1500
+      },
+      "max_leaf_nodes": {
+        "type": "int",
+        "default": 15,
+        "min": 3,
+        "max": 63
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.1,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_regularization": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0,
+        "max": 20
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 10,
+        "min": 1,
+        "max": 100
+      },
+      "early_stopping": {
+        "default": false,
+        "enum": [
+          false,
+          true,
+          "auto"
+        ]
+      },
+      "numeric_interactions": {
+        "default": false,
+        "enum": [
+          false,
+          true
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "lightgbm-classifier-v1",
+    "task_kind": "classification",
+    "family": "lightgbm",
+    "parameters": {
+      "n_estimators": {
+        "type": "int",
+        "default": 300,
+        "min": 20,
+        "max": 1500
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.05,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "num_leaves": {
+        "type": "int",
+        "default": 31,
+        "min": 7,
+        "max": 127
+      },
+      "min_child_samples": {
+        "type": "int",
+        "default": 20,
+        "min": 5,
+        "max": 100
+      },
+      "reg_lambda": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0.0,
+        "max": 20.0
+      },
+      "numeric_interactions": {
+        "default": false,
+        "enum": [
+          false,
+          true
+        ]
+      },
+      "class_weight": {
+        "default": null,
+        "enum": [
+          null,
+          "balanced"
+        ]
+      }
+    },
+    "requires": "lightgbm"
+  },
+  {
+    "id": "hist-native-regressor-v1",
+    "task_kind": "regression",
+    "family": "hist_gradient",
+    "parameters": {
+      "max_iter": {
+        "type": "int",
+        "default": 300,
+        "min": 20,
+        "max": 1500
+      },
+      "max_leaf_nodes": {
+        "type": "int",
+        "default": 15,
+        "min": 3,
+        "max": 63
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.1,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "l2_regularization": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0,
+        "max": 20
+      },
+      "min_samples_leaf": {
+        "type": "int",
+        "default": 10,
+        "min": 1,
+        "max": 100
+      },
+      "early_stopping": {
+        "default": false,
+        "enum": [
+          false,
+          true,
+          "auto"
+        ]
+      },
+      "target_transform": {
+        "default": "identity",
+        "enum": [
+          "identity",
+          "shifted_log1p"
+        ]
+      },
+      "numeric_interactions": {
+        "default": false,
+        "enum": [
+          false,
+          true
+        ]
+      }
+    },
+    "requires": null
+  },
+  {
+    "id": "lightgbm-regressor-v1",
+    "task_kind": "regression",
+    "family": "lightgbm",
+    "parameters": {
+      "n_estimators": {
+        "type": "int",
+        "default": 300,
+        "min": 20,
+        "max": 1500
+      },
+      "learning_rate": {
+        "type": "float",
+        "default": 0.05,
+        "min": 0.01,
+        "max": 0.3
+      },
+      "num_leaves": {
+        "type": "int",
+        "default": 31,
+        "min": 7,
+        "max": 127
+      },
+      "min_child_samples": {
+        "type": "int",
+        "default": 20,
+        "min": 5,
+        "max": 100
+      },
+      "reg_lambda": {
+        "type": "float",
+        "default": 1.0,
+        "min": 0.0,
+        "max": 20.0
+      },
+      "numeric_interactions": {
+        "default": false,
+        "enum": [
+          false,
+          true
+        ]
+      },
+      "target_transform": {
+        "default": "identity",
+        "enum": [
+          "identity",
+          "shifted_log1p"
+        ]
+      }
+    },
+    "requires": "lightgbm"
   }
 ]

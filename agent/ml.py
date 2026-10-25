@@ -44,6 +44,71 @@ class CatBoostFrameModel(BaseEstimator):
         return self.model_.predict_proba(sanitize_frame(X))
 
 
+class NativeHistogramModel(BaseEstimator):
+    """Fit-owned categorical codes with an explicit native categorical mask.
+
+    High-cardinality columns use fit-only frequencies, never an arbitrary order.
+    Unknown low-cardinality categories become NaN, understood by both backends.
+    """
+    def __init__(self, regression=False, parameters=None, cpu_threads=1, seed=42, backend='hist'):
+        self.regression, self.parameters, self.cpu_threads, self.seed, self.backend = regression, parameters, cpu_threads, seed, backend
+
+    def fit(self, X, y):
+        from agent.feature_engineering import _keys
+        self.columns_ = list(X.columns)
+        self.maps_, self.frequencies_, self.categorical_ = {}, {}, []
+        for c in X:
+            if pd.api.types.is_numeric_dtype(X[c]) and not pd.api.types.is_bool_dtype(X[c]):
+                self.categorical_.append(False)
+                continue
+            keys = _keys(X[c])
+            unique = sorted(keys.unique())
+            if len(unique) <= 254:
+                self.maps_[c] = {k: i for i,k in enumerate(unique)}
+                self.categorical_.append(True)
+            else:
+                if len(unique) > 100000:
+                    raise ValueError('Categorical column exceeds 100000 fitted keys')
+                self.frequencies_[c] = keys.value_counts(normalize=True).to_dict()
+                self.categorical_.append(False)
+        options = dict(self.parameters or {})
+        if self.backend == 'hist':
+            from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
+            cls = HistGradientBoostingRegressor if self.regression else HistGradientBoostingClassifier
+            self.model_ = cls(categorical_features=self.categorical_, random_state=self.seed, **options)
+            self.model_.fit(self._frame(X), y)
+        elif self.backend == 'lightgbm':
+            from lightgbm import LGBMClassifier, LGBMRegressor
+            cls = LGBMRegressor if self.regression else LGBMClassifier
+            self.model_ = cls(n_jobs=self.cpu_threads, random_state=self.seed, verbosity=-1, **options)
+            self.model_.fit(self._frame(X), y, categorical_feature=[i for i,b in enumerate(self.categorical_) if b])
+        else:
+            raise ValueError('Unsupported native backend')
+        if not self.regression:
+            self.classes_ = self.model_.classes_
+        return self
+
+    def _frame(self, X):
+        from agent.feature_engineering import _keys
+        if set(X.columns) != set(self.columns_):
+            raise ValueError('Native categorical input schema changed')
+        result = pd.DataFrame(index=X.index)
+        for c in self.columns_:
+            if c in self.maps_:
+                result[c] = _keys(X[c]).map(self.maps_[c]).astype(float)
+            elif c in self.frequencies_:
+                result[c] = _keys(X[c]).map(self.frequencies_[c]).fillna(0.).astype(float)
+            else:
+                result[c] = pd.to_numeric(X[c], errors='coerce').replace([np.inf, -np.inf], np.nan).astype(float)
+        return result
+
+    def predict(self, X):
+        return self.model_.predict(self._frame(X))
+
+    def predict_proba(self, X):
+        return self.model_.predict_proba(self._frame(X))
+
+
 class SequentialTargets(BaseEstimator):
     """Independent targets with one active estimator fit at a time per lease."""
     def __init__(self, estimator):
@@ -158,6 +223,10 @@ def build_pipeline(recipe_id, task_spec, params):
     if recipe_id.startswith("catboost-"):
         model = CatBoostFrameModel(regression, params, threads, seed)
         return Pipeline([("interactions", NumericInteractions()), ("model", model)]) if interactions else model
+    if recipe_id.startswith(('hist-native-', 'lightgbm-')):
+        model = NativeHistogramModel(regression, params, threads, seed,
+            'hist' if recipe_id.startswith('hist-native-') else 'lightgbm')
+        return Pipeline([('interactions', NumericInteractions()), ('model', model)]) if interactions else model
     policy = preprocessing_policy(recipe_id)
     numerical = Pipeline([("impute", SimpleImputer(strategy=policy['numeric_missing'], keep_empty_features=True))])
     encoder = (OneHotEncoder(handle_unknown="ignore", min_frequency=2, sparse_output=True)

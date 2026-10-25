@@ -106,6 +106,8 @@ class Catalog:
                     description = 'Dummy estimator; no learned feature preprocessing.'
                 elif family == 'catboost':
                     description = 'Numeric NaN reaches CatBoost; categorical missing values become __MISSING__ strings.'
+                elif recipe_id.startswith(('hist-native-', 'lightgbm-')):
+                    description = 'Native numeric NaN and explicit categorical mask; fit-only codes up to 254 levels, fit frequency above; unknown native categories become NaN.'
                 else:
                     encoding = 'one-hot encoding and numeric scaling' if family == 'linear' else 'ordinal categorical encoding'
                     description = 'Fit-only median numeric imputation (no missing indicators), then '+encoding+'. Numeric NaN does not reach the estimator.'
@@ -172,7 +174,7 @@ class Catalog:
     def warmup_choices(self):
         suffix = "regressor-v1" if self.kind == "regression" else "classifier-v1"
         choices = []
-        for family in ("extra-trees", "hist-gradient", "catboost", "linear"):
+        for family in ("catboost", "hist-native", "lightgbm", "extra-trees", "linear", "hist-gradient"):
             key = family + "-" + suffix
             if key not in self.recipes:
                 continue
@@ -188,7 +190,7 @@ class Catalog:
                 choices.append((key, self.normalize(key, params)))
         # Both peers first measure a feature-free family. A feature discovered in
         # the next pass then has useful pre-idea bases, rather than two Dummies.
-        primary = list(dict.fromkeys(recipe for recipe, _ in choices))[:2]
+        primary = list(dict.fromkeys(recipe for recipe, _ in choices))[:4]
         return ([(r, p) for r in primary for key, p in choices if key == r and p.get("target_transform", "identity") == "identity"]
                 + [(r, p) for r in primary for key, p in choices if key == r and p.get("target_transform", "identity") != "identity"]
                 + [(r, p) for r, p in choices if r not in primary])

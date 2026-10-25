@@ -11801,11 +11801,25 @@
                 "type": "object",
                 "properties": {
                   "valid_periods": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                    "type": "object",
+                    "properties": {
+                      "first": {
+                        "type": "string"
+                      },
+                      "last": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
                     },
-                    "minItems": 1
+                    "required": [
+                      "first",
+                      "last",
+                      "count"
+                    ],
+                    "additionalProperties": false
                   },
                   "fit_rows": {
                     "type": "integer",

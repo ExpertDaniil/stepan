@@ -55,12 +55,21 @@ def future_period_column(train, test, excluded=()):
     return best
 
 
+def _row_hashes(frame, features, numeric):
+    """Row hashes comparable across tables: shared numeric columns hash as floats,
+    so an integer training column matches the same values read as float in test."""
+    columns = {c: (pd.to_numeric(frame[c], errors='coerce').astype(float) if c in numeric else frame[c].astype(str))
+               for c in features}
+    return pd.util.hash_pandas_object(pd.DataFrame(columns, index=frame.index), index=False)
+
+
 def duplicate_profile(train, test, features):
     """How often fit rows repeat exactly, versus how often test rows repeat fit rows."""
     if not features:
         return {'train_duplicate_share': 0.0, 'test_seen_in_train_share': 0.0}
-    key = lambda frame: pd.util.hash_pandas_object(frame[features].astype(str), index=False)
-    fit, future = key(train), key(test)
+    numeric = {c for c in features if pd.api.types.is_numeric_dtype(train[c]) and pd.api.types.is_numeric_dtype(test[c])
+               and not pd.api.types.is_bool_dtype(train[c]) and not pd.api.types.is_bool_dtype(test[c])}
+    fit, future = _row_hashes(train, features, numeric), _row_hashes(test, features, numeric)
     return {'train_duplicate_share': round(float(fit.duplicated(keep=False).mean()), 6),
             'test_seen_in_train_share': round(float(future.isin(set(fit)).mean()), 6)}
 

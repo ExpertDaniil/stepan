@@ -21,6 +21,27 @@ class ValidationTests(unittest.TestCase):
         finally:
             h.close()
 
+    def test_temporal_holdout_scores_rolling_blocks_on_earlier_rows_only(self):
+        import json
+        h = Harness(with_periods=True)
+        try:
+            evaluator = Evaluator(h.spec, h.artifacts, h.store, h.log)
+            result = evaluator.create_protocol({"task_spec_id": h.spec["task_spec_id"], "dataset_id": h.spec["dataset_id"],
+                                                 "proposal": {"strategy": "temporal_holdout", "parameters": {"column": "period", "valid_fraction": 0.3}, "seed": 42, "reason": "synthetic ordered periods"}})
+            protocol = evaluator.protocols[result["validation_id"]]
+            h.schemas.validate(protocol, 'RProtocol')
+            self.assertEqual(protocol['fold_plan'], [
+                {'valid_periods': {'first': '4', 'last': '4', 'count': 1}, 'fit_rows': 60, 'valid_rows': 15},
+                {'valid_periods': {'first': '5', 'last': '5', 'count': 1}, 'fit_rows': 75, 'valid_rows': 15}])
+            self.assertEqual(protocol['confirmation_indices'], [])
+            folds = json.loads(h.artifacts.safe_path('validation/'+result['validation_id']+'.folds.json').read_text())
+            period = read_table(h.task.parent / "train.csv")["period"]
+            for fold in folds:
+                self.assertLess(period.iloc[fold['fit']].max(), period.iloc[fold['valid']].min())
+            self.assertEqual(sorted(i for fold in folds for i in fold['valid']), protocol['valid_indices'])
+        finally:
+            h.close()
+
     def test_group_holdout_keeps_groups_disjoint(self):
         h = Harness()
         try:

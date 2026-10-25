@@ -59,6 +59,11 @@ class DuplicateGroupTests(unittest.TestCase):
         facts = deployment_facts(train, test, ['y'])
         self.assertEqual(facts['duplicates'], {'train_duplicate_share': .5, 'test_seen_in_train_share': .5})
 
+    def test_integer_and_float_reads_of_one_value_match(self):
+        train = pd.DataFrame({'a': [1, 1, 2], 'b': ['x', 'x', 'y']})
+        test = pd.DataFrame({'a': [1.0, np.nan], 'b': ['x', 'y']})
+        self.assertEqual(deployment_facts(train, test, [])['duplicates']['test_seen_in_train_share'], .5)
+
 
 class MetricInferenceTests(unittest.TestCase):
     def test_primary_metric_from_prose(self):

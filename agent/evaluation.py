@@ -183,7 +183,8 @@ class Evaluator:
                 cutoff = periods[cut]
                 a, b = indices[(ordered < cutoff).to_numpy()], indices[(ordered >= cutoff).to_numpy()]
                 values = ordered.to_numpy()
-                fold_plan = [{'valid_periods': [str(v) for v in block],
+                # Fine timestamps can make thousands of periods: record a range, not a list.
+                fold_plan = [{'valid_periods': {'first': str(block[0]), 'last': str(block[-1]), 'count': len(block)},
                               'fit': indices[values < block[0]].tolist(),
                               'valid': indices[np.isin(values, np.asarray(block, dtype=values.dtype))].tolist()}
                              for block in blocks]

@@ -108,6 +108,7 @@ class StrongClassificationTests(unittest.TestCase):
         self.assertEqual(probabilities.shape, (50, 3))
         np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-6)
         self.assertTrue(set(model.predict(X)) <= {'rare', 'mid', 'common'})
+        self.assertEqual(model.report_['bags'], 3)
         decision = model.report_['decision']
         if not decision['accepted']:
             self.assertTrue(np.all(model.offsets_ == 0))

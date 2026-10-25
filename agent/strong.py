@@ -302,7 +302,7 @@ class StrongTabularModel(BaseEstimator):
         regression = self.task_spec['task_kind'] == 'regression'
         defaults = {'learning_rate': 0.05, 'num_leaves': 63 if regression else 31, 'min_child_samples': 20 if regression else 30,
                     'colsample_bytree': 0.7, 'reg_lambda': 1.0 if regression else 5.0, 'class_weight_power': 0.5,
-                    'bags': 3 if regression else 1}
+                    'bags': 3}
         return regression, {**defaults, **(self.parameters or {})}
 
     def _bagged(self, options, X, y, rounds, weight=None):

@@ -736,7 +736,7 @@
     "family": "strong",
     "task_kind": "classification",
     "requires": "lightgbm",
-    "description": "Hessian-guarded LightGBM with inner early stopping on duplicate-aware groups, class weighting and inner-confirmed F1 decision offsets.",
+    "description": "Hessian-guarded LightGBM with inner early stopping on duplicate-aware groups, class weighting, inner-confirmed F1 decision offsets and a three-seed bagged final fit.",
     "parameters": {
       "learning_rate": {
         "type": "float",

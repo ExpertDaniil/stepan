@@ -270,6 +270,9 @@ class ContextBuilder:
             validation_sha256=graph.get('task_contract', {}).get('protocol_sha256', getattr(self, 'validation_sha256', None)),
             visibility=graph.get('visibility'), store=getattr(self, 'store', None),
             experiment_ids=graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent])) if adaptive else {})
+        if specialist:
+            from agent.specialists import compact_context
+            compact_context(user, self.log)
         if adaptive and user['profile_summary'].get('scientific_protocol'):
             from agent.scientific_research import compact_protocol
             user['profile_summary']['scientific_protocol'] = compact_protocol(user['profile_summary']['scientific_protocol'])

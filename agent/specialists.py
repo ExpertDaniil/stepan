@@ -60,6 +60,17 @@ def member(plan, source):
     return None
 
 
+def representation_source(owned):
+    """Exact editable feature source; never expose the predictor as feature code."""
+    if owned.get('representation_source'):
+        return owned['representation_source']
+    if owned.get('feature_program'):
+        return ('from agent.feature_engineering import FeatureProgram\n\n'
+            'def make_features(task_spec):\n    return FeatureProgram('+repr(owned['feature_program'])+')\n')
+    return ('from sklearn.preprocessing import FunctionTransformer\n\n'
+        'def make_features(task_spec):\n    return FunctionTransformer(validate=False)\n')
+
+
 def validate_feature_source(source):
     from tools.code import ALLOWED_IMPORTS,BLOCKED_CALLS,BLOCKED_ATTRIBUTES
     try:tree=ast.parse(source)
@@ -150,7 +161,12 @@ def attach_context(builder,user,graph,peer):
     user['profile_summary']['specialist']={**role,'reference':reference,
         'objective':'Improve useful data representations and marginal ensemble contribution; standalone score alone is insufficient.',
         'optimizer':'Independent version studies in this architecture cluster; model axes are executor-owned.',
-        'source_detail':'read_solution(experiment_id=reference.experiment_id, view=pipeline) for exact representation and parameters.'}
+        'source_detail':'read_solution(experiment_id=reference.experiment_id, view=representation) for editable feature code; view=pipeline for the complete model.'}
+    user['profile_summary']['current_pipeline_facts']=builder.catalog.pipeline_facts({
+        'recipe_id':role['recipe_id'],'hyperparameters':(reference or {}).get('representation',{}).get('model_parameters',{})})
+    user['profile_summary']['feature_engineering']['semantics'] = (
+        'Use named inputs with evidence-backed meaning; several coherent changes are allowed. '
+        'Learned operations fit inside every enclosing fit. No mandatory investigation form.')
     if reference and reference['representation'].get('representation_source'):
         source=reference['representation']['representation_source']
         if len(source.encode())>4000:
@@ -161,6 +177,44 @@ def attach_context(builder,user,graph,peer):
     user['assignment']+='Share source-backed meanings, uncertainty and negative findings. Several coherent feature changes are allowed.'
     user['profile_summary']['recipes']=[r for r in user['profile_summary']['recipes'] if r['id'] in {role['recipe_id'],'python-pipeline-v1'}]
     return role
+
+
+def compact_context(user, log):
+    """Project duplicated execution logistics after the exact snapshot is frozen.
+
+    Semantic records, contradictory claims and the inference contract use their
+    existing memory projection; this helper never rewrites their epistemic status.
+    """
+    before=len(canonical(user).encode());profile=user['profile_summary']
+    detail=profile['detail_index']['reference_id']
+    for i,record in enumerate(profile.get('analysis_history',[])):
+        query=record.get('query',{})
+        if isinstance(query,dict):
+            record['query']={k:v for k,v in query.items() if k in {'kind','columns','group_by','question','artifact_id'}}
+        record['exact_read']={'reference_id':detail,'section':'analyses/'+str(i)}
+    for recipe in profile.get('recipes',[]):
+        for field in ('hyperparameters','parameters','parameter_space','defaults'):
+            recipe.pop(field,None)
+        recipe['parameters_owner']='executor Optuna; exact catalogue in section=recipes'
+    interface=profile.get('feature_engineering',{})
+    profile['feature_engineering']={k:v for k,v in interface.items() if k in {
+        'action','compiler','operations','geometry','semantics','output'}}
+    profile['feature_engineering']['exact_read']={'reference_id':detail,'section':'feature_engineering'}
+    profile['optimizer_facts']={'owner':'dispatcher','instruction':'Work on representations; no model parameter forms.'}
+    # Repeated complete configurations need not crowd out data semantics. IDs,
+    # metrics and the frozen full_context remain available without reconstruction.
+    measured=profile.get('measured_search',{})
+    if isinstance(measured,dict):
+        for record in measured.get('entries',[]):
+            for key in ('hyperparameters','effective_parameters','code','feature_steps'):
+                record.pop(key,None)
+    for i,fact in enumerate(user.get('facts',[])):
+        if len(canonical(fact).encode())>1600:
+            user['facts'][i]={**{k:v for k,v in fact.items() if k in {'source_id','kind','confidence','experiment_id','metric'}},
+                'excerpt':canonical(fact)[:600],'excerpt_only':True,
+                'exact_read':{'reference_id':detail,'section':'facts/'+str(i)}}
+    log.event('research.specialist_context_projected',before_bytes=before,after_bytes=len(canonical(user).encode()),
+        exact_reference_id=detail,semantics_rewritten=False)
 
 
 def make_specialist_pipeline(task_spec, params):

@@ -371,8 +371,15 @@ class Researcher:
             evidence.update(call.get('evidence_ids',[]))
         if proposed.get('semantic_updates'):
             from agent.research_memory import validate_semantic_updates
+            semantic_records = sections.get('semantics', []) if detail else []
+            evidence.update(i for i in (self.spec.get('task_spec_id'),self.spec.get('dictionary_artifact_id')) if i)
+            evidence.update(r['record_id'] for r in semantic_records)
+            semantic_model = sections.get('semantic_model') if detail else None
+            if semantic_model:
+                evidence.add(semantic_model['model_id'])
+                evidence.update(r['record_id'] for field in ('quantities','relations') for r in semantic_model[field])
             validate_semantic_updates(proposed['semantic_updates'],profile.get('research_memory',{}),evidence,
-                self.feature_columns,context['metadata'].get('detail_scope'))
+                self.feature_columns,context['metadata'].get('detail_scope'),semantic_records)
         return dict(user=user, program=program, memory=profile.get('research_memory', {}), evidence=evidence,
             knowledge=profile.get('knowledge', {}), protocol={}, landscape=profile.get('research_landscape', {}),
             investigation_check={'verification': 'executable_interface_checked', 'warnings': []})

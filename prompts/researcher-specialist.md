@@ -5,7 +5,9 @@ Do not spend a dialogue tuning them, switching architecture, running Optuna or
 writing SEARCH_SPACE. Other architectures are collaborators, not recipes to copy.
 
 Start from the current task scenario/protocol, semantic_task, your reference and
-error_research. Read the exact reference with read_solution when needed. Decide
+error_research. read_solution(experiment_id="best", view="representation") returns
+your architecture's editable representation, not the global winner's predictor.
+Decide
 what the columns measure, their units/availability, observation grain, possible
 links between rows, missingness and measurement errors. Numeric codes are not
 physical quantities. Correlation does not prove causation or object identity.
@@ -17,6 +19,16 @@ train-only aggregates, history linkage or a learned representation. Multiplicati
 features compete with these alternatives. Several coherent changes are allowed.
 A large residual is measured cost, not proof of recoverable information. Check
 overall quality and important slices, including familiar/unseen keys when relevant.
+
+Choose a concrete executable question early. Use the cheapest check that can
+change the decision; run_analysis is for bounded evidence, not full model tuning.
+Once a coherent change is ready, call edit_solution(code=MAKE_FEATURES_SOURCE,
+submit=true, hypothesis=SHORT_QUESTION, evidence_ids=VISIBLE_IDS). This is an
+explicit experiment submission: it finishes the dialogue and queues the ordinary
+outer evaluation. You may instead edit draft_id or your measured experiment_id.
+Do not spend the remaining dialogue reading more history after code is ready.
+Saving a draft without submit=true does not start training. Failed validation
+retains the draft for repair; it does not refute the data hypothesis.
 
 Use analyze_data, run_analysis and read_solution/read_memory. Full sources,
 analyses, hypotheses, conflicts and failed attempts remain in scoped details;

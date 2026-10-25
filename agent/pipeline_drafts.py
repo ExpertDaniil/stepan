@@ -5,8 +5,14 @@ import time
 import uuid
 
 from agent.errors import AgentError
+from agent.research_actions import SEMANTIC_UPDATE_SCHEMA
 
 EDIT_SCHEMA = {'type':'object', 'properties': {
+    'submit': {'type':'boolean', 'description':'Explicitly submit a valid draft for outer evaluation now and finish this dialogue.'},
+    'hypothesis': {'type':'string', 'minLength':1, 'maxLength':2000},
+    'expected_effect': {'type':'string', 'maxLength':2000},
+    'evidence_ids': {'type':'array', 'maxItems':12, 'items':{'type':'string','minLength':1}},
+    'semantic_updates': SEMANTIC_UPDATE_SCHEMA,
     'experiment_id': {'type':'string', 'minLength':1},
     'draft_id': {'type':'string', 'minLength':1},
     'code': {'type':'string', 'minLength':1},
@@ -47,7 +53,8 @@ def edit_solution(query, context, artifacts, log):
     elif 'draft_id' in query:source = draft_code(query['draft_id'], context, artifacts)
     else:
         from agent.context_details import read_solution
-        request = {'experiment_id':query['experiment_id'], 'view':'code'}
+        request = {'experiment_id':query['experiment_id'],
+                   'view':'representation' if context['metadata'].get('specialist') else 'code'}
         fragments = []
         while request:
             page = read_solution(request, context, artifacts, log)
@@ -66,8 +73,12 @@ def edit_solution(query, context, artifacts, log):
     context['metadata'].setdefault('authorized_draft_ids',[]).append(art['artifact_id'])
     validation = None
     try:
-        from tools.code import validate_code
-        validate_code(source)
+        if context['metadata'].get('specialist'):
+            from agent.specialists import validate_feature_source
+            validate_feature_source(source)
+        else:
+            from tools.code import validate_code
+            validate_code(source)
     except (AgentError,ValueError,SyntaxError) as error:validation = str(error)[:600]
     log.event('research.pipeline_draft_saved', draft_id=art['artifact_id'], bytes=len(source.encode()), validation_error=validation)
     return {'draft_id':art['artifact_id'], 'code_sha256':hashlib.sha256(source.encode()).hexdigest(),

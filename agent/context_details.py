@@ -16,7 +16,7 @@ READ_SCHEMA = {'type': 'object', 'properties': {
 
 SOLUTION_SCHEMA = {'type': 'object', 'properties': {
     'experiment_id': {'type': 'string', 'minLength': 1},
-    'view': {'enum': ['pipeline', 'code', 'result', 'features', 'diagnostics']},
+    'view': {'enum': ['pipeline', 'code', 'representation', 'result', 'features', 'diagnostics']},
     'offset': {'type': 'integer', 'minimum': 0},
     'limit_bytes': {'type': 'integer', 'minimum': 256, 'maximum': 6000}},
     'required': ['experiment_id'], 'additionalProperties': False}
@@ -62,6 +62,10 @@ def read_solution(query, context, artifacts, log):
     eid = query['experiment_id']
     if eid == 'best':
         measured = [v for v in catalog.values() if v.get('metric')]
+        specialist = metadata.get('specialist')
+        if specialist:
+            measured = [v for v in measured if
+                v['plan']['model']['hyperparameters'].get('base_recipe_id',v['plan']['recipe_id']) == specialist['recipe_id']]
         if not measured:
             raise AgentError('SOLUTION_UNAVAILABLE', 'No measured solution in this scope')
         eid = max(measured, key=lambda v: v['metric']['value']*(1 if v['metric']['direction'] == 'maximize' else -1))['experiment_id']
@@ -91,6 +95,12 @@ def read_solution(query, context, artifacts, log):
         return artifacts.read_json(meta['artifact_id']) if name == 'diagnostics' else path.read_text(encoding='utf-8')
     if view == 'code':
         value = document('code')
+    elif view == 'representation':
+        from agent.specialists import member, representation_source
+        owned = member(plan, document('code'))
+        if owned is None:
+            raise AgentError('SOLUTION_UNAVAILABLE', 'This source has no executor-owned representation')
+        value = representation_source(owned)
     elif view == 'diagnostics':
         value = document('diagnostics')
     elif view == 'features':
@@ -103,7 +113,7 @@ def read_solution(query, context, artifacts, log):
             'recipe_id': plan['recipe_id'], 'hyperparameters': plan['model']['hyperparameters'],
             'feature_steps': plan['feature_steps'], 'code': document('code'),
             'seed': plan['seed'], 'execution_error': record.get('execution_error')}
-    body = (value if view == 'code' and isinstance(value, str) else canonical(value)).encode('utf-8')
+    body = (value if view in {'code', 'representation'} and isinstance(value, str) else canonical(value)).encode('utf-8')
     offset, maximum = query.get('offset', 0), query.get('limit_bytes', 6000)
     if (isinstance(offset, bool) or not isinstance(offset, int) or offset < 0 or offset > len(body)
             or (offset < len(body) and body[offset] & 0xC0 == 0x80)
@@ -249,6 +259,7 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         'representations': profile.get('feature_memory', {}), 'comparisons': profile.get('comparison_evidence', {}),
         'analyses': profile.get('analysis_history', user.get('analysis_history', [])),
         'recipes': deepcopy(profile.get('recipes', [])),
+        'feature_engineering': deepcopy(profile.get('feature_engineering', {})),
         'research_landscape': deepcopy(profile.get('research_landscape', {})),
         'research_feedback': deepcopy(profile.get('research_feedback', []))}
     if profile.get('specialist'):

@@ -429,7 +429,7 @@ class Gateway:
         executable = bool(context['metadata'].get('pipeline_execution'))
         if executable:
             fields = {'action', 'hypothesis', 'code', 'code_ref', 'recipe_id', 'hyperparameters', 'feature_steps',
-                      'feature_program', 'evidence_ids', 'expected_effect', 'next_step', 'tuning'}
+                      'feature_program', 'evidence_ids', 'expected_effect', 'next_step', 'tuning', 'semantic_updates'}
             expected['properties'] = {k:v for k,v in expected['properties'].items() if k in fields}
             expected['properties']['action']['enum'] = ['pipeline', 'features', 'catalog', 'research', 'stop']
             expected['required'] = ['action']
@@ -472,6 +472,11 @@ class Gateway:
                        and deadline-dialogue_started >= self.config.llm_research_dialogue_seconds)
         if payload['response_schema_id'] == 'ResearchAction-v1':
             seconds = max(self.config.llm_research_dialogue_seconds, self.config.research_deep_dialogue_seconds) if funded_deep else self.config.llm_research_dialogue_seconds
+            if context['metadata'].get('specialist') and not funded_deep:
+                # A renewable work checkpoint, not a lifetime experiment cap.
+                # Scale with observed provider latency instead of letting every
+                # peer consume the full 15-minute window before its first action.
+                seconds = min(seconds, max(60., 2*self.budget.reasoning_estimate()))
             deadline = min(deadline, dialogue_started+seconds)
             self.log.event('llm.deliberation_budget', context_id=payload['context_artifact_id'],
                 extended_requested=extended, extended_funded=funded_deep,
@@ -542,7 +547,7 @@ class Gateway:
         if 'edit_solution' in payload['tool_schema_ids']:
             from agent.pipeline_drafts import EDIT_SCHEMA
             tools.append({'type':'function', 'function':{'name':'edit_solution',
-                'description':'Save a new source draft with code, or edit a visible experiment_id/best or draft_id using exact old/new replacements. Each old fragment must match once. Returns draft_id; submit action=pipeline, code_ref=draft_id without resending full source. Invalid source is retained for repair.',
+                'description':'Save/edit source using exact old/new replacements. Specialists edit make_features representations, other peers edit make_pipeline. Set submit=true with a short hypothesis to send valid code for outer evaluation immediately and end the dialogue. Invalid drafts remain repairable; saving alone does not train.',
                 'parameters':EDIT_SCHEMA}})
         dialogue_id, slots = None, 0
         if payload['response_schema_id'] == 'ResearchAction-v1':
@@ -760,6 +765,7 @@ class Gateway:
                     self._bound_reasoning_history(messages)
                     tools_started = time.monotonic()
                     new_calls = 0
+                    tool_submission = None
                     for item in prepared:
                         call, args, key = item['call'], item['args'], item['key']
                         name = call['function']['name']
@@ -782,7 +788,11 @@ class Gateway:
                                 original_tool_call_id=original_id, operation_key=self._digest(key))
                             continue
                         new_calls += 1
-                        if dialogue_id is not None and time.monotonic() >= tool_deadline:
+                        if tool_submission is not None:
+                            result = {'error': {'code':'PROPOSAL_ALREADY_SUBMITTED',
+                                'message':'The explicit submission ended this tool batch; remaining operations were not executed.'}}
+                            trace = {'call_id':call['id'],'name':name,'status':'submission_closed'}
+                        elif dialogue_id is not None and time.monotonic() >= tool_deadline:
                             force_decision = True
                             result = {'error': {'code': 'TOOL_PHASE_CLOSED', 'message': 'Time is reserved for the final decision; use saved results.'}}
                             trace = {'call_id': call['id'], 'name': name, 'status': 'time_reserve'}
@@ -802,10 +812,31 @@ class Gateway:
                             trace = {'call_id': call['id'], 'name': name,
                                      'experiment_id': result.get('experiment_id'), 'evidence_ids': result.get('evidence_ids', [])}
                         elif name == 'edit_solution':
-                            from agent.pipeline_drafts import edit_solution
+                            from agent.pipeline_drafts import edit_solution, resolve_candidate
                             context['_elapsed_ms'] = int((time.monotonic()-self.budget.started)*1000)
-                            try:result = edit_solution(args, context, self.artifacts, self.log)
-                            except AgentError as error:result = {'error':error.as_dict()}
+                            result = {}
+                            try:
+                                result = edit_solution(args, context, self.artifacts, self.log)
+                                if args.get('submit'):
+                                    if result['validation_error']:
+                                        raise AgentError('INVALID_SOURCE_EDIT', result['validation_error'])
+                                    if not args.get('hypothesis', '').strip():
+                                        raise AgentError('INVALID_RESEARCH_ACTION', 'Explicit submission needs a short hypothesis')
+                                    candidate = resolve_candidate({'action':'pipeline','code_ref':result['draft_id'],
+                                        **{k:args[k] for k in ('hypothesis','expected_effect','evidence_ids','semantic_updates') if k in args}},
+                                        context,self.artifacts)
+                                    self.bus.schemas._check(candidate,self.output_schemas['ResearchAction-v1'],'$')
+                                    from agent.data_research import require_action
+                                    require_action(candidate,self.budget.data_research_snapshot())
+                                    validator = getattr(self,'proposal_validator',None)
+                                    if validator:validator(candidate,context,{'tool_calls':calls})
+                                    tool_submission = candidate
+                                    result['submitted'] = True
+                                    self.log.event('research.executable_submitted',draft_id=result['draft_id'],
+                                        context_id=payload['context_artifact_id'],decision_origin='model_tool',call_no=call_no)
+                            except (AgentError, ValueError, TypeError, KeyError) as error:
+                                result['error'] = (error.as_dict() if isinstance(error,AgentError) else
+                                    {'code':'INVALID_RESEARCH_ACTION','message':str(error)[:600]})
                             trace = {'call_id':call['id'], 'name':name, 'draft_id':result.get('draft_id')}
                         elif name == 'read_memory':
                             from agent.context_details import read_details
@@ -862,6 +893,11 @@ class Gateway:
                                 sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False))
                             tool_cache[report_key] = (deepcopy(result), call['id'])
                         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
+                    if tool_submission is not None:
+                        self._archive_transcript(messages,context)
+                        art = self.artifacts.write_json('llm/parsed-'+uuid.uuid4().hex[:12]+'.json',tool_submission,'llm_output')
+                        return {'completion_id':completion_id,'output_artifact_id':art['artifact_id'],
+                            'parsed_payload':tool_submission,'tool_calls':calls,'usage':usage,'attempts_used':attempt}
                     tool_seconds += time.monotonic()-tools_started
                     self.log.event('llm.tool_batch_normalized', call_no=call_no, raw_calls=len(message['tool_calls']),
                         unique_calls=len(prepared), new_calls=new_calls, reused_calls=len(prepared)-new_calls,

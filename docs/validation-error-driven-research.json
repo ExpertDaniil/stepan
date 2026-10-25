@@ -1,0 +1,438 @@
+{
+  "base_remote_sha": "e0718df821f3920974d153332211c803563a6429",
+  "status": "targeted_paths_and_real_scripted_runs_passed; full_suite_not_green",
+  "compilation": true,
+  "git_diff_check": true,
+  "focused": {
+    "command": "python -m unittest tests.test_error_driven_research tests.test_feature_admission tests.test_confirmation tests.test_pipeline_background tests.test_context_continuation tests.test_research_logistics tests.test_research_latency tests.test_submission tests.test_processes tests.test_contracts tests.test_packaging tests.test_gateway_logging -q",
+    "tests": 112,
+    "passed": true
+  },
+  "new_scenarios": 23,
+  "initial_untouched_head_focused": {
+    "tests": 73,
+    "passed": true
+  },
+  "scripted_real_ml_runs": [
+    {
+      "task_kind": "regression",
+      "status": 0,
+      "csv_exists": true,
+      "events": {
+        "pipeline.version_registered": 3,
+        "pipeline.execution_started": 25,
+        "pipeline.batch_extended": 18,
+        "diagnostics.oof_started": 1,
+        "diagnostics.oof_completed": 1,
+        "research.python_analysis_completed": 1,
+        "research.paired_comparison": 24,
+        "research.proposal_failed": 0,
+        "submission.published": 10,
+        "validation.finalists_confirmed": 1
+      },
+      "errors": [],
+      "limitations": "Scripted replies, real fits and independent scores; not a long autonomous Qwen quality evaluation.",
+      "run_state": "completed",
+      "confirmation_after_barrier": true
+    },
+    {
+      "task_kind": "classification",
+      "status": 0,
+      "csv_exists": true,
+      "events": {
+        "pipeline.version_registered": 3,
+        "pipeline.execution_started": 59,
+        "pipeline.batch_extended": 38,
+        "diagnostics.oof_started": 1,
+        "diagnostics.oof_completed": 1,
+        "research.python_analysis_completed": 1,
+        "research.paired_comparison": 58,
+        "research.proposal_failed": 0,
+        "submission.published": 4,
+        "validation.finalists_confirmed": 1
+      },
+      "errors": [],
+      "limitations": "Scripted replies, real fits and independent scores; not a long autonomous Qwen quality evaluation.",
+      "run_state": "completed",
+      "confirmation_after_barrier": true
+    }
+  ],
+  "flat_zip_startup_replays": [
+    {
+      "kind": "regression",
+      "cli_exit_code": 0,
+      "state": "completed",
+      "csv_validated_and_published": true,
+      "scope": "actual flat ZIP entry point; startup fit/evaluate/refit with explicit two-request mock quota"
+    },
+    {
+      "kind": "classification",
+      "cli_exit_code": 0,
+      "state": "completed",
+      "csv_validated_and_published": true,
+      "scope": "actual flat ZIP entry point; startup fit/evaluate/refit with explicit two-request mock quota"
+    }
+  ],
+  "package": {
+    "files": 81,
+    "runtime_files": 101,
+    "bytes": 652017,
+    "sha256": "607ca307fad8787fee47ad7c758edcdc868237d5c9ec8f70d5d89f03fe81d298"
+  },
+  "package_verification": {
+    "flat": true,
+    "exact_official_requirements": true,
+    "source_byte_identity": true,
+    "secret_pattern_scan": true,
+    "flat_files": 81,
+    "zip_sha256": "607ca307fad8787fee47ad7c758edcdc868237d5c9ec8f70d5d89f03fe81d298"
+  },
+  "static_audit": {
+    "audit": "static_source_and_package_inputs",
+    "python_files_parsed": 150,
+    "owned_runtime_modules": 78,
+    "allowlisted_text_resources": 22,
+    "json_files_parsed": 174,
+    "schema_vocabulary_and_refs": "checked_without_importing_project_modules",
+    "runtime_contract_schema_declarations": "byte-independent_data_equality_checked",
+    "feature_execution_dependencies": "included_in_frozen_runtime",
+    "official_requirements_byte_equal": true,
+    "requirements_sha256": "9173b0388532fbd2a709e4f4b3029e3b9ccab685fce43a85261ffa1ba95efbe6",
+    "knowledge_manifest": "all_file_hashes_equal",
+    "regression_methods_written": 531,
+    "runtime_source_sha256": {
+      "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/artifacts.py": "6a1e25701827e3e3a337be73a1d4a516d8e1db360e637c4e79aa4ac9f86eb472",
+      "agent/budget.py": "6ae6e3ec6de0468d55c3de8f86f28c8afa0a4ef612c55309f65aea65350030fb",
+      "agent/catalog.py": "ba7806df4098d7a8096ca9474b68ebedecce308fe6a2034df676fac7b677250a",
+      "agent/config.py": "6af7bc4034ec0500053a24a4861db581fc002d6f948f58224bacee7bfdb0ad63",
+      "agent/confirmation.py": "838aebaf7ac2f6bd67f9d2141498bceca0cca331e8018c3211424dd54a127657",
+      "agent/context.py": "e7726f831d53c30288a2eec160538f209bde167d69d784bb8d88a1ffffaf96b8",
+      "agent/context_budget.py": "4cbb709c06362f4a73d8b94ee6a30f7bbbc561cd3e2097e3188c5ef300abaf69",
+      "agent/context_details.py": "ea23dd63d84a303caea5b161fcd55259447ec9f666f9d74395813a629b6a1420",
+      "agent/context_transcript.py": "91c93d7c2a511437b26737fc599ae80f42510a13dc656479dd006560cdfbc23d",
+      "agent/contracts.py": "7963e6db27253f41737b0e265ffaaf540682b134b4e7d22f46754a40ac0e5c8b",
+      "agent/data_research.py": "b8a476d428aeae665037f213de3de738391008f064916be2593faf9f2a2ce4b3",
+      "agent/data_transport.py": "5a9d643a3a86b9805888b816397452bfe1901001fc98c03bfeaa5443e7cb777a",
+      "agent/duration.py": "5839b36eca1654b7a0c8b03d6ea669b8e37c7d9b5b8fa087a7629c5b3a941689",
+      "agent/error_research.py": "5d9a55c919174cd01ef90dfb25b763fdd79b9fb6eb81ac05d555129ff7328082",
+      "agent/errors.py": "50a2a38d0eadde3f8b961de0dddd3171609d1724b34bd38ff434e3597cab5ab0",
+      "agent/evaluation.py": "26e2155880de8e5b7ba88861657fd5760988c1c539b1073c74fab074742a10af",
+      "agent/evidence.py": "1394d4187bbe247fe82684207de2b927f53851e55db3fac9ceb97e67764be180",
+      "agent/feature_engineering.py": "0d3e7f8512ff3b0bf67fab30ee8de87460a6c7bd4b4bf36138e236c90d7534da",
+      "agent/feature_memory.py": "3a900ad1f1134718832b52ebe8db26a6c4a3a553421421242f31251371da5008",
+      "agent/feature_schema.py": "c46cf7c24365a7459112833d97a872f47df5a23c27f8139e9f07ae2260ee1038",
+      "agent/feature_search.py": "62e6f93678b1d30b5d57083c328cd1c124f30042343af4f80ca77dcb302d0893",
+      "agent/fit_diagnostics.py": "89b7f043b64d0c397cc1e765a98b669c8844a859c1d22b6c42bda187f02c33bf",
+      "agent/graph/__init__.py": "01fac84fdd6e5ab57f25e01609f85c886496d08d160ad54541df3b1456f376d1",
+      "agent/graph/artifacts.py": "cab8029551b491f83a521694d14f70331bb38a84c5ca47ba220b6d5a065c869d",
+      "agent/graph/constraints.py": "a8475e5a95767a086dd9f5f04558ac095e886b9dc8eaf4f256b2a9758a8b31cb",
+      "agent/graph/constructor.py": "7e279d7edcae2f9949e97a7256fb4badaf84373e9104fc55725035626dd53e4c",
+      "agent/graph/context.py": "f2580e3d469953b30f96ebeb916908ed09fc3031ac16d1e541b8aa4a782064b5",
+      "agent/graph/controller.py": "83f2f2d3c5acd92318fddf70779715d46f4cb013a9f8ea498fa464675aab6ecd",
+      "agent/graph/export.py": "1841bb7a389129d14f177e9ef22ac147631978088c001c3164a2722441e19f29",
+      "agent/graph/identity.py": "4e2ea0ab88394f1cdf9ee9c3d5179c1e546336e7edb77443af38985da92822cf",
+      "agent/graph/recovery.py": "30c54febcf621ac7ee2d667faa2ec5776331a078fb06a21c69742945dc455414",
+      "agent/graph/refinement.py": "df3de90c62b96ae0053f5635fd0216a23e3c0095366edc604b26f79cd740a25a",
+      "agent/graph/research_scheduler.py": "39129198b896bfff1e5f1ecd12451b13a18061aa0005c2d859b87cf0438b2f09",
+      "agent/graph/service.py": "04933e789dfc0c7fe400929be2abe912d15b9a7dc93de2b9d2b7a4a954cf1b12",
+      "agent/llm/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/llm/gateway.py": "81bc2cbd4c1d8804de37166ef1c42061c54eb1d7afc8fa484e51822a227c59ee",
+      "agent/llm/protocol.py": "32731bca8f33607d46116307149daa45a415822e1ba1fefe9d69e98f5c968f76",
+      "agent/local_search.py": "a3ed2d411624fd35f0306e532e8654649cb1c77c3c78e838c0facd2b077d147f",
+      "agent/ml.py": "daa84951a60c156daf0052fe9af7dd5d8503e586fb0692fe9446b897120889e8",
+      "agent/observability/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/observability/logging.py": "94805366a9cd2a06945f0899443290b9076640441cf227377730d49aa90ea8b6",
+      "agent/optuna_search.py": "d48cf91198e6b389dfaacefd8628049a0116a39c9a9161bdc438518706992e61",
+      "agent/orchestrator.py": "7b82973ffd3f77b967728127b36026ad6285147d476d7092951115862a0882e8",
+      "agent/pipeline_candidates.py": "15da1a78505b574bb6649951febb94712aa863f92cef45e592f92b8e5a7b82cc",
+      "agent/pipeline_drafts.py": "6788bf9498056bfcecae9b2f018f8f8127b652ea0eed28fd97f1d387398e428f",
+      "agent/pipeline_search.py": "20a79df2e1d912c778ba35710c961c56c6b5387d58530bd7d7457602d6578518",
+      "agent/predictions.py": "4c95a2071316b96ea06d3fc46fdf97c5c72fe1f9d2122d5dafe584385a25aca7",
+      "agent/preprocessing.py": "d7834b1ec56490c68c10fd1fa15af5723e1b084b1ddb7c7bda3cce225edacb7b",
+      "agent/research_actions.py": "3739e6f9be5be4887a6d8ba5cd688d4004d26a64d0cbeb5926bb51e6d9005eb8",
+      "agent/research_coordination.py": "8217e326f7a52d7ad194b853237d1ca10de441008c900f78c195c69fa8306a90",
+      "agent/research_execution.py": "8e0b024b24dd83a347e64c189657d14d0ef83defc7aad12999aa3e8f468ec6ba",
+      "agent/research_feedback.py": "abe917c186d23933fc1e0d3491156995e588ad9d75b59729da22d75b301b81cc",
+      "agent/research_landscape.py": "0eea40830fc79e3a8d1717da2853a76c6e7bc1d70bee6f56815905baeb73587f",
+      "agent/research_memory.py": "54e193a6a490a91bd879c2c31c89da22057533dde9ffcdbe98ed7c6f64839743",
+      "agent/researcher.py": "9df885d38e07aa45ba16505c9e9cb768e4f220cb39ee83fb6483f2fab02ed0a1",
+      "agent/runner.py": "b8e8c3928bc3ec99d87f8b0401026d34444a3d1e3b578000a28aa9b0b32f6e69",
+      "agent/runtime.py": "b484eeb427dbf0c9f882c72dab39b6e921921c57baaf2f2e30d7487eb8514093",
+      "agent/scientific_research.py": "b9f21368f480f9cd27696afaa9c0b3bbff9e4b9ab25f375df8f173e9547fa2be",
+      "agent/search_policy.py": "13c3f6d5ce6e24fd2a770e8d40c8704f712b193b826f0acf2ed3d7bbf85a620f",
+      "agent/semantic_planning.py": "7419895e27a3ce2e8083cc93ff066dfefe6a9c052d458445627738abcd3106f0",
+      "agent/store.py": "4cb4c4ce1d6ac49996597bce730a01717b77e26ca186cc2b9720934fb3707e4b",
+      "agent/submission.py": "431f9027e91ecf63287161376d62f86a616834f5fac51f2dd2b8f42865fa0021",
+      "agent/task.py": "2990da1d7def3c226b73ca8faabd4120c75fdcccad1b212c7080c6b7c56d5d70",
+      "agent/task_interpreter.py": "c43183e2c3798a02a836fdaa08ba271ac85015477be29e09029e97ce4061fb20",
+      "agent/tool_arguments.py": "8f7c1d41fbc257c2ef7f29f080adc26902f3096dd1b28e528f140aa79e8f0037",
+      "agent/tuning_space.py": "f43cf6385827707c3e154bcce1e8aecb058c48af5c7e667d1f26b9a8c4fee1e1",
+      "agent/worker.py": "ba16b79f53e8dc2612fbfaf350a5ee923f218f625e87f593d4ba5bc8f2865b10",
+      "tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tools/analysis.py": "9894c324d42a53d3d377ee3ddb64d4b87fc91ea33e88ec564ae1f6ed5dd13f19",
+      "tools/analysis_worker.py": "c937eea169fbb3ed44b5100f8ee1ff608c56035baa106ae72ebd014940e6582c",
+      "tools/code.py": "beb821fb5d2f67192e7db935c8a5851b9057daa673f3487e905fd6dac2c922b6",
+      "tools/data.py": "c73015ced92431779db0c2d6fb0c5dc940259ab43d058870ea85ea47dcb01bec",
+      "tools/files.py": "90f83940b4d2d13ae6948b992e5647a0462822a274f81d295516114737ba5665",
+      "tools/knowledge.py": "ce47812d8682add79631d25b03bf2feda35ca2a616cdd73609a18fcec7457fb6",
+      "tools/knowledge_content.py": "e29c25b3e2d9880d89aadc61a1519a07937069ad265ae5e1351189b733678a71",
+      "tools/python_analysis.py": "2fc26f135cd742a6683dbea81acdd23b2645b911b67e4116ae9c23dfb8af76ce",
+      "tools/runtime_guard.py": "e1ddfc4a3e78413eda1211b83f2d4397e1df80ce65ae2a436e00880d73961298"
+    },
+    "not_performed": [
+      "project_module_import",
+      "test_execution",
+      "training",
+      "agent_smoke_or_full_run",
+      "live_llm_request",
+      "dependency_installation",
+      "zip_build_or_runtime_execution"
+    ],
+    "limitation": "Static packaging policy/input checks do not prove generated ZIP bytes or platform execution."
+  },
+  "full_suite": {
+    "command": "python scripts/check.py --jobs 2",
+    "tests": 550,
+    "passed": false,
+    "timing": "Executed on an intermediate working tree before final compatibility/checkpoint fixes; targeted repairs rerun afterwards, full suite not rerun.",
+    "reported_subcase_failures": [
+      {
+        "kind": "ERROR",
+        "case": "test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts (tests.test_adaptive_research.AdaptiveResearchTests.test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_api_exhaustion_keeps_verified_answer_without_early_parameter_search (tests.test_data_research_window.DataResearchExecutionTests.test_api_exhaustion_keeps_verified_answer_without_early_parameter_search) (graph=True)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_authoritative_schema_survives_provider_context_compaction (tests.test_feature_admission.FeatureAdmissionTests.test_authoritative_schema_survives_provider_context_compaction)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_feature_action_rejects_target_input_before_training (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_rejects_target_input_before_training)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code (tests.test_optuna_search.OptunaSearchTests.test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_completed_series_is_in_the_next_sent_request_and_evidence_trace (tests.test_platform_research.ActualRequestTests.test_completed_series_is_in_the_next_sent_request_and_evidence_trace)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_model_details_are_frozen_and_identity_checks_reject_other_tasks (tests.test_semantic_planning.SemanticPersistenceTests.test_model_details_are_frozen_and_identity_checks_reject_other_tasks)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase (tests.test_adaptive_refinement.AdaptiveRefinementExecutionTests.test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_bad_generated_code_does_not_end_search_before_a_corrected_proposal (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_bad_generated_code_does_not_end_search_before_a_corrected_proposal) (graph=False)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_bad_generated_code_does_not_end_search_before_a_corrected_proposal (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_bad_generated_code_does_not_end_search_before_a_corrected_proposal) (graph=True)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_tune_of_a_measured_base_runs_new_trials_in_both_controllers (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers) (graph=False)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_tune_of_a_measured_base_runs_new_trials_in_both_controllers (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_tune_of_a_measured_base_runs_new_trials_in_both_controllers) (graph=True)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_custom_pipeline_train_publish_and_reconstruct_refit (tests.test_adaptive_research.AdaptiveIntegrationTests.test_custom_pipeline_train_publish_and_reconstruct_refit)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_zero_tool_wall_budget_preserves_final_and_json_repair (tests.test_research_latency.ResearchLatencyTests.test_zero_tool_wall_budget_preserves_final_and_json_repair)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_unsubmitted_decision_does_not_cross_graph_visibility (tests.test_research_memory.ResearchMemoryTests.test_unsubmitted_decision_does_not_cross_graph_visibility)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_other_peers_measured_landscape_is_valid_visible_evidence (tests.test_feature_admission.FeatureAdmissionTests.test_other_peers_measured_landscape_is_valid_visible_evidence)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_unknown_feature_still_rejected_with_compacted_provider_context (tests.test_feature_admission.FeatureAdmissionTests.test_unknown_feature_still_rejected_with_compacted_provider_context)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_daily_key_budget_stops_retry_and_followup_calls (tests.test_gateway_logging.GatewayTests.test_daily_key_budget_stops_retry_and_followup_calls) (status=429)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_daily_key_budget_stops_retry_and_followup_calls (tests.test_gateway_logging.GatewayTests.test_daily_key_budget_stops_retry_and_followup_calls) (status=403)"
+      },
+      {
+        "kind": "ERROR",
+        "case": "test_free_peer_starts_another_dialogue_before_slow_peer_finishes (tests.test_platform_research.RollingDispatcherTests.test_free_peer_starts_another_dialogue_before_slow_peer_finishes)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_failed_custom_training_preserves_the_previous_checked_answer (tests.test_adaptive_refinement.AdaptiveRefinementExecutionTests.test_failed_custom_training_preserves_the_previous_checked_answer)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_failed_refit_does_not_block_a_later_publishable_candidate (tests.test_adaptive_regressions.AdaptiveSearchRegressions.test_failed_refit_does_not_block_a_later_publishable_candidate)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_tool_error_can_be_corrected_without_replaying_provider_reasoning (tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tool_error_can_be_corrected_without_replaying_provider_reasoning)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_custom_classifier_train_publish_and_reconstruct_refit (tests.test_adaptive_research.AdaptiveIntegrationTests.test_custom_classifier_train_publish_and_reconstruct_refit)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_real_features_run_before_tuning_and_the_checked_answer_is_retained (tests.test_data_research_window.DataResearchExecutionTests.test_real_features_run_before_tuning_and_the_checked_answer_is_retained) (graph=False, refinement=False)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_real_features_run_before_tuning_and_the_checked_answer_is_retained (tests.test_data_research_window.DataResearchExecutionTests.test_real_features_run_before_tuning_and_the_checked_answer_is_retained) (graph=True, refinement=False)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_real_features_run_before_tuning_and_the_checked_answer_is_retained (tests.test_data_research_window.DataResearchExecutionTests.test_real_features_run_before_tuning_and_the_checked_answer_is_retained) (graph=True, refinement=True)"
+      },
+      {
+        "kind": "FAIL",
+        "case": "test_eight_tool_turns_leave_a_final_action_and_preserve_content_and_call_ids (tests.test_platform_research.ActualRequestTests.test_eight_tool_turns_leave_a_final_action_and_preserve_content_and_call_ids)"
+      }
+    ]
+  },
+  "untouched_upstream_comparisons": {
+    "baseline-fast-failures.log": {
+      "summary": "Ran 12 tests in 3.564s\n\nFAILED (failures=3, errors=8)",
+      "cases": [
+        {
+          "kind": "ERROR",
+          "case": "test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts (tests.test_adaptive_research.AdaptiveResearchTests.test_tool_roundtrip_then_custom_pipeline_passes_graph_contracts)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_authoritative_schema_survives_provider_context_compaction (tests.test_feature_admission.FeatureAdmissionTests.test_authoritative_schema_survives_provider_context_compaction)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_compiles_the_exact_owned_source_and_frozen_dependencies)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_other_peers_measured_landscape_is_valid_visible_evidence (tests.test_feature_admission.FeatureAdmissionTests.test_other_peers_measured_landscape_is_valid_visible_evidence)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code (tests.test_optuna_search.OptunaSearchTests.test_researcher_can_authorize_tuning_of_the_current_custom_base_without_rewriting_code)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_completed_series_is_in_the_next_sent_request_and_evidence_trace (tests.test_platform_research.ActualRequestTests.test_completed_series_is_in_the_next_sent_request_and_evidence_trace)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_model_details_are_frozen_and_identity_checks_reject_other_tasks (tests.test_semantic_planning.SemanticPersistenceTests.test_model_details_are_frozen_and_identity_checks_reject_other_tasks)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_zero_tool_wall_budget_preserves_final_and_json_repair (tests.test_research_latency.ResearchLatencyTests.test_zero_tool_wall_budget_preserves_final_and_json_repair)"
+        },
+        {
+          "kind": "FAIL",
+          "case": "test_feature_action_rejects_target_input_before_training (tests.test_feature_admission.FeatureAdmissionTests.test_feature_action_rejects_target_input_before_training)"
+        },
+        {
+          "kind": "FAIL",
+          "case": "test_unknown_feature_still_rejected_with_compacted_provider_context (tests.test_feature_admission.FeatureAdmissionTests.test_unknown_feature_still_rejected_with_compacted_provider_context)"
+        },
+        {
+          "kind": "FAIL",
+          "case": "test_unsubmitted_decision_does_not_cross_graph_visibility (tests.test_research_memory.ResearchMemoryTests.test_unsubmitted_decision_does_not_cross_graph_visibility)"
+        }
+      ]
+    },
+    "baseline-other-fast.log": {
+      "summary": "Ran 3 tests in 6.427s\n\nFAILED (errors=3)",
+      "cases": [
+        {
+          "kind": "ERROR",
+          "case": "test_tool_error_can_be_corrected_without_replaying_provider_reasoning (tests.test_adaptive_regressions.AdaptiveToolRegressions.test_tool_error_can_be_corrected_without_replaying_provider_reasoning)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_free_peer_starts_another_dialogue_before_slow_peer_finishes (tests.test_platform_research.RollingDispatcherTests.test_free_peer_starts_another_dialogue_before_slow_peer_finishes)"
+        },
+        {
+          "kind": "ERROR",
+          "case": "test_eight_tool_turns_leave_a_final_action_and_preserve_content_and_call_ids (tests.test_platform_research.ActualRequestTests.test_eight_tool_turns_leave_a_final_action_and_preserve_content_and_call_ids)"
+        }
+      ]
+    },
+    "baseline-slow-comparison.log": {
+      "summary": "Ran 3 tests in 97.944s\n\nFAILED (failures=2, errors=1)",
+      "cases": [
+        {
+          "kind": "ERROR",
+          "case": "test_api_exhaustion_keeps_verified_answer_without_early_parameter_search (tests.test_data_research_window.DataResearchExecutionTests.test_api_exhaustion_keeps_verified_answer_without_early_parameter_search) (graph=True)"
+        },
+        {
+          "kind": "FAIL",
+          "case": "test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase (tests.test_adaptive_refinement.AdaptiveRefinementExecutionTests.test_custom_pipeline_is_actually_trained_and_evaluated_in_final_phase)"
+        },
+        {
+          "kind": "FAIL",
+          "case": "test_custom_pipeline_train_publish_and_reconstruct_refit (tests.test_adaptive_research.AdaptiveIntegrationTests.test_custom_pipeline_train_publish_and_reconstruct_refit)"
+        }
+      ]
+    },
+    "baseline-tuning.log": {
+      "summary": "Ran 1 test in 0.644s\n\nFAILED (failures=1)",
+      "cases": [
+        {
+          "kind": "FAIL",
+          "case": "test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue (tests.test_open_investigation.ResearchCheckpointTests.test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue)"
+        }
+      ]
+    }
+  },
+  "subsequent_fixes": [
+    "Known optional legacy explanations are accepted without advertising/requiring long forms in the executable wire schema.",
+    "Controller rotation checkpoints include evidence_ids and pass C09; invalid feature source remains rejected with a typed saved error.",
+    "Recovery tests now check interruptible Event.wait rather than sleep and do not invent provider reset time.",
+    "The historical local-tuning-domain fixture explicitly disables background tuning to exercise its intended protocol.",
+    "OOF completions are serviced in compatible dispatcher loops; the default executable path has renewable work and no lifetime numeric trial/peer cap."
+  ],
+  "remaining_suite_limitations": [
+    "The project-wide suite is not green; no aggregate full-suite pass is claimed.",
+    "Several historical tests expect action_admitted/tune, refinement or semantic-contract flags removed/changed by earlier background-pipeline work; representative failures were reproduced on the untouched base.",
+    "Unsubmitted decisions are retained as explicitly unmeasured history by the base implementation; the old empty-history assertion still conflicts with it.",
+    "Not every failing historical subcase was independently rerun after the final targeted fixes; its final status remains unresolved in this report."
+  ],
+  "not_performed": [
+    "paid API calls",
+    "three-hour live Qwen evaluation",
+    "leaderboard upload",
+    "claims of improved public/private RMSE or F1"
+  ],
+  "env": {
+    "required_changes_for_adaptive_compact": [],
+    "optional_disable_internal_output_quota": "LLM_MAX_TOTAL_OUTPUT_TOKENS=0",
+    "packaged_output_quota": 1048576,
+    "legacy_oof_zero": "RESEARCH_OOF_JOBS=0 still disables; positive values permit renewable one-worker diagnostics",
+    "background_max_trials": "review batch size, same study can continue beyond it"
+  }
+}

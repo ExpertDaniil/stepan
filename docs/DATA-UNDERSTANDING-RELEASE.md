@@ -33,3 +33,28 @@ root and task.md as CLI argument. Submission limit is three per Moscow day.
 
 The unmodified base is being checked with `scripts/check.py --jobs 2` using
 Python 3.12 and the pinned local runtime. Results and measurements follow below.
+
+## Checkpoint requested by the user
+
+Published scope: emergency unscored CSV before API initialization; conservative
+task/sample/dictionary agreement; deterministic recovery after provider errors;
+source-preserving conflict summaries; scoped measurement identity and fit cost;
+optional quotation-checked deployment scenario frozen into validation; separate
+native-category HGB and LightGBM recipes without changing legacy recipe IDs.
+
+Focused verification: bootstrap recovery tests passed (both synthetic task types,
+invalid JSON/provider error, exact IDs, ambiguous sources, unknown metric);
+10 memory/scenario/confirmation tests passed; native recipes fit/predict checks
+passed for both task types. No fresh public quality improvement is claimed.
+
+Work explicitly unfinished and excluded from the published commits: resumable
+version prioritization; stronger confirmation finalists and reuse of prior ready
+outputs; supervised target-statistics operator and Macro F1 class decisions;
+their worker/protocol integration; residual/specialist experiments; controlled
+ML comparisons, live Qwen/memory ablation, complete deadline exercise, final ZIP.
+The development checkout retains this uncommitted work for continuation.
+
+The first full-suite check reported inherited failures and was not a clean
+release gate. An isolated unchanged fa25a30 full-suite check was also started;
+do not treat a passing focused subset as a passing complete suite. No official
+test labels, platform submission or configured paid API calls were used.

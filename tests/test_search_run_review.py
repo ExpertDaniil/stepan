@@ -54,10 +54,11 @@ class SearchRunReviewTests(unittest.TestCase):
 
     def test_warmup_bases_precede_feature_variants(self):
         catalog = Catalog('regression', Config())
-        choices = catalog.warmup_choices()[:4]
+        choices = catalog.warmup_choices()
         self.assertNotEqual(choices[0][0], choices[1][0])
-        self.assertEqual([p.get('target_transform', 'identity') for _, p in choices[:2]], ['identity', 'identity'])
-        self.assertTrue(any(p.get('target_transform') == 'shifted_log1p' for _, p in choices[2:]))
+        self.assertEqual([p.get('target_transform', 'identity') for _, p in choices[:4]], ['identity']*4)
+        self.assertEqual(len({recipe for recipe,_ in choices[:4]}),4)
+        self.assertTrue(any(p.get('target_transform') == 'shifted_log1p' for _, p in choices[4:]))
 
     def test_planned_warmup_is_reused_as_the_controlled_transfer_pilot(self):
         h = GraphHarness()

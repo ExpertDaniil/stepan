@@ -112,6 +112,7 @@ class DataResearchWindowTests(unittest.TestCase):
         budget = Budget(Config(data_research_min_seconds=None), time.monotonic(), None)
         budget.start_data_research()
         active = budget.data_research_snapshot()
+        with self.assertRaises(AgentError):require_action({'action':'research','next_step':'finish'},active)
         for kind in ['catalog', 'tune', 'stop']:
             with self.subTest(action=kind), self.assertRaises(AgentError) as caught:
                 require_action(action(kind), active)
@@ -267,6 +268,7 @@ class DataResearchExecutionTests(unittest.TestCase):
                 root = Path(temporary)
                 task = make_demo(root/'task', 'regression', rows=90, test_rows=12)
                 settings = {'AUTOML_PROFILE': 'development', 'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive',
+                    'RESEARCH_PROTOCOL':'legacy','BACKGROUND_TUNING_ENABLED':'0',
                     'TIME_BUDGET_SECONDS': '90', 'DATA_RESEARCH_MIN_SECONDS': '60', 'LLM_MAX_CALLS': '2',
                     'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1',
                     'GRAPH_REFINEMENT_ENABLED': '0', 'MAX_WORKERS': '1', 'TRAIN_CPU_THREADS': '1',
@@ -326,6 +328,7 @@ class DataResearchExecutionTests(unittest.TestCase):
                 response['choices'][0]['message']['content'] = json.dumps(value)
                 return response
             settings = {'AUTOML_PROFILE': 'development', 'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive',
+                'RESEARCH_PROTOCOL':'legacy','BACKGROUND_TUNING_ENABLED':'0',
                 'TIME_BUDGET_SECONDS': '90', 'DATA_RESEARCH_MIN_SECONDS': '4', 'MAX_WORKERS': '1',
                 'GRAPH_ENABLED': str(int(graph)), 'GRAPH_PEERS': '1', 'GRAPH_TRAIN_WORKERS': '1',
                 'GRAPH_REFINEMENT_ENABLED': str(int(refinement)),

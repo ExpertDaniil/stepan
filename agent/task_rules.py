@@ -34,10 +34,11 @@ def validation_requirement(text, columns, dictionary=()):
     an unrelated random split.
     """
     lines = list(plain_lines(text))
-    future = [(raw, line) for raw, line in lines if re.search(
+    affirmative=[(raw,line) for raw,line in lines if not re.search(r'\bnot\b|\bне\b',line,re.I)]
+    future = [(raw, line) for raw, line in affirmative if re.search(
         r'\bfuture (?:observations|periods?|data)\b|\bnext (?:period|year)\b|'
         r'будущ\w* (?:наблюден|период|данн)|следующ\w* (?:период|год)', line, re.I)]
-    unseen = [(raw, line) for raw, line in lines if re.search(
+    unseen = [(raw, line) for raw, line in affirmative if re.search(
         r'\b(?:new|unseen) (?:entities|objects|groups)\b|нов\w* (?:объект|групп)|'
         r'ранее не (?:встречавш|наблюдавш)', line, re.I)]
     explicit = [(raw, line) for raw, line in lines if re.match(

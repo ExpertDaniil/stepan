@@ -444,6 +444,8 @@ class Gateway:
             messages = deepcopy(context['messages'])
             if window['active']:
                 expected['properties']['action']['enum'] = ['features', 'pipeline', 'research']
+                if 'next_step' in expected['properties']:
+                    expected['properties']['next_step']['enum'] = ['continue','wait']
         scientific = user.get('profile_summary', user).get('scientific_protocol', {}) if isinstance(user, dict) else {}
         if payload['response_schema_id'] == 'ResearchAction-v1' and not executable and scientific.get('version') == 'scientific-v1':
             expected['required'] = list(dict.fromkeys([*expected['required'], 'research_notes']))

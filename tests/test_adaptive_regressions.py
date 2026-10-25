@@ -117,6 +117,7 @@ class AdaptiveSearchRegressions(unittest.TestCase):
             root = Path(temp)
             task = make_demo(root/'task', 'regression', rows=100, test_rows=12)
             settings = dict(LLM_MODE='mock', RESEARCH_MODE='adaptive', TIME_BUDGET_SECONDS='120',
+                RESEARCH_PROTOCOL='legacy', BACKGROUND_TUNING_ENABLED='0',
                 # Isolate tuning/recovery here; mandatory timing has dedicated enabled checks.
                 DATA_RESEARCH_MIN_SECONDS='0',
                 GRAPH_ENABLED=str(int(graph)), GRAPH_REFINEMENT_ENABLED='0', MAX_WORKERS='1', GRAPH_PEERS='1',

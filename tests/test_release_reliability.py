@@ -67,6 +67,7 @@ class TaskRecoveryTests(unittest.TestCase):
             req = validation_requirement('Predict future observations.\nTime column: period',['period'])
             with self.assertRaises(AgentError):bind_requirement({'strategy':'random_holdout','parameters':{}},req)
             self.assertIsNone(validation_requirement('A timestamp exists, deployment unspecified.',['timestamp']))
+            self.assertIsNone(validation_requirement('We do not predict future observations.',['period']))
         finally:h.close()
 
 

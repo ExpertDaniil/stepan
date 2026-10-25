@@ -114,6 +114,7 @@ class AdaptiveRefinementExecutionTests(unittest.TestCase):
                                      'finish_reason': 'stop'}],
                         'usage': {'prompt_tokens': 100, 'completion_tokens': 100}}
             settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '120',
+                'RESEARCH_PROTOCOL':'legacy','BACKGROUND_TUNING_ENABLED':'0','DATA_RESEARCH_MIN_SECONDS':'0',
                 'GRAPH_ENABLED': '1', 'GRAPH_REFINEMENT_ENABLED': '1', 'GRAPH_PEERS': '1',
                 'GRAPH_TRAIN_WORKERS': '1', 'MAX_WORKERS': '1', 'TRAIN_CPU_THREADS': '1',
                 'CATALOG_WARMUP_EXPERIMENTS': '1', 'LLM_MAX_CALLS': '8', 'LOG_LEVEL': 'ERROR',

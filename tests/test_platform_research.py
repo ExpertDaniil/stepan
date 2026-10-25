@@ -193,7 +193,8 @@ class ActualRequestTests(unittest.TestCase):
 
 class RollingDispatcherTests(unittest.TestCase):
     def test_free_peer_starts_another_dialogue_before_slow_peer_finishes(self):
-        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800,
+            graph_train_workers=1,research_protocol='legacy',background_tuning_enabled=False)
         release = threading.Event()
         try:
             c, g = h.controller, h.g

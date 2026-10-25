@@ -1,5 +1,7 @@
 * text=auto
 *.py text eol=lf
+/requirements.txt text eol=lf
+/requirements.organizers.txt text eol=lf
 *.json text eol=lf
 *.jsonl text eol=lf
 recipes/knowledge/UPSTREAM_LICENSE.txt text eol=lf

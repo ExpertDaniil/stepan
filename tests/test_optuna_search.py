@@ -25,7 +25,7 @@ def request(space, max_trials=3):
 
 class OptunaSearchTests(unittest.TestCase):
     def setUp(self):
-        self.h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800)
+        self.h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800,research_protocol='legacy',background_tuning_enabled=False)
         self.g, self.c = self.h.g, self.h.controller
         self.c.graph = self.g
         self.c.llm_available = lambda: True

@@ -240,17 +240,21 @@ class EndToEndTests(unittest.TestCase):
             self.assertIn("State: degraded", (run / "summary.md").read_text())
             self.assertIn("llm.daily_budget_exhausted", (run / "events.jsonl").read_text())
 
-    def test_provider_credit_failure_before_bootstrap_reports_cause_without_fake_output(self):
+    def test_provider_credit_failure_preserves_early_output_and_learns_the_known_contract(self):
         with tempfile.TemporaryDirectory() as temp:
             task = make_demo(Path(temp) / "task")
             failure = RuntimeError("OpenrouterException - Insufficient credits")
             failure.status_code = 503
             with patch.dict(os.environ, self.env()), patch.object(MockTransport, "complete", side_effect=failure) as transport, redirect_stderr(io.StringIO()):
                 code = main([str(task), "--llm-mode", "mock", "--work-dir", str(Path(temp) / "runs")])
-            self.assertEqual(code, 1)
+            self.assertEqual(code, 0)
             self.assertEqual(transport.call_count, 1)
-            self.assertFalse((task.parent / "submission.csv").exists())
+            self.assertTrue((task.parent / "submission.csv").exists())
             events = [json.loads(line) for line in next((Path(temp)/"runs").glob("run-*/events.jsonl")).read_text().splitlines()]
-            self.assertEqual(events[-1]["event"], "run.failed")
-            self.assertEqual(events[-1]["code"], "LLM_PROVIDER_CREDITS_EXHAUSTED")
-            self.assertFalse(any(e["event"] in {"llm.daily_budget_exhausted", "job.started"} for e in events))
+            self.assertEqual(events[-1]["event"], "run.finished")
+            early=next(e for e in events if e['event']=='submission.emergency_published')
+            self.assertIsNone(early['score'])
+            self.assertIsNone(early['evaluation'])
+            self.assertTrue(any(e['event']=='llm.provider_credits_exhausted' for e in events))
+            self.assertTrue(any(e['event']=='job.started' for e in events))
+            self.assertFalse(any(e['event']=='llm.daily_budget_exhausted' for e in events))

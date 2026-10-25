@@ -239,7 +239,7 @@ class ExactSemanticChecks(analysis_fixture.AnalysisAccessTests):
 
 class SemanticPersistenceTests(unittest.TestCase):
     def setUp(self):
-        self.h = GraphHarness('regression', research_mode='adaptive')
+        self.h = GraphHarness('regression', research_mode='adaptive',research_protocol='legacy',background_tuning_enabled=False)
         g = self.h.g
         self.source = build_task_model(unknown_model(), '', self.h.h.profile['summary'], g.schemas, g.spec)
         art = g.artifacts.write_json('task/synthetic-semantic-model.json', self.source, 'task_semantic_model')

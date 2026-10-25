@@ -297,7 +297,7 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
             'question': question, 'preview_only': True})
     sections['transcripts_index'] = transcripts
     sections['drafts_index'] = []
-    visible_orders = set(memory.get('visible_work_order_ids', []))
+    visible_orders = set(memory.get('visible_work_order_ids') or [])
     cutoffs = memory.get('visible_analysis_cutoffs', {})
     with artifacts.lock:
         drafts = [deepcopy(entry['meta']) for entry in artifacts.entries.values() if entry['meta']['kind'] == 'pipeline_draft']

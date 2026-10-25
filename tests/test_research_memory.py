@@ -88,11 +88,13 @@ class ResearchMemoryTests(unittest.TestCase):
         self.assertIsNone(memory['decisions'][0]['configuration'])
         self.assertEqual(len(memory['open_ideas']), 1)
 
-    def test_unsubmitted_decision_does_not_cross_graph_visibility(self):
+    def test_unsubmitted_decision_remains_scoped_and_has_no_measured_outcome(self):
         ticket = self.h.issue()
         payload = self.h.proposal(ticket)
         self.save(ticket, payload['proposal']['plan'], notes())
-        self.assertEqual(self.g.research_memory(self.h.root, [])['decisions'], [])
+        visible=self.g.research_memory(self.h.root, [])['decisions']
+        self.assertTrue(visible)
+        self.assertTrue(all(not decision['observations'] for decision in visible))
         self.assertEqual(build_research_memory(self.g.store, self.g.artifacts, [])['decisions'], [])
 
     def test_sibling_decisions_do_not_enter_another_branch(self):

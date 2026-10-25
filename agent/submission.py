@@ -75,9 +75,16 @@ class Submission:
         train_hash = file_sha256(self.artifacts.resolve(self.spec['train_artifact_id']))
         if train_hash != self.artifacts.meta(self.spec['train_artifact_id'])['sha256']:
             raise AgentError('CANDIDATE_CHANGED', 'Reference training bytes changed')
+        execution=self.artifacts.safe_path('experiments/'+experiment_id+'/execution.json')
+        execution_hash=None
+        if execution.is_file():
+            from agent.runner import frozen_execution
+            frozen_execution(self.artifacts,exp,self.spec,'refit')
+            execution_hash=file_sha256(execution)
         return {'fingerprint': exp['fingerprint'], 'code_sha256': code_hash,
                 'task_spec_sha256': hashlib.sha256(canonical(self.spec).encode()).hexdigest(),
-                'validation_id': plan['validation_id'], 'test_sha256': test_hash, 'train_sha256': train_hash}
+                'validation_id': plan['validation_id'], 'test_sha256': test_hash, 'train_sha256': train_hash,
+                'execution_sha256':execution_hash}
 
     def ready_candidate(self, experiment_id):
         """Previously committed publications are reusable only under the same identity."""

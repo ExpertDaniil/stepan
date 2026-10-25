@@ -135,7 +135,7 @@ class TimeAdmissionTests(unittest.TestCase):
             controller.graph = h.g
             controller.degraded = False
             controller.admit_training = lambda plan, eid: controller.budget.admit(eid, plan)["allowed"]
-            controller.lease = lambda *args: (_ for _ in ()).throw(AgentError("BUDGET_EXHAUSTED", "Time changed"))
+            controller.call = lambda *args,**kwargs: (_ for _ in ()).throw(AgentError("BUDGET_EXHAUSTED", "Time changed at C13"))
             controller.wait_jobs = lambda jobs: {}
             ticket = h.issue()
             plan = h.proposal(ticket)["proposal"]["plan"]

@@ -219,6 +219,7 @@ class AdaptiveIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp);task = make_demo(root/'task', kind, rows=120, test_rows=16)
             settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '120',
+                'RESEARCH_PROTOCOL':'legacy','BACKGROUND_TUNING_ENABLED':'0',
                 # This fixture tests reconstruction and explicit stop, independently of timing policy.
                 'DATA_RESEARCH_MIN_SECONDS': '0',
                 'GRAPH_ENABLED': '1', 'GRAPH_REFINEMENT_ENABLED': '0', 'CATALOG_WARMUP_EXPERIMENTS': '0',

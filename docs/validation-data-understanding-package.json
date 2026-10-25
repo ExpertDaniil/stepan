@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-25",
+  "branch": "feat/data-understanding-release",
+  "base_code_commit": "86027327f252cbf9aada4097a1a4b48fb7d15429",
+  "subsequent_runtime_delta": "Official requirement files normalized to supplied LF bytes; owned Python modules unchanged.",
+  "archive": {
+    "name": "stepan-data-understanding-2026-10-25.zip",
+    "bytes": 668815,
+    "files": 83,
+    "sha256": "bc19749ad550ca70703ef53de0f88d38426f0447b3ad05cf08e0723911978f73",
+    "root_files_only": true,
+    "allowed_extensions": [
+      ".py",
+      "requirements.txt"
+    ],
+    "owned_python_bytes_match": true,
+    "official_requirements_bytes_match": true,
+    "official_requirements_sha256": "9173b0388532fbd2a709e4f4b3029e3b9ccab685fce43a85261ffa1ba95efbe6"
+  },
+  "checks": {
+    "packaging_and_isolated_classification_regression": {
+      "cases": 9,
+      "passed": 9,
+      "seconds": 114.85
+    },
+    "exact_archive_adaptive_run": {
+      "zip_sha256": "bc19749ad550ca70703ef53de0f88d38426f0447b3ad05cf08e0723911978f73",
+      "command": "python3 solution.py task.md",
+      "default_research_mode": "adaptive/compact",
+      "provider": "explicit_mock",
+      "exit_code": 0,
+      "state": "completed",
+      "rows": 24,
+      "columns": [
+        "id",
+        "label"
+      ],
+      "research_versions": 1,
+      "verified_publications": 2
+    }
+  },
+  "limits": {
+    "live_api": false,
+    "data": "synthetic tasks",
+    "full_updated_suite": "not run; focused regressions and release checks only",
+    "three_hour_competition_run": false,
+    "platform_upload": false
+  }
+}

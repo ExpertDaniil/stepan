@@ -62,7 +62,8 @@ class Config:
     background_cpu_threads: int = 6
     background_switch_margin: float = 0.0
     python_analysis_enabled: bool = True
-    data_research_min_seconds: int | None = None  # Auto: one sixth of the run, up to 30 minutes.
+    # 0 disables the data-only window; an explicit DATA_RESEARCH_MIN_SECONDS opts in.
+    data_research_min_seconds: int | None = 0
     llm_max_calls: int | None = 32
     llm_timeout_seconds: int = 600
     llm_operation_timeout_seconds: int = 1200
@@ -148,7 +149,7 @@ class Config:
             background_switch_margin=real('BACKGROUND_SWITCH_MARGIN', 0.0, 0, 1000000),
             python_analysis_enabled=boolean("PYTHON_ANALYSIS_ENABLED", True),
             data_research_min_seconds=(integer('DATA_RESEARCH_MIN_SECONDS', 0, 0, 10800)
-                                       if 'DATA_RESEARCH_MIN_SECONDS' in os.environ else None),
+                                       if 'DATA_RESEARCH_MIN_SECONDS' in os.environ else 0),
             llm_max_calls=optional_limit("LLM_MAX_CALLS", None if platform else 32, 1, 1000000),
             llm_timeout_seconds=integer("LLM_TIMEOUT_SECONDS", 600, 1, 1800),
             llm_operation_timeout_seconds=integer("LLM_OPERATION_TIMEOUT_SECONDS", 1200, 1, 3600),

@@ -241,6 +241,28 @@ def worker_inputs(job):
     return train_rows, fit_x, target if len(names) > 1 else target[names[0]], predict_x
 
 
+def fold_inputs(job, fit_indices, valid_indices):
+    """Fit X/y and prediction X for one rolling fold of the frozen protocol."""
+    import pandas as pd
+    from agent.predictions import read_training, targets
+    task = job['task_spec']
+    names = targets(task)
+    reference = job.get('input_tables', {}).get('train')
+    if reference:
+        manifest = json.loads(Path(reference['path']).read_text(encoding='utf-8'))
+        features = [c for c in manifest['columns'] if c not in {*names, *task['excluded_features']}]
+        fit_x = read_cached(reference, features, fit_indices)
+        target = read_cached(reference, names, fit_indices)
+        predict_x = read_cached(reference, features, valid_indices)
+    else:
+        train = read_training(job['train_path'], task)
+        features = [c for c in train if c not in {*names, *task['excluded_features']}]
+        fit_x, target = train.iloc[fit_indices][features].copy(), train.iloc[fit_indices][names].copy()
+        predict_x = train.iloc[valid_indices][features].copy()
+    target = target.apply(pd.to_numeric, errors='raise') if task['task_kind'] == 'regression' else target.astype(str)
+    return fit_x, target if len(names) > 1 else target[names[0]], predict_x
+
+
 def transport(artifacts):
     # Shared only inside this run's trusted services; no module-global cache.
     with artifacts.lock:

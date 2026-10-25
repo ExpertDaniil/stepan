@@ -17,7 +17,7 @@ from tools.data import profile_data
 
 
 class Harness:
-    def __init__(self, kind="classification", with_periods=False):
+    def __init__(self, kind="classification", with_periods=False, with_duplicates=False):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.task = make_demo(self.root / "task", kind, rows=90, test_rows=12)
@@ -28,6 +28,14 @@ class Harness:
                 frame = pd.read_csv(path, dtype={"id": str}, keep_default_na=False)
                 frame["period"] = [i // 15 for i in range(len(frame))]
                 frame.to_csv(path, index=False)
+        if with_duplicates:
+            import pandas as pd
+            path = self.task.parent / "train.csv"
+            frame = pd.read_csv(path, dtype={"id": str}, keep_default_na=False)
+            features = [c for c in frame.columns if c not in {"id", "label", "target"}]
+            # Every feature row appears three times; labels and ids stay as generated.
+            frame[features] = frame[features].iloc[[3*(i//3) for i in range(len(frame))]].to_numpy()
+            frame.to_csv(path, index=False)
         self.run = self.root / "run"
         self.config = Config(llm_mode="mock", research_mode='catalog', work_dir=self.root, time_budget_seconds=90, log_level="ERROR")
         self.log = RunLogger(self.run, "unit-run", level="ERROR", secrets=["unit-private-secret"])

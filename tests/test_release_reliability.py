@@ -62,8 +62,8 @@ class TaskRecoveryTests(unittest.TestCase):
             self.assertEqual(proposal['parameters']['column'],'period')
             interpreter.ask.assert_not_called()
             interpreter.task['task_text'] = 'Predict future observations.'
-            with self.assertRaises(AgentError) as caught:interpreter.choose_validation(h.spec)
-            self.assertEqual(caught.exception.code,'VALIDATION_SCENARIO_UNRESOLVED')
+            # Unresolved prose is logged; a measured holdout beats a constant submission.
+            self.assertEqual(interpreter.choose_validation(h.spec)['strategy'],'random_holdout')
             req = validation_requirement('Predict future observations.\nTime column: period',['period'])
             with self.assertRaises(AgentError):bind_requirement({'strategy':'random_holdout','parameters':{}},req)
             self.assertIsNone(validation_requirement('A timestamp exists, deployment unspecified.',['timestamp']))

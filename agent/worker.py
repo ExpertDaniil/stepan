@@ -96,6 +96,14 @@ def execute(job, trusted_thread=None):
     from agent.fit_diagnostics import execute_oof
     data_started = time.monotonic()
     train_rows, fit_x, fit_y, predict_x = worker_inputs(job)
+    folds = None
+    if job['phase'] == 'train' and job.get('fold_plan_path') and not job.get('diagnostic'):
+        # Read every rolling fold before the generated-code guard seals file access.
+        from agent.data_transport import fold_inputs
+        plan = json.loads(Path(job['fold_plan_path']).read_text(encoding='utf-8'))
+        if sorted(i for fold in plan for i in fold['valid']) != sorted(predict_x.index.tolist()):
+            raise ValueError('Rolling fold plan does not partition the validation rows')
+        folds = [fold_inputs(job, fold['fit'], fold['valid']) for fold in plan]
     data_seconds = time.monotonic()-data_started
     print('AUTOML_WORKER '+json.dumps({'stage': 'data_prepared', 'phase': job['phase'],
         'format': 'numpy-columns-v1' if job.get('input_tables', {}).get('train') else 'csv',
@@ -119,7 +127,8 @@ def execute(job, trusted_thread=None):
     if guard:
         guard.active = True
     try:
-        result = execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits)
+        result = execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits,
+                                  folds=folds)
         result['input_preparation_seconds'] = data_seconds
         return result
     finally:
@@ -128,7 +137,7 @@ def execute(job, trusted_thread=None):
         limits.close()
 
 
-def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits):
+def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, fit_y, predict_x, guard, limits, folds=None):
     import numpy as np
     import pandas as pd
     from threadpoolctl import threadpool_limits
@@ -140,10 +149,14 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
         from agent.fit_diagnostics import execute_oof
         return execute_oof(module, task, params, fit_x, fit_y, job, guard, limits)
     print("AUTOML_WORKER "+json.dumps({"stage": "constructing", "phase": job["phase"], "rows": train_rows, "features": len(fit_x.columns)}),flush=True)
-    model = validate_estimator(enforce_threads(bind_validation_policy(module.make_pipeline(task, params),job.get('training_policy')), job["cpu_threads"]))
-    if len(targets(task)) > 1:
-        from agent.ml import SequentialTargets
-        model = SequentialTargets(model)
+    def build():
+        built = validate_estimator(enforce_threads(bind_validation_policy(module.make_pipeline(task, params),
+                                                                          job.get('training_policy')), job["cpu_threads"]))
+        if len(targets(task)) > 1:
+            from agent.ml import SequentialTargets
+            built = SequentialTargets(built)
+        return built
+    model = build()
     if not callable(getattr(model, "fit", None)) or not callable(getattr(model, "predict", None)):
         raise TypeError("make_pipeline must return an object implementing fit and predict")
     if job.get('preflight'):
@@ -161,14 +174,26 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
             print('AUTOML_WORKER '+json.dumps({'stage': 'preflight_completed', 'rows': len(sample)}), flush=True)
         finally:
             job.pop('_preflight_deadline', None)
-        model = validate_estimator(enforce_threads(bind_validation_policy(module.make_pipeline(task, params),job.get('training_policy')), job['cpu_threads']))
-        if len(targets(task)) > 1:
-            from agent.ml import SequentialTargets
-            model = SequentialTargets(model)
+        model = build()
     started = time.monotonic()
     print("AUTOML_WORKER "+json.dumps({"stage": "fit_started", "phase": job["phase"], "cpu_threads": job["cpu_threads"]}),flush=True)
     with limits:
-        if job["phase"] == "train":
+        if job["phase"] == "train" and folds:
+            # Rolling origin: one fresh model per block, fitted on all earlier rows.
+            parts = []
+            for number, (fold_x, fold_y, fold_predict) in enumerate(folds):
+                model = model if number == 0 else build()
+                model.fit(fold_x, fold_y)
+                part = pd.DataFrame(predict(model, fold_predict, task, 'train'), columns=validation_columns(task))
+                part.insert(0, '__row_index', fold_predict.index.tolist())
+                parts.append(part)
+                print('AUTOML_WORKER '+json.dumps({'stage': 'rolling_fold_completed', 'fold': number+1, 'folds': len(folds),
+                    'fit_rows': len(fold_x), 'prediction_rows': len(fold_predict)}), flush=True)
+            fit_seconds = time.monotonic() - started
+            frame = pd.concat(parts, ignore_index=True).sort_values('__row_index', kind='mergesort').reset_index(drop=True)
+            if frame['__row_index'].tolist() != sorted(predict_x.index.tolist()):
+                raise ValueError('Rolling fold predictions do not cover the validation rows exactly once')
+        elif job["phase"] == "train":
             valid_indices = predict_x.index.tolist()
             model.fit(fit_x, fit_y)
             fit_seconds = time.monotonic() - started
@@ -214,7 +239,9 @@ def execute_pipeline(job, module, module_spec, params, task, train_rows, fit_x, 
                     if hasattr(fitted_child, 'get_params'):
                         objects.extend(fitted_child.get_params(deep=True).values())
             from agent.supervised import MacroF1DecisionClassifier
-            if isinstance(transformer, (FeatureProgram, NumericInteractions, MacroF1DecisionClassifier)) and hasattr(transformer, 'report_'):
+            from agent.strong import StrongTabularModel
+            if isinstance(transformer, (FeatureProgram, NumericInteractions, MacroF1DecisionClassifier,
+                                        StrongTabularModel)) and hasattr(transformer, 'report_'):
                 item = {'target_index': target_index, 'report': transformer.report_,
                         'verification': 'owned_transformer_executed', 'units': 'not_inferred'}
                 execution.append(item)

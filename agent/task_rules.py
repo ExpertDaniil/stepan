@@ -45,9 +45,14 @@ def infer_metric(text):
 
     Precedence: an explicit "metric:" label, a line that calls a metric primary or
     main, a line about the metric that names exactly one, then the whole text when
-    it names exactly one. Several metrics without a primary marker stay unresolved.
+    it names exactly one. Several metrics without a primary marker stay unresolved,
+    and so do explicit labels that each name a different single metric.
     """
-    labelled = _mentioned(metric_text(text))
+    labels = [_mentioned(line) for line in metric_text(text).splitlines()]
+    decisive = {found[0] for found in labels if len(found) == 1}
+    if len(decisive) > 1:
+        return None
+    labelled = [metric for found in labels for metric in found]
     if len(set(labelled)) == 1:
         return labelled[0]
     lines = [line for _, line in plain_lines(text) if line]

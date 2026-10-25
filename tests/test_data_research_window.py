@@ -88,15 +88,17 @@ class DataResearchWindowTests(unittest.TestCase):
                 with self.assertRaises(AgentError):
                     Config.from_env(profile='development')
 
-    def test_runtime_defaults_enable_the_window_in_both_profiles(self):
+    def test_runtime_defaults_disable_the_window_in_both_profiles(self):
+        # A data-only window measured as idle time when the provider is down; the
+        # scaled window stays available through an explicit None.
         for profile in ('platform', 'development'):
             with self.subTest(profile=profile), patch.dict(os.environ, {}, clear=True):
                 config = Config.from_env(profile=profile)
-                self.assertIsNone(config.data_research_min_seconds)
+                self.assertEqual(config.data_research_min_seconds, 0)
                 budget = Budget(config, time.monotonic(), None)
                 budget.start_data_research()
-                self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 1800)
-                self.assertTrue(budget.data_research_snapshot()['active'])
+                self.assertEqual(budget.data_research_snapshot()['minimum_seconds'], 0)
+                self.assertFalse(budget.data_research_snapshot()['active'])
 
     def test_data_window_never_extends_the_global_deadline_or_output_reserve(self):
         with patch('agent.budget.time.monotonic', return_value=100) as clock:

@@ -133,15 +133,29 @@ class Evaluator:
         if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not 0.05 <= fraction <= 0.5:
             raise AgentError("INVALID_SPLIT", "valid_fraction must be between 0.05 and 0.5")
         indices = np.arange(len(frame))
+        fold_plan = None
         strategy = proposal["strategy"]
         y = frame[self.spec["target_column"]]
         try:
+            duplicate_groups = None
+            if params.get('duplicate_groups') and strategy in {'stratified_holdout', 'random_holdout'}:
+                features = [c for c in frame.columns if c not in targets(self.spec) and c not in self.spec['excluded_features']]
+                duplicate_groups = pd.util.hash_pandas_object(frame[features].astype(str), index=False).to_numpy()
             if strategy == "stratified_holdout":
                 if self.spec["task_kind"] == "regression":
                     raise AgentError("INVALID_SPLIT", "Stratification requires classification")
-                a, b = train_test_split(indices, test_size=fraction, random_state=proposal["seed"], stratify=y.astype(str))
+                if duplicate_groups is not None:
+                    from sklearn.model_selection import StratifiedGroupKFold
+                    splitter = StratifiedGroupKFold(max(2, round(1/fraction)), shuffle=True, random_state=proposal["seed"])
+                    a, b = next(splitter.split(indices, y.astype(str), duplicate_groups))
+                else:
+                    a, b = train_test_split(indices, test_size=fraction, random_state=proposal["seed"], stratify=y.astype(str))
             elif strategy == "random_holdout":
-                a, b = train_test_split(indices, test_size=fraction, random_state=proposal["seed"])
+                if duplicate_groups is not None:
+                    a, b = next(GroupShuffleSplit(n_splits=1, test_size=fraction, random_state=proposal["seed"]).split(
+                        indices, groups=duplicate_groups))
+                else:
+                    a, b = train_test_split(indices, test_size=fraction, random_state=proposal["seed"])
             elif strategy == "group_holdout":
                 column = params.get("column")
                 if column not in frame or column in targets(self.spec):
@@ -161,8 +175,18 @@ class Evaluator:
                 periods = sorted(ordered.unique().tolist())
                 if len(periods) < 2:
                     raise AgentError("INVALID_SPLIT", "At least two periods required")
-                cutoff = periods[max(1, int(len(periods) * (1 - fraction)))]
+                # Rolling origin: at least two validation periods when three exist,
+                # split into two consecutive blocks. Each block is predicted by a
+                # model fitted on every earlier row, as the deployment would be.
+                cut = max(1, min(int(len(periods)*(1-fraction)), len(periods)-2))
+                blocks = [list(block) for block in np.array_split(np.asarray(periods[cut:], dtype=object), min(2, len(periods)-cut))]
+                cutoff = periods[cut]
                 a, b = indices[(ordered < cutoff).to_numpy()], indices[(ordered >= cutoff).to_numpy()]
+                values = ordered.to_numpy()
+                fold_plan = [{'valid_periods': [str(v) for v in block],
+                              'fit': indices[values < block[0]].tolist(),
+                              'valid': indices[np.isin(values, np.asarray(block, dtype=values.dtype))].tolist()}
+                             for block in blocks]
             else:
                 raise AgentError("INVALID_SPLIT", f"Unsupported validation strategy: {strategy}")
         except AgentError:
@@ -175,11 +199,17 @@ class Evaluator:
         from agent.confirmation import partition
         from agent.semantic_planning import validation_scenario
         scenario = validation_scenario(proposal, self.spec, self.artifacts)
-        selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
+        if fold_plan:
+            # Every rolling block is a scored deployment period; none is withheld.
+            selection, confirmation, confirmation_reason = list(b), [], 'rolling_temporal_folds_score_every_period'
+        else:
+            selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
         protocol = {"dataset_id": payload["dataset_id"], "metric": self.spec["metric"], "proposal": proposal,
                     "train_indices": a, "valid_indices": b, "evaluator_version": "sklearn-metrics-v2",
                     'selection_indices': selection, 'confirmation_indices': confirmation, 'scenario': scenario,
                     'confirmation_unavailable_reason': confirmation_reason,
+                    'fold_plan': ([{'valid_periods': f['valid_periods'], 'fit_rows': len(f['fit']), 'valid_rows': len(f['valid'])}
+                                   for f in fold_plan] if fold_plan else None),
                     'prediction_contract': {'target_columns': targets(self.spec), 'allowed_labels': self.spec['allowed_labels'],
                                             'prediction_kind': self.spec['metric']['prediction_kind']}}
         sha = hashlib.sha256(canonical(protocol).encode()).hexdigest()
@@ -187,6 +217,10 @@ class Evaluator:
         train_art = self.artifacts.write_json(f"validation/{ident}.train.json", a, "split_train")
         valid_art = self.artifacts.write_json(f"validation/{ident}.valid.json", b, "split_valid")
         self.artifacts.write_json(f"validation/{ident}.protocol.json", protocol, "validation_protocol")
+        if fold_plan:
+            if sorted(i for f in fold_plan for i in f['valid']) != b:
+                raise AgentError("INVALID_SPLIT", "Rolling folds must partition the validation rows")
+            self.artifacts.write_json(f"validation/{ident}.folds.json", fold_plan, "split_folds")
         self.protocols[ident] = protocol
         self.log.event("validation.created", validation_id=ident, strategy=strategy, parameters=params,
                        metric_id=self.spec["metric"]["metric_id"], direction=self.spec["metric"]["direction"],

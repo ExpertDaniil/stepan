@@ -101,6 +101,8 @@ class MockTransport:
                 params = {"iterations": 100+20*round_no}
             elif recipe.startswith(("random-forest-", "extra-trees-")):
                 params = {"n_estimators": 60+10*round_no}
+            elif recipe.startswith(("strong-", "lightgbm-")):
+                params = {"learning_rate": min(0.2, 0.05+0.01*round_no)}
             else:
                 params = {"max_iter": 40+10*round_no}
             payload = {"recipe_id": recipe, "hyperparameters": params,

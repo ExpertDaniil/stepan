@@ -6,7 +6,11 @@ check (built from the fit rows alone) supports it:
 * LightGBM with inner early stopping and numerically guarded multiclass settings.
 * Entity history: under a temporal protocol, a key whose rows recur across periods
   is discovered from the fit rows; strictly earlier target values of the same key
-  become features. Rows with history use a history model, the rest a base model.
+  become features of one joint model, where missing history marks a first
+  appearance. (A separate base model for first appearances was measured worse on
+  later periods: it cannot tell new keys from recurring ones.)
+* Seed bagging of the final fit: deployment periods are new, so prediction
+  variance across seeds is a first-order error term.
 * Class decisions: optional class weighting and, for F1 metrics, per-class log
   offsets tuned on one inner half and confirmed on the other.
 
@@ -20,12 +24,12 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 HISTORY_FEATURES = ('last', 'mean', 'count', 'gap')
-ENTITY_MIN_MULTI_PERIOD = 0.2    # At least a fifth of keys recur in another period.
+ENTITY_MIN_MULTI_PERIOD = 0.05   # Some keys recur; the inner check decides usefulness.
 ENTITY_MAX_WITHIN_SHARE = 0.6    # The key explains at least 40% of target variance.
 ENTITY_MAX_DUPLICATE = 0.1       # A key is almost unique inside one period.
 ENTITY_MAX_COLUMNS = 5
 ENTITY_SECONDS = 30.0
-ROUTING_MIN_GAIN = 0.01          # Relative inner loss reduction needed to use history.
+HISTORY_MIN_GAIN = 0.01          # Relative inner loss reduction needed to use history.
 DECISION_MIN_GAIN = 0.002        # Confirmed inner F1 gain needed to keep offsets.
 OFFSET_GRID = (-2.0, -1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0, 2.0)
 
@@ -50,7 +54,7 @@ class TableEncoder:
             text = _text(values).dropna()
             sample = text.head(500)
             if len(sample) and sample.str.match(DATE_PATTERN).all() and \
-                    pd.to_datetime(text, errors='coerce', utc=True).notna().mean() >= 0.99:
+                    pd.to_datetime(text, format='ISO8601', errors='coerce', utc=True).notna().mean() >= 0.99:
                 self.dates_.append(column)
                 continue
             levels = text.unique()
@@ -72,7 +76,7 @@ class TableEncoder:
             elif column in self.frequencies_:
                 result[column] = _text(values).map(self.frequencies_[column]).fillna(0.0).astype(float)
             elif column in self.dates_:
-                stamp = pd.to_datetime(_text(values), errors='coerce', utc=True)
+                stamp = pd.to_datetime(_text(values), format='ISO8601', errors='coerce', utc=True)
                 result[column] = (stamp.astype('int64')/1e9).where(stamp.notna()).astype(float)
                 for part in ('year', 'month', 'day', 'dayofweek', 'hour'):
                     result[column+'__'+part] = getattr(stamp.dt, part).astype(float)
@@ -85,7 +89,7 @@ def ordered_values(values):
     """Period values as floats (numbers or ISO dates); None when not orderable."""
     if pd.api.types.is_numeric_dtype(values) and not pd.api.types.is_bool_dtype(values):
         return pd.to_numeric(values, errors='coerce').astype(float)
-    parsed = pd.to_datetime(values, errors='coerce', utc=True)
+    parsed = pd.to_datetime(values, format='ISO8601', errors='coerce', utc=True)
     if parsed.notna().mean() < 0.99:
         return None
     return pd.Series(parsed.astype('int64'), index=values.index).where(parsed.notna()).astype(float)
@@ -297,13 +301,24 @@ class StrongTabularModel(BaseEstimator):
     def _settings(self):
         regression = self.task_spec['task_kind'] == 'regression'
         defaults = {'learning_rate': 0.05, 'num_leaves': 63 if regression else 31, 'min_child_samples': 20 if regression else 30,
-                    'colsample_bytree': 0.7, 'reg_lambda': 1.0 if regression else 5.0, 'class_weight_power': 0.5}
+                    'colsample_bytree': 0.7, 'reg_lambda': 1.0 if regression else 5.0, 'class_weight_power': 0.5,
+                    'bags': 3 if regression else 1}
         return regression, {**defaults, **(self.parameters or {})}
+
+    def _bagged(self, options, X, y, rounds, weight=None):
+        """Final models on every fit row with the inner round count, one per seed."""
+        regression = self.task_spec['task_kind'] == 'regression'
+        models = []
+        for bag in range(max(1, int(self.bags_))):
+            seeded = {**options, 'random_state': int(self.seed)+1009*bag}
+            models.append(_fit_lgbm(regression, seeded, X, y, weight=weight, rounds=rounds)[0])
+        return models
 
     def fit(self, X, y):
         started = time.monotonic()
         regression, params = self._settings()
         self.columns_ = list(X.columns)
+        self.bags_ = max(1, int(params['bags']))
         self.encoder_ = TableEncoder().fit(X)
         self.report_ = {'operator': 'strong_tabular_model', 'fit_rows': len(X), 'policy': deepcopy(self.validation_policy)}
         if regression:
@@ -328,11 +343,13 @@ class StrongTabularModel(BaseEstimator):
         base_prediction = base.predict(encoded.iloc[valid])
         base_loss = _loss(metric, y[valid], base_prediction)
         self.report_.update(inner_fit_rows=len(fit), inner_valid_rows=len(valid), base_rounds=base_rounds, inner_base_loss=base_loss)
-        self.history_, self.history_model_ = None, None
+        self.history_ = None
         policy = self.validation_policy or {}
         entity = None
         if policy.get('strategy') == 'temporal_holdout' and policy.get('column') in X.columns:
-            entity = discover_entity(X.iloc[fit], y[fit], policy['column'])
+            # The key is a structural fact of the model's own fit rows; history values
+            # for inner-valid rows still come only from strictly earlier periods.
+            entity = discover_entity(X, y, policy['column'])
         self.report_['entity'] = entity
         self.mode_ = 'base'
         if entity:
@@ -342,33 +359,19 @@ class StrongTabularModel(BaseEstimator):
             covered_fit = fit_frame['__history_count'].to_numpy() > 0
             covered_valid = valid_frame['__history_count'].to_numpy() > 0
             if covered_fit.sum() >= 200 and covered_valid.sum() >= 50:
-                # Joint: one model; missing history also marks a first appearance.
                 joint, joint_rounds = _fit_lgbm(True, options, fit_frame, y[fit], eval_set=(valid_frame, y[valid]))
                 joint_loss = _loss(metric, y[valid], joint.predict(valid_frame))
-                # Routed: a history specialist for covered rows, the base model elsewhere.
-                covered_model, covered_rounds = _fit_lgbm(True, options, fit_frame[covered_fit], y[fit][covered_fit],
-                                                          eval_set=(valid_frame[covered_valid], y[valid][covered_valid]))
-                routed = base_prediction.copy()
-                routed[covered_valid] = covered_model.predict(valid_frame[covered_valid])
-                routed_loss = _loss(metric, y[valid], routed)
-                losses = {'base': base_loss, 'joint': joint_loss, 'routed': routed_loss}
-                choice = min(losses, key=losses.get)
-                if choice != 'base' and losses[choice] >= base_loss*(1-ROUTING_MIN_GAIN):
-                    choice = 'base'
+                choice = 'joint' if joint_loss < base_loss*(1-HISTORY_MIN_GAIN) else 'base'
                 self.mode_ = choice
-                self.report_.update(inner_losses=losses, history_mode=choice, joint_rounds=joint_rounds,
-                                    covered_rounds=covered_rounds, inner_valid_covered_share=float(covered_valid.mean()))
-                if choice != 'base':
+                self.report_.update(inner_losses={'base': base_loss, 'joint': joint_loss}, history_mode=choice,
+                                    joint_rounds=joint_rounds, inner_valid_covered_share=float(covered_valid.mean()))
+                if choice == 'joint':
                     self.history_ = EntityHistory(entity['columns'], entity['period_column']).fit(X, y)
-                    full = self._history_frame(self.history_, encoded, X)
-                    if choice == 'joint':
-                        self.history_model_, _ = _fit_lgbm(True, options, full, y, rounds=round(joint_rounds*1.1))
-                    else:
-                        covered = full['__history_count'].to_numpy() > 0
-                        self.history_model_, _ = _fit_lgbm(True, options, full[covered], y[covered],
-                                                           rounds=round(covered_rounds*1.1))
-        if self.mode_ != 'joint':
-            self.model_, _ = _fit_lgbm(True, options, encoded, y, rounds=round(base_rounds*1.1))
+                    self.bag_models_ = self._bagged(options, self._history_frame(self.history_, encoded, X), y,
+                                                round(joint_rounds*1.1))
+        if self.mode_ == 'base':
+            self.bag_models_ = self._bagged(options, encoded, y, round(base_rounds*1.1))
+        self.report_['bags'] = len(self.bag_models_)
 
     # ---- classification -----------------------------------------------------
     def _weights(self, labels, power):
@@ -405,7 +408,8 @@ class StrongTabularModel(BaseEstimator):
                 self.offsets_, _, _ = _tune_offsets(probabilities, truth, self.classes_, average)
             self.report_['decision'] = {'average': average, 'tuning_half_score': tuned, 'confirm_before': before,
                                         'confirm_after': after, 'accepted': bool(accepted), 'offsets': self.offsets_.tolist()}
-        self.model_, _ = _fit_lgbm(False, options, encoded, labels, weight=weight, rounds=round(rounds*1.1))
+        self.bag_models_ = self._bagged(options, encoded, labels, round(rounds*1.1), weight=weight)
+        self.report_['bags'] = len(self.bag_models_)
 
     def _aligned(self, model, frame):
         raw = np.asarray(model.predict_proba(frame), dtype=float)
@@ -418,22 +422,17 @@ class StrongTabularModel(BaseEstimator):
     def predict_proba(self, X):
         if self.task_spec['task_kind'] == 'regression':
             raise TypeError('Regression has no class probabilities')
-        return self._aligned(self.model_, self.encoder_.transform(X))
+        encoded = self.encoder_.transform(X)
+        return np.mean([self._aligned(model, encoded) for model in self.bag_models_], axis=0)
 
     def predict(self, X):
-        encoded = self.encoder_.transform(X)
         if self.task_spec['task_kind'] != 'regression':
-            logp = np.log(np.clip(self._aligned(self.model_, encoded), 1e-12, 1))
+            logp = np.log(np.clip(self.predict_proba(X), 1e-12, 1))
             return self.classes_[(logp+self.offsets_).argmax(axis=1)]
+        frame = self.encoder_.transform(X)
         if self.mode_ == 'joint':
-            return np.asarray(self.history_model_.predict(self._history_frame(self.history_, encoded, X)), dtype=float)
-        prediction = np.asarray(self.model_.predict(encoded), dtype=float)
-        if self.mode_ == 'routed':
-            frame = self._history_frame(self.history_, encoded, X)
-            covered = frame['__history_count'].to_numpy() > 0
-            if covered.any():
-                prediction[covered] = self.history_model_.predict(frame[covered])
-        return prediction
+            frame = self._history_frame(self.history_, frame, X)
+        return np.mean([np.asarray(model.predict(frame), dtype=float) for model in self.bag_models_], axis=0)
 
 
 def make_strong_model(task_spec, params):

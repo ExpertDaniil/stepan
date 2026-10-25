@@ -2,7 +2,7 @@
 
 Example:
   python scripts/bench.py --task data/regression/task.md --split temporal:Year_Factor --budget 1800
-  python scripts/bench.py --task data/classification/task.md --split stratified --budget 1800 --mock
+  python scripts/bench.py --task data/classification/task.md --split duplicates --budget 1800 --api-down
 
 The organizers' baseline value is unknown locally, so the case formula is applied
 against a fixed reference (sklearn HistGradientBoosting with default settings) on
@@ -22,9 +22,17 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def split_rows(frame, target, how, fraction, seed):
+def split_rows(frame, target, how, fraction, seed, excluded=()):
     import numpy as np
-    from sklearn.model_selection import GroupShuffleSplit, train_test_split
+    import pandas as pd
+    from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold, train_test_split
+    if how == 'duplicates':
+        # Exact feature-row copies stay on one side, as in a test drawn from new sessions.
+        features = [c for c in frame.columns if c != target and c not in set(excluded)]
+        groups = pd.util.hash_pandas_object(frame[features].astype(str), index=False).to_numpy()
+        splitter = StratifiedGroupKFold(max(2, round(1/fraction)), shuffle=True, random_state=seed)
+        a, b = next(splitter.split(frame, frame[target].astype(str), groups))
+        return frame.index[a], frame.index[b]
     if how.startswith('temporal:'):
         column = how.split(':', 1)[1]
         last = frame[column].max()
@@ -76,7 +84,7 @@ def main():
     parser.add_argument('--task', required=True, type=Path)
     parser.add_argument('--target', default=None, help='Defaults to the single train column absent from test')
     parser.add_argument('--id', default='id')
-    parser.add_argument('--split', default='random', help='random | stratified | temporal:COL | group:COL')
+    parser.add_argument('--split', default='random', help='random | stratified | duplicates | temporal:COL | group:COL')
     parser.add_argument('--fraction', type=float, default=0.25)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--metric', default=None, help='rmse | mae | f1_macro | accuracy; inferred from task kind')
@@ -93,7 +101,7 @@ def main():
     target = args.target or next(c for c in train.columns if c not in test.columns)
     kind = 'regression' if pd.api.types.is_numeric_dtype(train[target]) and train[target].nunique() > 20 else 'classification'
     metric = args.metric or ('rmse' if kind == 'regression' else 'f1_macro')
-    fit_rows, hidden_rows = split_rows(train, target, args.split, args.fraction, args.seed)
+    fit_rows, hidden_rows = split_rows(train, target, args.split, args.fraction, args.seed, excluded={args.id})
     work = Path(tempfile.mkdtemp(prefix='stepan-bench-'))
     task_dir = work/'task'
     task_dir.mkdir()

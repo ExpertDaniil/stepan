@@ -495,7 +495,10 @@ def search(controller, root, accepted):
                     renewable = retry_at < c.budget.deadline-c.budget.reserve_seconds()-1
             cooling_versions = any(v.get('retry_at', 0) > time.monotonic() and
                 (not v['paused'] or v.get('retryable_initial')) for v in service.versions.values())
-            if not pending and not service.jobs and not service.queue and not service.eligible() and not diagnostic_pending and not renewable and not cooling_versions:
+            # A data-only window blocks tuning for a while; it must not end the search.
+            window_active = c.budget.data_research_snapshot()['active']
+            if (not pending and not service.jobs and not service.queue and not service.eligible() and not diagnostic_pending
+                    and not renewable and not cooling_versions and not window_active):
                 reason = 'prepared_work_exhausted_llm_paused' if provider_reason else 'research_and_background_exhausted'
                 break
             time.sleep(.1)

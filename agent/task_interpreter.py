@@ -133,9 +133,13 @@ class TaskInterpreter:
 
     def choose_validation(self, spec):
         """Data facts first, then explicit task declarations, then the LLM; never fatal."""
+        from agent.data_facts import apply_duplicate_groups
+        facts = self.deployment_facts(spec)
+        return apply_duplicate_groups(self._choose_validation(spec, facts), facts)
+
+    def _choose_validation(self, spec, facts):
         from agent.data_facts import scenario_proposal
         from agent.task_rules import validation_requirement, bind_requirement
-        facts = self.deployment_facts(spec)
         observed = scenario_proposal(facts, self.config.seed)
         if observed:
             self.gateway.log.event('validation.data_scenario', proposal=observed)

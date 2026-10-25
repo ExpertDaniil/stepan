@@ -28,7 +28,7 @@ def frozen_execution(artifacts, experiment, task_spec, phase):
     if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
         raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
     runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py',
-               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/supervised.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
+               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/supervised.py', 'agent/strong.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
                'tools/data.py', 'tools/runtime_guard.py']
     value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
              'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
@@ -218,6 +218,10 @@ class Runner:
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))
+            folds_path = self.artifacts.safe_path('validation/'+experiment['plan']['validation_id']+'.folds.json')
+            if folds_path.is_file() and not payload.get('diagnostic'):
+                # Candidate scores come from rolling folds; fit-only probes keep their own rows.
+                job_spec['fold_plan_path'] = str(folds_path)
         if payload.get('diagnostic'):
             job_spec['diagnostic'] = payload['diagnostic']
             job_spec['model_snapshot_max_bytes'] = 0

@@ -21,7 +21,7 @@ def _ordered(values):
     sample = values.dropna().astype(str).head(200)
     if sample.empty or not sample.str.match(r'^\d{4}-\d{2}-\d{2}').all():
         return None
-    parsed = pd.to_datetime(values, errors='coerce', utc=True)
+    parsed = pd.to_datetime(values, format='ISO8601', errors='coerce', utc=True)
     if parsed.notna().mean() < 0.99:
         return None
     return pd.Series(parsed.astype('int64'), index=values.index).where(parsed.notna()).astype(float)
@@ -92,3 +92,25 @@ def scenario_proposal(facts, seed):
             'parameters': {'valid_fraction': .2, 'column': period['column']},
             'reason': 'Data fact: %.1f%% of test rows lie after the latest of %d training periods of %s.'
                       % (100*period['test_after_train_share'], period['train_periods'], period['column'])}
+
+
+DUPLICATE_LEAK_MIN_SHARE = 0.1     # Exact repeats are common among training rows,
+DUPLICATE_LEAK_RATIO = 0.5         # yet the test repeats training rows far less often.
+
+
+def apply_duplicate_groups(proposal, facts):
+    """Keep exact duplicate feature rows on one side of a random/stratified holdout.
+
+    A random split puts copies of a row on both sides; when the test repeats
+    training rows much less often than training rows repeat each other, such a
+    holdout rewards memorization that the deployment will not reward.
+    """
+    duplicates = (facts or {}).get('duplicates') or {}
+    share, seen = duplicates.get('train_duplicate_share', 0.0), duplicates.get('test_seen_in_train_share', 0.0)
+    if (proposal.get('strategy') not in {'random_holdout', 'stratified_holdout'}
+            or share < DUPLICATE_LEAK_MIN_SHARE or seen > DUPLICATE_LEAK_RATIO*share):
+        return proposal
+    return {**proposal, 'parameters': {**proposal['parameters'], 'duplicate_groups': True},
+            'reason': proposal['reason']+(' Data fact: %.1f%% of training rows repeat exactly, but only %.1f%% of test rows '
+                                          'repeat a training row; duplicates stay in one partition.' % (100*share, 100*seen))}
+

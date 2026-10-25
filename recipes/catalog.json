@@ -697,7 +697,7 @@
     "family": "strong",
     "task_kind": "regression",
     "requires": "lightgbm",
-    "description": "LightGBM with inner early stopping; under a temporal protocol a fit-only entity key and strictly earlier target history are kept when the inner check supports them.",
+    "description": "LightGBM with inner early stopping and a three-seed bagged final fit; under a temporal protocol a fit-only entity key and strictly earlier target history (one joint model, missing history marks a first appearance) are kept when the inner check supports them.",
     "parameters": {
       "learning_rate": {
         "type": "float",

@@ -23,9 +23,13 @@ class DurationModel:
         self.test_rows = 1
         self.defaults = {}
         self.samples = defaultdict(lambda: deque(maxlen=32))
+        self.predicted_rows = 1
 
-    def configure(self, profile, validation_rows, recipes, target_count=1):
+    def configure(self, profile, validation_rows, recipes, target_count=1, predicted_rows=None):
         self.rows = {"train": max(1, validation_rows), "refit": max(1, profile["train_rows"])}
+        # Rows predicted during a training job; rolling folds fit more rows than they hold out.
+        self.predicted_rows = max(1, predicted_rows if predicted_rows is not None
+                                  else self.rows['refit']-self.rows['train'])
         self.features = max(1, len(profile.get("test_columns", [])))
         self.target_count = max(1, target_count)
         self.test_rows = max(1, profile.get('test_rows', 1))
@@ -87,7 +91,7 @@ class DurationModel:
             overhead = max(overheads[math.ceil(.75 * len(overheads))-1], complete[-1]['overhead'])
             # Prediction and IO live in measured overhead. Extrapolate them too
             # when test is larger than the fit/selection prediction partition.
-            prediction_scale = max(1, self.test_rows/max(1, self.rows['refit']-self.rows['train'])) if phase == 'refit' else 1
+            prediction_scale = max(1, self.test_rows/self.predicted_rows) if phase == 'refit' else 1
             growth = max(1, self.rows['refit']/self.rows['train'])**.25 if phase == 'refit' and family == 'custom' else 1
             seconds = (overhead*prediction_scale + work*rate*growth) * 1.35
         else:

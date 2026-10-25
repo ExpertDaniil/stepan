@@ -42,8 +42,12 @@ class Orchestrator:
                 self.context.knowledge = knowledge
                 self.researcher.gateway.knowledge = knowledge
         from agent.predictions import targets
-        self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes,
-                                       target_count=len(targets(spec)))
+        # Rolling protocols fit once per fold; duration work counts every fitted row.
+        fold_plan = evaluator.protocols[validation['validation_id']].get('fold_plan')
+        fitted_rows = (sum(fold['fit_rows'] for fold in fold_plan) if fold_plan
+                       else len(artifacts.read_json(validation["train_rows_artifact_id"])))
+        self.budget.duration.configure(profile, fitted_rows, catalog.recipes, target_count=len(targets(spec)),
+                                       predicted_rows=len(artifacts.read_json(validation["valid_rows_artifact_id"])))
         if evaluator.protocols[validation['validation_id']].get('confirmation_indices'):
             self.budget.confirmation_seconds = 1.
             evaluator.timing_observer = lambda seconds: setattr(self.budget, 'confirmation_seconds',

@@ -89,6 +89,9 @@ class ContextBuilder:
         detail_metadata = (prepare_details(user, self.spec, self.artifacts, self.log,
             validation_id=getattr(self, 'validation_id', None), validation_sha256=getattr(self, 'validation_sha256', None), store=getattr(self, 'store', None),
             experiment_ids=ids if getattr(self, 'store', None) else ()) if self.catalog.config.research_mode == 'adaptive' else {})
+        if detail_metadata and user.get('scientific_protocol'):
+            from agent.scientific_research import compact_protocol
+            user['scientific_protocol'] = compact_protocol(user['scientific_protocol'])
         messages = [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(user, ensure_ascii=False)}]
         # Conservative byte heuristic, not a claim about the provider tokenizer.
         from agent.context_budget import assembly_limit
@@ -259,6 +262,9 @@ class ContextBuilder:
             validation_sha256=graph.get('task_contract', {}).get('protocol_sha256', getattr(self, 'validation_sha256', None)),
             visibility=graph.get('visibility'), store=getattr(self, 'store', None),
             experiment_ids=graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent])) if adaptive else {})
+        if adaptive and user['profile_summary'].get('scientific_protocol'):
+            from agent.scientific_research import compact_protocol
+            user['profile_summary']['scientific_protocol'] = compact_protocol(user['profile_summary']['scientific_protocol'])
         messages = [{"role": "system", "content": system}, {"role": "user", "content": ""}]
         def size():
             messages[1]["content"] = json.dumps(user, ensure_ascii=False, separators=(',', ':')) if adaptive else json.dumps(user, ensure_ascii=False)

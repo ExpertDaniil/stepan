@@ -8,8 +8,43 @@ import json
 from pathlib import Path
 import time
 import uuid
+import hashlib
 
 from agent.errors import AgentError
+
+
+def diverse_groups(groups, limit=12):
+    """Mix measured cost, per-row severity and substantial rare concentrations."""
+    cost = sorted(groups, key=lambda r: (-r['priority_cost'], -r['error_delta']))
+    severity = sorted((r for r in groups if r['error_delta'] > 0),
+                      key=lambda r: (-r['error_delta'], -r['priority_cost']))
+    rare = sorted((r for r in groups if r['support_fraction'] <= .02
+                   and r['priority_fraction'] >= .05), key=lambda r: -r['priority_cost'])
+    chosen = []
+    for rank in range(len(groups)):
+        for sequence in (cost, severity, rare):
+            if rank < len(sequence) and sequence[rank] not in chosen:
+                chosen.append(sequence[rank])
+                if len(chosen) == limit:return chosen
+    return chosen
+
+
+def compact_group(group):
+    result = deepcopy(group)
+    aliases = result.get('related_groups', [])
+    result['related_groups'] = aliases[:6]
+    result['omitted_related_groups'] = result.get('omitted_related_groups', 0)+max(0, len(aliases)-6)
+    return result
+
+
+def compact_report(report, limit=4):
+    """The full computed groups stay in the immutable scoped diagnostic artifact."""
+    result = deepcopy({k:v for k,v in report.items() if k != 'diagnostic_groups'})
+    for field in ('hard_groups', 'error_associations'):
+        values = result.get(field, [])
+        result['omitted_'+field] = result.get('omitted_'+field, 0)+max(0, len(values)-limit)
+        result[field] = [compact_group(g) for g in values[:limit]] if field == 'hard_groups' else values[:limit]
+    return result
 
 
 def inner_folds(frame, spec, proposal, seed):
@@ -107,16 +142,27 @@ def error_profile(data, truth, prediction, fold, task, *, deadline=None):
     excluded = set(task.get('excluded_features', [])) | set(targets(task))
     eligible = [c for c in data if c not in excluded]
     groups, associations, scanned = [], [], 0
+    memberships = {}
     labels = task.get('allowed_labels', sorted(set(y))) if not regression else []
     weights = {str(label): 1/max(1, int((y == label).sum())) for label in labels}
+    total_cost = float(mass.sum()) if regression else sum(weights.get(str(a), 0) for a, b in zip(y, p) if a != b)
     def add(column, label, mask, definition, applicable=True):
         rows = int(mask.sum())
         if not rows or rows == len(error):return
+        membership = np.packbits(mask).tobytes()
+        alias = {'feature': str(column), 'group': str(label)[:100], 'definition': definition,
+                 'test_applicable': applicable}
+        if membership in memberships:
+            existing = memberships[membership]
+            existing['related_groups'].append(alias)
+            if applicable and not existing['test_applicable']:
+                existing.update(alias)
+            return
         supported = [f for f in np.unique(fold) if (mask & (fold == f)).any()]
         deltas = [float(mass[mask & (fold == f)].mean()-mass[fold == f].mean()) for f in supported]
         record = {'feature': str(column), 'group': str(label)[:100], 'definition': definition,
             'test_applicable': applicable, 'rows': rows, 'support_fraction': rows/len(error),
-            'support_uncertain': rows < 10 or len(supported) < 2, 'mean_error': float(error[mask].mean()),
+            'support_uncertain': rows <= 10 or len(supported) < 2, 'mean_error': float(error[mask].mean()),
             'error_delta': float(mass[mask].mean()-baseline), 'folds_with_support': len(supported),
             'folds_with_higher_error': sum(d > 0 for d in deltas),
             'per_fold': [{'fold': int(f), 'rows': int((mask & (fold == f)).sum()), 'error_delta': d}
@@ -134,6 +180,10 @@ def error_profile(data, truth, prediction, fold, task, *, deadline=None):
             record.update(macro_f1=float(f1.mean()), class_metrics=sorted(class_metrics, key=lambda r:r['f1'])[:6],
                 omitted_classes=max(0,len(labels)-6),
                 priority_cost=float(sum(weights.get(str(a), 0) for a, b in zip(y[mask], p[mask]) if a != b)))
+        record['priority_fraction'] = record['priority_cost']/total_cost if total_cost else 0.
+        record['row_membership_sha256'] = hashlib.sha256(json.dumps(sorted(map(str, data.index[mask]))).encode()).hexdigest()
+        record['related_groups'] = [alias]
+        memberships[membership] = record
         groups.append(record)
     for column in eligible:
         if deadline is not None and time.monotonic() >= deadline:break
@@ -166,8 +216,10 @@ def error_profile(data, truth, prediction, fold, task, *, deadline=None):
     result = {'scope': 'fit_only_inner_oof', 'metric_id': metric, 'predicted_rows': len(error),
         'mean_error': float(error.mean()), 'eligible_columns': len(eligible), 'scanned_columns': scanned,
         'omitted_columns': len(eligible)-scanned, 'groups_overlap': True,
-        'hard_groups': sorted(groups, key=lambda r: (-r['priority_cost'], -r['error_delta']))[:12],
+        'diagnostic_groups': groups,
+        'hard_groups': diverse_groups(groups),
         'omitted_groups': max(0, len(groups)-12),
+        'duplicate_groups_merged': sum(len(g['related_groups'])-1 for g in groups),
         'error_associations': sorted(associations, key=lambda r: -abs(r['error_mass_spearman']))[:8],
         'priority_measure': ('absolute_error_mass' if metric == 'mae' else 'squared_error_mass') if regression else 'class_normalized_misses_proxy',
         'interpretation': 'Discovery on the reported uniform fit sample only; overlapping shares are not additive or population estimates. '

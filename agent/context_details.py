@@ -256,6 +256,14 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         sections['fit_diagnostics'] = deepcopy(profile['scientific_protocol'].get('fit_diagnostics', []))
         for index, record in enumerate(sections['fit_diagnostics']):
             sections['fit_diagnostics/'+str(index)] = record
+    observation = profile.get('error_research', {})
+    if observation.get('source_artifact_id'):
+        from agent.artifacts import file_sha256
+        aid = observation['source_artifact_id']
+        if file_sha256(artifacts.resolve(aid)) != artifacts.meta(aid)['sha256']:
+            raise AgentError('MEMORY_SOURCE_CHANGED', 'Frozen diagnostic report changed')
+        sections['error_observation'] = {'source_experiment_id': observation['source_experiment_id'],
+            'source_artifact_id': aid, 'report': artifacts.read_json(aid)}
     if model is not None:
         sections.update(semantic_model=model, quantities=model['quantities'], relations=model['relations'])
     sections['analyses'] = [{**r, 'report': artifacts.read_json(r['artifact_id'])}

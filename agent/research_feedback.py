@@ -88,6 +88,9 @@ def compact_memory(memory, *, base_experiment_id=None, question='', max_bytes=12
 def compact_updates(value):
     """Keep recent measurements/activity; exact updates can be read by their ID."""
     result = deepcopy({k: v for k, v in value.items() if k != 'solution_catalog'})
+    from agent.fit_diagnostics import compact_report
+    for record in result.get('fit_diagnostics', []):
+        record['report'] = compact_report(record.get('report', {}))
     # Source/parameter documents are read by the gateway from the authorized
     # immutable snapshot, never copied into every API request.
     result.pop('solution_catalog', None)

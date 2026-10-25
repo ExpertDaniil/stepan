@@ -145,14 +145,34 @@ class Gateway:
         self.cooldown_until = 0.0
         self.daily_retry_at = None
         self.daily_probe_active = False
+        self.daily_probe_failures = 0
+        self.daily_reset_known = False
+
+    def _schedule_daily_probe(self, reset_seconds=None, *, transient=False):
+        """Schedule a useful request, without sleeping or assuming provider funds."""
+        with self.availability_lock:
+            self.daily_probe_failures += 1
+            if reset_seconds is not None:
+                delay = max(1., reset_seconds)
+            else:
+                initial, ceiling = (5, 60) if transient else (60, 900)
+                delay = min(ceiling, initial*2**min(self.daily_probe_failures-1, 8))
+            now = time.monotonic()
+            latest = self.budget.deadline-self.budget.reserve_seconds()-1
+            self.daily_retry_at = now+delay if now+delay <= latest else None
+            self.log.event('llm.budget_probe_scheduled', reset_known=self.daily_reset_known,
+                retry_after_seconds=delay if self.daily_retry_at is not None else None,
+                reason='temporary_probe_failure' if transient else 'explicit_budget_exhaustion',
+                finalization_reserve_preserved=True)
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
             with self.availability_lock:
-                due = self.daily_retry_at is not None and time.monotonic() >= self.daily_retry_at and not self.daily_probe_active
+                due = (self.daily_retry_at is not None and time.monotonic() >= self.daily_retry_at
+                       and not self.daily_probe_active and self.budget.remaining() > self.budget.reserve_seconds()+1)
             if due:return  # One availability probe, not a calendar-based balance reset.
             raise AgentError("LLM_BUDGET_EXHAUSTED", "The provider reported budget exhaustion; resume only after a successful availability probe",
-                             details={"reset_known": self.daily_retry_at is not None})
+                             details={"reset_known": self.daily_reset_known})
 
     def check_availability(self):
         if self.provider_credits_exhausted.is_set():
@@ -230,14 +250,11 @@ class Gateway:
         timeout = min(self.config.llm_timeout_seconds, deadline - time.monotonic())
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
-        self.check_availability()
         daily_probe = False
         with self.availability_lock:
+            self.check_availability()
             if self.daily_budget_exhausted.is_set():
-                if self.daily_probe_active:
-                    raise AgentError('LLM_BUDGET_EXHAUSTED', 'A single provider recovery probe is already running')
                 self.daily_probe_active = daily_probe = True
-                self.daily_retry_at = None  # A failed probe cannot poll indefinitely.
         try:
             call_no = self.budget.begin_llm_call(request["max_tokens"], dialogue_id)
         except BaseException:
@@ -272,8 +289,13 @@ class Gateway:
                     series_ids=[s['series_id'] for s in delivered['series']])
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
-            if daily_probe:
+            with self.availability_lock:
+                budget_recovered = self.daily_budget_exhausted.is_set()
                 self.daily_budget_exhausted.clear()
+                self.daily_retry_at = None
+                self.daily_probe_failures = 0
+                self.daily_reset_known = False
+            if budget_recovered:
                 self.log.event('llm.budget_availability_confirmed', call_no=call_no)
             with self.availability_lock:
                 recovered = self.cooldown_until > time.monotonic()
@@ -329,7 +351,6 @@ class Gateway:
                                    message=str(error), attempt=attempt, status_code=status, retryable=False)
                     raise error from exc
             if "budget has been exceeded" in body.casefold():
-                self.daily_budget_exhausted.set()
                 # Only explicit provider metadata supplies the expected reset.
                 # Missing/invalid metadata means unknown, never guessed funds.
                 from datetime import datetime, timezone
@@ -337,12 +358,16 @@ class Gateway:
                 if isinstance(metadata, dict):
                     metadata = metadata.get('error', metadata)
                 reset = metadata.get('budget_reset_at', metadata.get('reset_at')) if isinstance(metadata, dict) else None
+                seconds = None
                 try:
-                    seconds = (datetime.fromisoformat(reset.replace('Z','+00:00'))-datetime.now(timezone.utc)).total_seconds()
-                    if seconds > 0:self.daily_retry_at = time.monotonic()+seconds
+                    seconds = max(1., (datetime.fromisoformat(reset.replace('Z','+00:00'))-datetime.now(timezone.utc)).total_seconds())
                 except (TypeError, ValueError, AttributeError):pass
+                with self.availability_lock:
+                    self.daily_budget_exhausted.set()
+                    self.daily_reset_known = seconds is not None
+                    self._schedule_daily_probe(seconds)
                 self.log.event("llm.daily_budget_exhausted", level="WARNING", call_no=call_no,
-                               status_code=status, reset_known=self.daily_retry_at is not None)
+                               status_code=status, reset_known=self.daily_reset_known)
                 self.check_daily_budget()
             retryable = status == 429 or status is None or (isinstance(status, int) and status >= 500)
             error = AgentError("LLM_RATE_LIMIT" if status == 429 else "LLM_UNAVAILABLE", str(exc), retryable=retryable)
@@ -351,7 +376,11 @@ class Gateway:
             raise error from exc
         finally:
             if daily_probe:
-                with self.availability_lock:self.daily_probe_active = False
+                with self.availability_lock:
+                    self.daily_probe_active = False
+                    if (self.daily_budget_exhausted.is_set() and self.daily_retry_at is not None
+                            and self.daily_retry_at <= time.monotonic()):
+                        self._schedule_daily_probe(transient=True)
             done.set()
             if progress.ident is not None:
                 progress.join(timeout=0.2)

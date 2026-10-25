@@ -12,12 +12,9 @@ def episode_allowance(config):
 def compact_protocol(protocol):
     """Shrink displayed hints; full records remain in the scoped detail snapshot."""
     result = deepcopy(protocol)
+    from agent.fit_diagnostics import compact_report
     for index, record in enumerate(result.get('fit_diagnostics', [])):
-        report = record.get('report', {})
-        for field in ('hard_groups', 'error_associations'):
-            values = report.get(field, [])
-            report['omitted_'+field] = report.get('omitted_'+field, 0)+max(0, len(values)-4)
-            report[field] = values[:4]
+        record['report'] = compact_report(record.get('report', {}))
         record['detail_hint'] = 'read_memory section=fit_diagnostics/'+str(index)
     episode = result.get('episode')
     if episode and episode.get('last_test_plan'):

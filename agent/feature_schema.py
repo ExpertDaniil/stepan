@@ -4,9 +4,10 @@ import math
 
 OPS = ('missing', 'log1p', 'signed_log1p', 'square', 'sum', 'difference', 'product',
        'ratio', 'frequency', 'cross', 'group_mean', 'group_std', 'group_rank',
-       'relative_to_group', 'month', 'dayofweek', 'hour', 'cyclic_sin', 'cyclic_cos')
+       'relative_to_group', 'month', 'dayofweek', 'hour', 'cyclic_sin', 'cyclic_cos', 'target_mean', 'target_count')
 
 GROUP_OPS = ('group_mean', 'group_std', 'group_rank', 'relative_to_group')
+TARGET_OPS = ('target_mean', 'target_count')
 
 FEATURE_PROGRAM_SCHEMA = {
     'type': 'array', 'minItems': 1, 'maxItems': 24,
@@ -16,6 +17,7 @@ FEATURE_PROGRAM_SCHEMA = {
         'group_by': {'type': 'string', 'minLength': 1},
         'period': {'type': 'number', 'exclusiveMinimum': 0},
         'origin': {'type': 'number'},
+        'alpha': {'type': 'number', 'minimum': 0, 'maximum': 1000000},
         'input_units': {'type': 'object', 'additionalProperties': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
         'output_unit': {'type': 'string', 'minLength': 1, 'maxLength': 100}},
         'required': ['op', 'name', 'columns'], 'additionalProperties': False}}
@@ -30,7 +32,7 @@ def validate_program(program, columns=None, excluded=()):
     available = set(columns) if columns is not None else None
     generated = set()
     for step in program:
-        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit', 'period', 'origin'}:
+        if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit', 'period', 'origin', 'alpha'}:
             raise ValueError('Unknown feature operation fields')
         op, name, inputs = step.get('op'), step.get('name'), step.get('columns')
         if op not in OPS or not isinstance(name, str) or not 1 <= len(name) <= 100:
@@ -42,8 +44,14 @@ def validate_program(program, columns=None, excluded=()):
             raise ValueError('Feature inputs must be 1..4 named columns')
         if op in {'difference', 'ratio'} and len(inputs) != 2:
             raise ValueError(op+' needs exactly two inputs')
-        if op not in {'sum', 'product', 'difference', 'ratio', 'cross'} and len(inputs) != 1:
+        if op not in {'sum', 'product', 'difference', 'ratio', 'cross', *TARGET_OPS} and len(inputs) != 1:
             raise ValueError(op+' needs exactly one input')
+        alpha=step.get('alpha',10.)
+        if op in TARGET_OPS:
+            if isinstance(alpha,bool) or not isinstance(alpha,(int,float)) or not math.isfinite(alpha) or not 0<=alpha<=1000000:
+                raise ValueError('Target statistics require finite nonnegative smoothing')
+        elif 'alpha' in step:
+            raise ValueError('alpha belongs only to target statistics')
         if op in {'cyclic_sin', 'cyclic_cos'}:
             period, origin = step.get('period'), step.get('origin', 0)
             if (isinstance(period, bool) or not isinstance(period, (int, float)) or not math.isfinite(period) or period <= 0
@@ -70,7 +78,15 @@ def validate_program(program, columns=None, excluded=()):
     return deepcopy(program)
 
 
-PROGRAM_VERSION = 'feature-program-3'
+PROGRAM_VERSION = 'feature-program-4'
+
+
+def validate_for_task(program,spec,columns=None):
+    excluded=[*spec.get('target_columns',[spec['target_column']]),*spec['excluded_features']]
+    result=validate_program(program,columns,excluded)
+    if spec['task_kind']!='regression' and any(step['op'] in TARGET_OPS for step in result):
+        raise ValueError('Owned target statistics currently support regression only')
+    return result
 
 
 def operation_facts(program):
@@ -84,7 +100,7 @@ def operation_facts(program):
         'verification': 'owned_executable_specification', 'predictive_usefulness': 'not_established',
         'operations': [{'order': i, 'operator': step['op'], 'output': step['name'],
             'inputs': list(step['columns']), 'group_by': step.get('group_by'),
-            'fit_scope': 'fit_rows_without_target' if step['op'] in (*GROUP_OPS, 'frequency') else 'rowwise',
+            'fit_scope': 'fit_only_target_crossfit' if step['op'] in TARGET_OPS else 'fit_rows_without_target' if step['op'] in (*GROUP_OPS, 'frequency') else 'rowwise',
             'formula': {'missing': 'is_missing(x)', 'log1p': 'log(1+x) for x>=0',
                 'signed_log1p': 'sign(x)*log(1+abs(x))', 'square': 'x*x', 'sum': 'sum(inputs)',
                 'difference': 'inputs[0]-inputs[1]', 'product': 'product(inputs)',
@@ -93,7 +109,10 @@ def operation_facts(program):
                 'group_std': 'fit_group_std(x,ddof=1)', 'group_rank': 'fit_group_ECDF(x), right inclusive',
                 'relative_to_group': 'x/fit_group_mean(x)', 'month': 'UTC month',
                 'dayofweek': 'UTC weekday 0..6', 'hour': 'UTC hour',
-                'cyclic_sin': 'sin(2*pi*(x-origin)/period)', 'cyclic_cos': 'cos(2*pi*(x-origin)/period)'}[step['op']],
+                'cyclic_sin': 'sin(2*pi*(x-origin)/period)', 'cyclic_cos': 'cos(2*pi*(x-origin)/period)',
+                'target_mean': '(other_fold_target_sum+alpha*other_fold_prior)/(other_fold_count+alpha)',
+                'target_count': 'other_fold_count(key); full_fit_count at prediction'}[step['op']],
+            **({'alpha': step.get('alpha',10.)} if step['op'] in TARGET_OPS else {}),
             **({'period': step['period'], 'origin': step.get('origin', 0)} if step['op'] in {'cyclic_sin', 'cyclic_cos'} else {}),
             'missing': ('typed missing key participates in counts/cross/group lookup'
                 if step['op'] in {'cross', 'frequency', 'group_mean', 'group_std'} else

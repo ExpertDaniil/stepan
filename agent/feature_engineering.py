@@ -1,6 +1,6 @@
 """Owned, composable feature programs with inductive fit/transform semantics.
 
-No labels, files, estimator search or mutable inference statistics are used here.
+Target-dependent operations are cross fitted under the worker-owned protocol.
 Arbitrary approved custom pipelines remain available alongside this small language.
 """
 from copy import deepcopy
@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from agent.feature_schema import GROUP_OPS, PROGRAM_VERSION, validate_program, operation_facts
+from agent.feature_schema import GROUP_OPS, TARGET_OPS, PROGRAM_VERSION, validate_program, validate_for_task, operation_facts
+from agent.supervised import CrossFitHistory, MacroF1DecisionClassifier
 
 def _keys(values):
     def key(value):
@@ -32,10 +33,17 @@ def _number(values):
 
 
 class FeatureProgram(TransformerMixin, BaseEstimator):
-    def __init__(self, program):
-        self.program = program
+    def __init__(self, program, validation_policy=None):
+        self.program, self.validation_policy = program, validation_policy
 
     def fit(self, X, y=None):
+        self._fit_frame(X,y)
+        return self
+
+    def fit_transform(self,X,y=None,**fit_params):
+        return self._fit_frame(X,y)
+
+    def _fit_frame(self,X,y):
         self.program_ = validate_program(self.program, X.columns)
         self.execution_spec_ = operation_facts(self.program_)
         self.input_columns_ = list(X.columns)
@@ -45,7 +53,11 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
         for step in self.program_:
             op, cols, name = step['op'], step['columns'], step['name']
             stats = {}
-            if op == 'frequency':
+            if op in TARGET_OPS:
+                transformer=CrossFitHistory(cols,step.get('alpha',10.),self.validation_policy)
+                encoded=transformer.fit_transform(frame,y)
+                stats['transformer']=transformer
+            elif op == 'frequency':
                 stats['counts'] = _keys(frame[cols[0]]).value_counts(normalize=True).to_dict()
             elif op in GROUP_OPS:
                 group, values = _keys(frame[step['group_by']]), _number(frame[cols[0]])
@@ -57,15 +69,16 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
                 else:
                     stats['values'] = (grouped.std() if op == 'group_std' else grouped.mean()).to_dict()
             self.statistics_[name] = stats
-            frame[name] = self._apply(frame, step, stats)
+            frame[name] = encoded['mean' if op=='target_mean' else 'count'] if op in TARGET_OPS else self._apply(frame, step, stats)
             values = frame[name]
             self.report_.append({'name': name, 'op': op, 'inputs': cols,
                 'program_id': self.execution_spec_['program_id'], 'verification': 'owned_operation_executed',
                 'implementation': PROGRAM_VERSION, 'units': 'not_inferred',
                 'group_by': step.get('group_by'), 'fit_rows': len(frame),
                 'missing_fraction': float(values.isna().mean()), 'unique': int(values.nunique()),
-                'statistics_scope': 'fit_rows_without_target'})
-        return self
+                'statistics_scope': 'fit_only_target_crossfit' if op in TARGET_OPS else 'fit_rows_without_target',
+                **({'crossfit':transformer.report_} if op in TARGET_OPS else {})})
+        return frame
 
     def transform(self, X):
         if set(X.columns) != set(self.input_columns_):
@@ -79,6 +92,8 @@ class FeatureProgram(TransformerMixin, BaseEstimator):
     def _apply(frame, step, stats):
         op, columns = step['op'], step['columns']
         raw = frame[columns[0]]
+        if op in TARGET_OPS:
+            return stats['transformer'].transform(frame)['mean' if op=='target_mean' else 'count']
         if op == 'missing':
             return raw.isna().astype(float)
         if op == 'frequency':
@@ -139,7 +154,9 @@ def make_feature_pipeline(task_spec, params):
     options = deepcopy(params)
     base = options.pop('base_recipe_id')
     model = options.pop('model_parameters')
-    program = validate_program(options.pop('feature_program'), excluded=[*targets(task_spec), *task_spec['excluded_features']])
+    requested = options.pop('feature_program', [])
+    program = validate_for_task(requested,task_spec) if requested else []
+    decision = options.pop('decision_rule',None)
     for key in ('_cpu_threads', '_seed'):
         if key in options:
             model[key] = options.pop(key)
@@ -148,4 +165,10 @@ def make_feature_pipeline(task_spec, params):
             model[key[7:]] = options.pop(key)
     if options or base.startswith(('python-', 'dummy-')):
         raise ValueError('Feature programs require one owned learned base recipe')
-    return Pipeline([('features', FeatureProgram(program)), ('model', build_pipeline(base, task_spec, model))])
+    estimator=build_pipeline(base, task_spec, model)
+    if program:estimator=Pipeline([('features', FeatureProgram(program)), ('model', estimator)])
+    if decision:
+        if decision!='macro_f1' or task_spec['task_kind']=='regression' or task_spec['metric']['metric_id']!='f1_macro':
+            raise ValueError('macro_f1 decision rule requires the Macro F1 classification contract')
+        estimator=MacroF1DecisionClassifier(estimator)
+    return estimator

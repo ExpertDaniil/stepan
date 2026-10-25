@@ -86,12 +86,14 @@ def execute_oof(module, task, params, fit_x, fit_y, job, guard, limits):
     import numpy as np
     import pandas as pd
     from agent.ml import enforce_threads, validate_estimator, SequentialTargets
+    from agent.supervised import bind_validation_policy
     from agent.predictions import predict, targets, validation_columns
     started = time.monotonic()
     records = []
     with limits:
         for number, split in enumerate(job['diagnostic']['folds']):
-            model = validate_estimator(enforce_threads(module.make_pipeline(task, dict(params)), job['cpu_threads']))
+            model = validate_estimator(enforce_threads(bind_validation_policy(module.make_pipeline(task, dict(params)),
+                job.get('training_policy')), job['cpu_threads']))
             if len(targets(task)) > 1:
                 model = SequentialTargets(model)
             model.fit(fit_x.iloc[split['fit']], fit_y.iloc[split['fit']])

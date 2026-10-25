@@ -17,8 +17,7 @@ class NativeRecipeTests(unittest.TestCase):
             catalog=Catalog(kind,Config())
             for family in ('hist-native','lightgbm'):
                 rid=family+'-'+suffix+'-v1'
-                if rid not in catalog.recipes:
-                    continue
+                self.assertIn(rid,catalog.recipes,'Install the pinned requirements.runtime.txt before this runtime check')
                 with self.subTest(recipe=rid):
                     params=catalog.normalize(rid,{'max_iter' if family=='hist-native' else 'n_estimators':20})
                     model=build_pipeline(rid,{'task_kind':kind},params)

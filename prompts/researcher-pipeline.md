@@ -59,3 +59,21 @@ and drafts_index in scoped read_memory; use returned reference/section/next_offs
 for exact records. Do not rerun successful checks just to rebuild a transcript.
 Technical failure leaves the idea untested; a measured joint failure does not
 refute each component or an entire model family. Only evaluator scores are trusted.
+Owned supervised methods are available without external downloads. For regression,
+feature_program supports target_mean/target_count with columns=[1..4 inspected
+input keys], name and optional alpha (default 10). Training values are cross fitted;
+the worker binds group/time/random folds to the frozen validation protocol.
+Unseen keys use the fitted prior/count=0; the first temporal block has no future
+history and remains missing/count=0. Check general quality and new-key slices.
+These operations are not physical entity-ID proof and currently support regression.
+
+For classification with metric_id=f1_macro, an executable candidate may use:
+from agent.feature_engineering import make_feature_pipeline
+def make_pipeline(task_spec, params):
+    return make_feature_pipeline(task_spec, params)
+with params containing base_recipe_id (an available learned classification recipe),
+model_parameters, feature_program (may be []), decision_rule="macro_f1".
+Offsets are chosen on inner fit-only OOF, then the base is refit on all fit rows.
+The independent outer evaluator still chooses whether this helps. This costs
+several base fits; start with an affordable configuration. Never use held-out
+labels to select offsets, keys, thresholds or mixtures.

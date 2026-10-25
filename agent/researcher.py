@@ -213,15 +213,15 @@ class Researcher:
         from agent.feature_search import validate_focus
         validate_focus(proposed, user)
         if proposed['action'] == 'features':
-            from agent.feature_schema import validate_program
+            from agent.feature_schema import validate_for_task
             from agent.predictions import targets
             profile = user.get('profile_summary', {}).get('data', user.get('profile', {}))
             excluded = [*targets(self.spec), *self.spec['excluded_features']]
             try:
-                program = validate_program(proposed['feature_program'],
+                program = validate_for_task(proposed['feature_program'], self.spec,
                     ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
                      else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
-                     else None), excluded)
+                     else None))
             except (ValueError, KeyError) as error:
                 raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
         memory = user.get('profile_summary', user).get('research_memory', {})
@@ -346,11 +346,10 @@ class Researcher:
                 user['base_result'] = sections.get('base_result')
         program = None
         if proposed['action'] == 'features':
-            from agent.feature_schema import validate_program
+            from agent.feature_schema import validate_for_task
             from agent.predictions import targets
             try:
-                program = validate_program(proposed['feature_program'], self.feature_columns,
-                                           [*targets(self.spec), *self.spec['excluded_features']])
+                program = validate_for_task(proposed['feature_program'], self.spec, self.feature_columns)
             except (ValueError, KeyError) as error:
                 raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
         if proposed['action'] not in {'research', 'stop'}:

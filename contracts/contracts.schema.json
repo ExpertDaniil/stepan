@@ -14038,7 +14038,9 @@
                   "dayofweek",
                   "hour",
                   "cyclic_sin",
-                  "cyclic_cos"
+                  "cyclic_cos",
+                  "target_mean",
+                  "target_count"
                 ]
               },
               "name": {
@@ -14065,6 +14067,11 @@
               },
               "origin": {
                 "type": "number"
+              },
+              "alpha": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "input_units": {
                 "type": "object",

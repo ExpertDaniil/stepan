@@ -28,10 +28,12 @@ def frozen_execution(artifacts, experiment, task_spec, phase):
     if hashlib.sha256(canonical(core).encode()).hexdigest() != experiment['fingerprint']:
         raise AgentError('CANDIDATE_CHANGED', 'Effective pipeline no longer matches the reserved experiment')
     runtime = ['agent/worker.py', 'agent/ml.py', 'agent/preprocessing.py', 'agent/predictions.py',
-               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
+               'agent/feature_engineering.py', 'agent/feature_schema.py', 'agent/supervised.py', 'agent/data_transport.py', 'agent/fit_diagnostics.py',
                'tools/data.py', 'tools/runtime_guard.py']
     value = {'plan': experiment['plan'], 'task_spec': task_spec, 'code_sha256': actual_code_hash,
              'runtime_sha256': {name: file_sha256(ROOT/name) for name in runtime}}
+    protocol_path=artifacts.safe_path('validation/'+experiment['plan']['validation_id']+'.protocol.json')
+    value['validation_protocol_sha256']=file_sha256(protocol_path) if protocol_path.is_file() else None
     path = artifacts.safe_path('experiments/'+experiment['experiment_id']+'/execution.json')
     if path.exists():
         if file_sha256(path) != artifacts.meta('execution-'+experiment['experiment_id'])['sha256']:
@@ -208,6 +210,11 @@ class Runner:
                     "model_snapshot_max_bytes": self.snapshot_allowance(),
                     "result_path": str(directory / "result.json")}
         job_spec['preflight'] = phase == 'train' and experiment['plan']['plan_id'].startswith('candidate-')
+        protocol_path=self.artifacts.safe_path('validation/'+experiment['plan']['validation_id']+'.protocol.json')
+        if protocol_path.is_file():
+            proposal=json.loads(protocol_path.read_text(encoding='utf-8'))['proposal']
+            job_spec['training_policy']={'strategy':proposal['strategy'],'seed':proposal['seed'],
+                'column':proposal['parameters'].get('column')}
         if phase == "train":
             job_spec.update(train_indices_path=str(self.artifacts.resolve(payload["train_rows_artifact_id"])),
                             valid_indices_path=str(self.artifacts.resolve(payload["valid_rows_artifact_id"])))

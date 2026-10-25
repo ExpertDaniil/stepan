@@ -62,6 +62,7 @@ runpy.run_path("solution.py", run_name="__main__")
             args = []
             if overrides:
                 env["LLM_MAX_OUTPUT_TOKENS"] = "4096"
+                env["LLM_MAX_TOTAL_OUTPUT_TOKENS"] = "4096"
                 (root / "explicit.env").write_text(
                     "LLM_MAX_OUTPUT_TOKENS=2048\nGRAPH_CONTEXT_BYTES=131072\n"
                     "OPENAI_API_KEY=wrong\nOPENAI_BASE_URL=https://wrong.invalid\n")
@@ -76,13 +77,14 @@ runpy.run_path("solution.py", run_name="__main__")
                         "catalog_warmup_experiments": 4, "research_series_size": 4,
                         "llm_max_calls": None, "llm_max_output_tokens": 32768,
                         "llm_max_output_tokens_limit": 65536, "llm_bootstrap_output_tokens": 8192,
-                        "llm_max_total_output_tokens": 1048576, "llm_timeout_seconds": 600,
+                        "llm_max_total_output_tokens": None, "llm_timeout_seconds": 600,
                         "llm_operation_timeout_seconds": 1200, "llm_progress_seconds": 15,
                         "console_format": "human", "log_level": "INFO", "log_model_io": True,
                         "llm_mode": "live", "graph_context_bytes": 196608,
                         "llm_request_max_bytes": 196608}
             if overrides:
-                expected.update(llm_max_output_tokens=4096, graph_context_bytes=131072, llm_mode="mock")
+                expected.update(llm_max_output_tokens=4096, llm_max_total_output_tokens=4096,
+                                graph_context_bytes=131072, llm_mode="mock")
             self.assertEqual({key: config[key] for key in expected}, expected)
             events = [json.loads(line) for path in (root / "runs").glob("*/events.jsonl")
                       for line in path.read_text().splitlines()]

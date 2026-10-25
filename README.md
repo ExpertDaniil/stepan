@@ -3,7 +3,7 @@
 
 > Профиль посылки: [recipes/platform-env.json](recipes/platform-env.json).
 > Он включён в ZIP: контекст 192 KiB, ответ 32k–64k, bootstrap 8192,
-> общий выходной бюджет 1048576 токенов, численного лимита API-вызовов нет.
+> общего численного лимита выходных токенов и API-вызовов нет.
 > Приоритет настроек и проверка фактических лимитов: [docs/PLATFORM.md](docs/PLATFORM.md#настройки-в-посылке).
 > Context continuation under tool-history pressure: [CONTEXT-CONTINUATION.md](docs/CONTEXT-CONTINUATION.md).
 > Current default: [executable pipeline versions and background Optuna](docs/BACKGROUND-PIPELINES.md).

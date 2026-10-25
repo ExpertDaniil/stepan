@@ -91,7 +91,10 @@ class ErrorResearch:
         previous = self.assignments.get(assignment_key)
         candidates = [p for p in self.problems.values() if p['base_experiment_id'] in visible]
         candidates.sort(key=lambda p: (p['base_experiment_id'] == base, p['priority']), reverse=True)
-        if previous and previous['base_experiment_id'] == base and previous.get('status') == 'active':
+        # A dialogue may start before its first OOF report exists. Refresh an
+        # empty assignment once evidence arrives; dispatched tickets stay frozen.
+        if (previous and previous['base_experiment_id'] == base and previous.get('status') == 'active'
+                and (previous.get('problem_key') or not candidates)):
             assigned = previous
         else:
             occupied = {a.get('problem_key') for name, a in self.assignments.items() if name != assignment_key and a.get('branch_id') == branch and a.get('status') == 'active'}

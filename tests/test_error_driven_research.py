@@ -167,6 +167,37 @@ class DiagnosticIntegrationTests(unittest.TestCase):
         query['code'] += '\n# new check'
         with self.assertRaises(AgentError):run_analysis(service,query,context)
 
+    def test_warmup_waits_for_oof_memory_instead_of_failing_start(self):
+        from agent.graph.controller import acquire_training_lease
+        c = self.c
+        c.budget.cpu_capacity = 7
+        c.budget.memory_capacity = 12675
+        c.budget.analysis_memory = 1024
+        c.science = SimpleNamespace(diagnostics=self.diag)
+        self.diag.ensure([self.eid])
+        self.assertIsNotNone(self.diag.running)
+        request = {'cpu_threads':3, 'memory_limit_mb':10240, 'timeout_seconds':30}
+        self.assertFalse(c.lease('warmup-next', 'train', request)['granted'])
+        allocation = acquire_training_lease(c, 'warmup-next', request)
+        self.assertTrue(allocation['granted'])
+        self.assertTrue(self.diag.records)
+        lease = allocation['lease']
+        c.call('C13', {'operation':'release', 'owner_id':'warmup-next', 'phase':'train',
+            'requested':request, 'lease_id':lease['lease_id'], 'fencing_token':lease['fencing_token']}, c.budget.lease)
+
+    def test_empty_assignment_gets_group_after_oof_without_mutating_ticket(self):
+        c = self.c
+        ids = self.h.g.visible_history(self.h.root)
+        c.error_research.advice(ids, 'researcher-1')
+        key = 'legacy/researcher-1'
+        frozen = deepcopy(c.error_research.assignments[key])
+        self.assertIsNone(frozen['problem_key'])
+        self.complete()
+        advice = c.error_research.advice(ids, 'researcher-1')
+        self.assertIsNotNone(advice['observation'])
+        self.assertIsNotNone(c.error_research.assignments[key]['problem_key'])
+        self.assertIsNone(frozen['definition'])
+
     def test_new_leader_refresh_and_more_than_two_diagnostic_jobs(self):
         for index in range(3):
             if index:

@@ -1,6 +1,7 @@
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from copy import deepcopy
 import json
+import time
 import uuid
 
 from agent.catalog import factory_source
@@ -76,6 +77,28 @@ def cancel_queued(controller, experiment_id, reason):
         controller.graph.terminal_tx(experiment_id, "cancelled", reason, "C22")
 
 
+def acquire_training_lease(controller, eid, resources):
+    """A diagnostic lease is temporary contention, not a failed candidate."""
+    logged = False
+    while True:
+        # A denied C13 response is idempotently cached. Each retry needs a new
+        # request key, otherwise a released diagnostic can never unblock it.
+        allocation = controller.call("C13", {"operation":"acquire", "owner_id":eid,
+            "phase":"train", "requested":resources, "lease_id":None, "fencing_token":None},
+            controller.budget.lease, key="acquire/"+eid+"/train/"+uuid.uuid4().hex)
+        if allocation["granted"]:
+            return allocation
+        diagnostics = getattr(getattr(controller, "science", None), "diagnostics", None)
+        if not diagnostics or not diagnostics.running:
+            return allocation
+        if not logged:
+            controller.log.event("graph.train_deferred", experiment_id=eid, reason="fit_oof_resources")
+            logged = True
+        while diagnostics.running:
+            diagnostics.poll()
+            time.sleep(.05)
+
+
 def train(controller, plans, tickets):
     graph = controller.graph
     if tickets is None or len(plans) != len(tickets):
@@ -123,7 +146,7 @@ def train(controller, plans, tickets):
             try:
                 for art_id in (controller.spec["train_artifact_id"], controller.validation["train_rows_artifact_id"], controller.validation["valid_rows_artifact_id"]):
                     graph.files.resolve(art_id, True)
-                allocation = controller.lease(eid, "train", plan["resources"])
+                allocation = acquire_training_lease(controller, eid, plan["resources"])
                 if not allocation["granted"]:
                     raise AgentError("RESOURCE_BUSY", "Graph train limit cannot acquire an execution slot")
                 lease = allocation["lease"]

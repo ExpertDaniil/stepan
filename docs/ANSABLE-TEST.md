@@ -1,5 +1,8 @@
 # ansable_test: architecture specialists and fit-only ensembles
 
+Latest runtime corrections and exact verification limits:
+[ANSABLE-RUNTIME-FIXES.md](ANSABLE-RUNTIME-FIXES.md).
+
 Experimental branch from the published `de7a28c3f6dc2082369a803df41a8e114160beeb`.
 The original development checkout and its uncommitted work were left intact.
 The user requested that further tests and ML runs stop; the final changes below
@@ -19,8 +22,8 @@ git fetch origin
 git switch ansable_test
 git pull --ff-only origin ansable_test
 
-ENSEMBLE_RESEARCH_ENABLED=1 GRAPH_PEERS=5 python solution.py /path/to/regression/task.md --env-file .env
-ENSEMBLE_RESEARCH_ENABLED=1 GRAPH_PEERS=5 python solution.py /path/to/classification/task.md --env-file .env
+ENSEMBLE_RESEARCH_ENABLED=1 GRAPH_PEERS=5 RESEARCH_MODE=adaptive BACKGROUND_TUNING_ENABLED=1 python solution.py "data_for_participants/Регрессия/task.md" --env-file .env
+ENSEMBLE_RESEARCH_ENABLED=1 GRAPH_PEERS=5 RESEARCH_MODE=adaptive BACKGROUND_TUNING_ENABLED=1 python solution.py "data_for_participants/Многоклассовая классификация/task.md" --env-file .env
 ```
 
 API configuration remains OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_MODEL from

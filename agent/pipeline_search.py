@@ -324,6 +324,8 @@ class VersionSearch:
                 version['paused']='deterministic_initial_failure'
             if trial is not None and trial.number in {t.number for t in self.study(version).get_trials() if not t.state.is_finished()}:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
+            if version['paused']:
+                self.save()
             c.record_research_feedback(plan['researcher_id'], version['ticket']['work_order']['branch_id'],
                 'pipeline_rejected', str(error), code=getattr(error, 'code', 'PIPELINE_ERROR'))
             c.log.exception('pipeline.execution_failed', error, version_id=version['version_id'])

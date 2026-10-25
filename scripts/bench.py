@@ -4,6 +4,8 @@ Example:
   python scripts/bench.py --task data/regression/task.md --split temporal:Year_Factor --budget 1800
   python scripts/bench.py --task data/classification/task.md --split duplicates --budget 1800 --api-down
 
+Logs of every bench run stay in runs/bench-<time>/runs/run-*/ (use --clean to delete).
+
 The organizers' baseline value is unknown locally, so the case formula is applied
 against a fixed reference (sklearn HistGradientBoosting with default settings) on
 the same hidden split. Compare variants by the raw metric and the proxy score.
@@ -16,7 +18,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,7 +94,8 @@ def main():
     parser.add_argument('--api-down', action='store_true', help='Point the provider at an unreachable address')
     parser.add_argument('--env-file', type=Path, default=None)
     parser.add_argument('--results', type=Path, default=ROOT/'bench_results.csv')
-    parser.add_argument('--keep', action='store_true')
+    parser.add_argument('--keep', action='store_true', help='Ignored: bench runs are kept by default')
+    parser.add_argument('--clean', action='store_true', help='Delete the bench directory after scoring')
     args = parser.parse_args()
     source = args.task.resolve().parent
     train = pd.read_csv(source/'train.csv', keep_default_na=False, na_values=[''])
@@ -102,7 +104,10 @@ def main():
     kind = 'regression' if pd.api.types.is_numeric_dtype(train[target]) and train[target].nunique() > 20 else 'classification'
     metric = args.metric or ('rmse' if kind == 'regression' else 'f1_macro')
     fit_rows, hidden_rows = split_rows(train, target, args.split, args.fraction, args.seed, excluded={args.id})
-    work = Path(tempfile.mkdtemp(prefix='stepan-bench-'))
+    # Same place as ordinary runs: <repo>/runs/bench-<time>/{task,runs/run-*}.
+    work = ROOT/'runs'/('bench-'+time.strftime('%Y%m%dT%H%M%S'))
+    work.mkdir(parents=True, exist_ok=False)
+    print('bench logs:', work/'runs', file=sys.stderr, flush=True)
     task_dir = work/'task'
     task_dir.mkdir()
     for path in source.iterdir():
@@ -153,10 +158,10 @@ def main():
         if new:
             writer.writeheader()
         writer.writerow(result)
-    if not args.keep:
+    if args.clean:
         shutil.rmtree(work, ignore_errors=True)
     else:
-        print('kept', work)
+        print('bench logs:', work/'runs', file=sys.stderr)
 
 
 if __name__ == '__main__':

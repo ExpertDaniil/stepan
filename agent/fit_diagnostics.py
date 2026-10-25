@@ -79,181 +79,304 @@ def execute_oof(module, task, params, fit_x, fit_y, job, guard, limits):
             'sample_rows': len(fit_x), 'model_path': None}
 
 
+def error_values(truth, prediction, task):
+    import numpy as np
+    y = np.asarray(truth, dtype=float if task['task_kind'] == 'regression' else str)
+    raw = np.asarray(prediction)
+    if task['task_kind'] == 'regression':
+        p = raw.astype(float).reshape(y.shape)
+        residual = p-y
+        return y, p, np.abs(residual), residual**2
+    p = (np.asarray(task['allowed_labels'])[raw.argmax(axis=1)]
+         if task.get('metric', {}).get('prediction_kind') == 'probabilities' else raw.reshape(-1).astype(str))
+    return y.reshape(-1), p, (p != y.reshape(-1)).astype(float), None
+
+
 def error_profile(data, truth, prediction, fold, task, *, deadline=None):
-    """Scan eligible columns, rank supported patterns; no causal/underfit verdict."""
+    """Cost of measured misses on a uniform FIT sample; never expected remedy gain."""
     import numpy as np
     import pandas as pd
+    from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
     from agent.predictions import targets
-    regression = task['task_kind'] == 'regression'
-    y = np.asarray(truth, dtype=float if regression else str)
-    p = np.asarray(prediction, dtype=float if regression else str)
-    if regression:
-        if y.ndim == 1:
-            p = p.reshape(-1)
-        residual = p-y
-        signed = residual.mean(axis=1) if residual.ndim > 1 else residual
-        error = np.abs(residual).mean(axis=1) if residual.ndim > 1 else np.abs(residual)
-    else:
-        signed = None
-        error = (p.reshape(-1) != y.reshape(-1)).astype(float)
-    baseline = float(error.mean())
-    excluded = set(task['excluded_features']) | set(targets(task))
+    y, p, absolute, squared = error_values(truth, prediction, task)
+    regression = squared is not None
+    error = absolute.mean(axis=1) if absolute.ndim > 1 else absolute
+    metric = task.get('metric', {}).get('metric_id', 'rmse' if regression else 'f1_macro')
+    mass = (squared.mean(axis=1) if squared.ndim > 1 else squared) if regression and metric != 'mae' else error
+    baseline = float(mass.mean()); fold = np.asarray(fold)
+    excluded = set(task.get('excluded_features', [])) | set(targets(task))
     eligible = [c for c in data if c not in excluded]
     groups, associations, scanned = [], [], 0
-    minimum = max(10, int(len(error)*.02))
-    fold = np.asarray(fold)
+    labels = task.get('allowed_labels', sorted(set(y))) if not regression else []
+    weights = {str(label): 1/max(1, int((y == label).sum())) for label in labels}
+    def add(column, label, mask, definition, applicable=True):
+        rows = int(mask.sum())
+        if not rows or rows == len(error):return
+        supported = [f for f in np.unique(fold) if (mask & (fold == f)).any()]
+        deltas = [float(mass[mask & (fold == f)].mean()-mass[fold == f].mean()) for f in supported]
+        record = {'feature': str(column), 'group': str(label)[:100], 'definition': definition,
+            'test_applicable': applicable, 'rows': rows, 'support_fraction': rows/len(error),
+            'support_uncertain': rows < 10 or len(supported) < 2, 'mean_error': float(error[mask].mean()),
+            'error_delta': float(mass[mask].mean()-baseline), 'folds_with_support': len(supported),
+            'folds_with_higher_error': sum(d > 0 for d in deltas),
+            'per_fold': [{'fold': int(f), 'rows': int((mask & (fold == f)).sum()), 'error_delta': d}
+                         for f, d in zip(supported, deltas)]}
+        if regression:
+            part = squared[mask]
+            record.update(sse=float(part.sum()), rmse=float(np.sqrt(part.mean())),
+                sse_fraction=float(part.sum()/squared.sum()) if squared.sum() else 0.,
+                prediction_bias=float((p-y)[mask].mean()), priority_cost=float(mass[mask].sum()))
+        else:
+            pr, re, f1, support = precision_recall_fscore_support(y[mask], p[mask], labels=labels, zero_division=0)
+            class_metrics = [
+                {'label': str(l), 'rows': int(n), 'precision': float(a), 'recall': float(b), 'f1': float(c)}
+                for l, a, b, c, n in zip(labels, pr, re, f1, support)]
+            record.update(macro_f1=float(f1.mean()), class_metrics=sorted(class_metrics, key=lambda r:r['f1'])[:6],
+                omitted_classes=max(0,len(labels)-6),
+                priority_cost=float(sum(weights.get(str(a), 0) for a, b in zip(y[mask], p[mask]) if a != b)))
+        groups.append(record)
     for column in eligible:
-        if deadline is not None and time.monotonic() >= deadline:
-            break
+        if deadline is not None and time.monotonic() >= deadline:break
         series = data[column]
-        masks = [('missing', series.isna().to_numpy())]
+        add(column, 'missing', series.isna().to_numpy(), {'kind': 'missing', 'column': str(column)})
         if pd.api.types.is_numeric_dtype(series) and not pd.api.types.is_bool_dtype(series):
             numeric = pd.to_numeric(series, errors='coerce').replace([np.inf, -np.inf], np.nan)
             cuts = sorted(set(numeric.dropna().quantile([.25, .5, .75]).tolist()))
-            if cuts:
-                buckets = np.searchsorted(cuts, numeric.fillna(0).to_numpy(), side='right')
-                masks += [('quantile_'+str(i), (buckets == i) & numeric.notna().to_numpy()) for i in range(len(cuts)+1)]
+            for i in range(len(cuts)+1) if cuts else []:
+                lower, upper = cuts[i-1] if i else None, cuts[i] if i < len(cuts) else None
+                mask = numeric.notna().to_numpy()
+                if lower is not None:mask &= numeric.ge(lower).to_numpy()
+                if upper is not None:mask &= numeric.lt(upper).to_numpy()
+                add(column, 'quantile_'+str(i), mask, {'kind': 'range', 'column': str(column), 'lower': lower, 'upper': upper})
             valid = numeric.notna().to_numpy()
-            if valid.sum() >= minimum and numeric[valid].nunique() > 1:
-                ranks = numeric[valid].rank().to_numpy()
-                err_ranks = pd.Series(error[valid]).rank().to_numpy()
-                correlation = np.corrcoef(ranks, err_ranks)[0, 1] if np.std(err_ranks) else 0.0
-                associations.append({'feature': str(column)[:100], 'absolute_error_spearman': float(correlation)})
+            if valid.sum() >= 3 and numeric[valid].nunique() > 1:
+                ranks = numeric[valid].rank().to_numpy(); errors = pd.Series(mass[valid]).rank().to_numpy()
+                corr = np.corrcoef(ranks, errors)[0, 1] if np.std(errors) else 0.
+                associations.append({'feature': str(column), 'error_mass_spearman': float(corr)})
         else:
-            values = series.dropna().astype(str)
-            if values.nunique() > 1:
-                actual = series.astype(str).to_numpy()
-                masks += [(str(value)[:80], (actual == value) & series.notna().to_numpy())
-                          for value in values.value_counts().index[:5]]
+            actual = series.astype(str)
+            # Cost-first category discovery includes rare groups without oversampling.
+            costs = pd.Series(mass, index=series.index).groupby(actual).sum().sort_values(ascending=False)
+            for value in costs.index[:32]:
+                add(column, value, (actual.eq(value) & series.notna()).to_numpy(),
+                    {'kind': 'equals', 'column': str(column), 'value': str(value)})
         scanned += 1
-        for label, mask in masks:
-            rows = int(mask.sum())
-            if rows < minimum or rows == len(error):
-                continue
-            lift = float(error[mask].mean()-baseline)
-            per_fold = [float(error[mask & (fold == f)].mean()-error[fold == f].mean())
-                        for f in np.unique(fold) if (mask & (fold == f)).sum() >= 3]
-            record = {'feature': str(column)[:100], 'group': label, 'rows': rows,
-                      'mean_error': float(error[mask].mean()), 'error_delta': lift,
-                      'folds_with_support': len(per_fold),
-                      'folds_with_higher_error': sum(value > 0 for value in per_fold)}
-            if signed is not None:
-                record['prediction_bias'] = float(signed[mask].mean())
-            groups.append(record)
-    return {'scope': 'fit_only_inner_oof', 'predicted_rows': len(error), 'mean_error': baseline,
-            'eligible_columns': len(eligible), 'scanned_columns': scanned,
-            'omitted_columns': len(eligible)-scanned,
-            'hard_groups': sorted(groups, key=lambda r: (-r['error_delta'], -r['rows']))[:8],
-            'error_associations': sorted(associations, key=lambda r: -abs(r['absolute_error_spearman']))[:8],
-            'interpretation': 'Exploratory associations on a bounded fit sample. Selection/confirmation labels were not used. '
-                'High group error does not prove a cause, underfitting, or a useful new feature. Validate proposed remedies normally.'}
+    if not regression:
+        for label in labels:add('target_class', label, y == label, {'kind': 'target_class', 'label': str(label)}, False)
+    result = {'scope': 'fit_only_inner_oof', 'metric_id': metric, 'predicted_rows': len(error),
+        'mean_error': float(error.mean()), 'eligible_columns': len(eligible), 'scanned_columns': scanned,
+        'omitted_columns': len(eligible)-scanned, 'groups_overlap': True,
+        'hard_groups': sorted(groups, key=lambda r: (-r['priority_cost'], -r['error_delta']))[:12],
+        'omitted_groups': max(0, len(groups)-12),
+        'error_associations': sorted(associations, key=lambda r: -abs(r['error_mass_spearman']))[:8],
+        'priority_measure': ('absolute_error_mass' if metric == 'mae' else 'squared_error_mass') if regression else 'class_normalized_misses_proxy',
+        'interpretation': 'Discovery on the reported uniform fit sample only; overlapping shares are not additive or population estimates. '
+            'High cost is not proven fixability or expected gain. Small support remains uncertain. '
+            'Target classes/worst residual rows are post-hoc; deployment rules require available inputs/predictions.'}
+    if regression:
+        total = float(squared.sum()); row_sse = squared.sum(axis=1) if squared.ndim > 1 else squared
+        result.update(sse=total, rmse=float(np.sqrt(squared.mean())), prediction_bias=float((p-y).mean()),
+            error_concentration=[{'worst_fraction': q, 'rows': max(1, int(np.ceil(len(error)*q))),
+                'sse_fraction': float(np.sort(row_sse)[::-1][:max(1, int(np.ceil(len(error)*q)))].sum()/total) if total else 0.,
+                'test_applicable': False} for q in (.01, .05, .1)])
+    else:
+        pr, re, f1, support = precision_recall_fscore_support(y, p, labels=labels, zero_division=0)
+        classes = [{'label': str(l), 'rows': int(n), 'precision': float(a), 'recall': float(b), 'f1': float(c)}
+                   for l, a, b, c, n in zip(labels, pr, re, f1, support)]
+        pairs = pd.DataFrame({'truth':y, 'prediction':p}).value_counts().head(16)
+        result['class_summary'] = {'macro_f1': float(f1.mean()), 'class_count': len(labels),
+            'classes': sorted(classes,key=lambda r:r['f1'])[:12], 'omitted_classes': max(0,len(labels)-12),
+            'confusion': [{'truth':str(a), 'prediction':str(b), 'rows':int(n)} for (a,b),n in pairs.items()],
+            'confusion_is_bounded': True}
+        if task.get('metric'):
+            from agent.evaluation import score_predictions
+            result['primary_metric_value'] = float(score_predictions(task, y, np.asarray(prediction)))
+    return result
 
 
 class FitDiagnostics:
+    """Dispatcher-owned renewable queue; at most one diagnostic learner at once."""
     def __init__(self, controller):
+        import threading
         self.c = controller
-        self.attempted = set()
-        self.records = []
-        self.spent = 0.0
+        self.attempted, self.records = set(), []
+        self.spent = 0.
+        self.pending, self.running, self.retry_at = [], None, {}
+        self.failures = {}
+        self.lock = threading.RLock()
+
+    def postpone_failure(self, eid, error):
+        import hashlib
+        signature = hashlib.sha256((type(error).__name__+':'+str(error)).encode()).hexdigest()
+        previous, count = self.failures.get(eid, (None, 0))
+        count = count+1 if previous == signature else 1
+        self.failures[eid] = (signature, count)
+        self.retry_at[eid] = time.monotonic()+min(900, 30*2**min(count-1, 5))
 
     def visible(self, ids):
-        return deepcopy([r for r in self.records if r['experiment_id'] in set(ids)][-2:])
+        with self.lock:
+            return deepcopy([r for r in self.records if r['experiment_id'] in set(ids)][-4:])
+
+    def remaining(self):
+        c = self.c
+        return min(c.config.time_budget_seconds*c.config.research_oof_budget_fraction-self.spent,
+                   c.budget.remaining()-c.budget.reserve_seconds()-2, c.budget.phase_remaining()-2)
 
     def ensure(self, ids):
-        c = self.c
-        cfg = c.config
-        if (not cfg.research_oof_enabled or len(self.attempted) >= cfg.research_oof_jobs or c.runner.active()
-                or not c.store.champion() or not c.budget.snapshot()['search_allowed']):
-            return
-        remaining = min(cfg.time_budget_seconds*cfg.research_oof_budget_fraction-self.spent,
-                        c.budget.remaining()-c.budget.reserve_seconds()-2, c.budget.phase_remaining()-2)
-        timeout = int(min(cfg.research_oof_timeout_seconds, remaining))
-        if timeout < 5:
-            return
+        c, cfg = self.c, self.c.config
+        if not cfg.research_oof_enabled or cfg.research_oof_jobs == 0 or not c.store.champion():return
         candidates = []
         for eid in ids:
             exp, ev = c.store.get(eid), c.store.experiment_evaluation(eid)
-            if exp['state'] == 'evaluated' and ev and ev['valid'] and not ev['violations'] and exp['plan']['model']['family'] != 'dummy':
+            if (exp['state'] == 'evaluated' and ev and ev['valid'] and not ev['violations']
+                    and exp['plan']['model']['family'] != 'dummy'
+                    and ev['primary_metric']['validation_id'] == c.validation['validation_id']):
                 m = ev['primary_metric']
-                if m['validation_id'] == c.validation['validation_id']:
-                    candidates.append((m['value']*(1 if m['direction'] == 'minimize' else -1), eid))
-        if not candidates:
-            return
-        eid = min(candidates, key=lambda candidate: candidate[0])[1]
-        if eid in self.attempted:
-            return
-        experiment = c.store.get(eid)
-        estimate = 3*c.budget.duration.estimate(experiment['plan'])
-        if estimate > timeout or not c.budget.can_train(experiment['plan'])['allowed']:
-            return
-        self.attempted.add(eid)
-        started = time.monotonic()
-        lease = job = None
+                candidates.append((m['value']*(1 if m['direction'] == 'minimize' else -1), eid))
+        if not candidates or self.remaining() < 5 or not c.budget.snapshot()['search_allowed']:return
+        eid = min(candidates)[1]
+        if eid not in self.pending and (not self.running or self.running['eid'] != eid):
+            reports = [r for r in self.records if r['experiment_id'] == eid]
+            previous = self.records[-1] if self.records else None
+            plan = c.store.get(eid)['plan']
+            refresh = not previous
+            if previous and previous['experiment_id'] != eid:
+                old = c.store.get(previous['experiment_id'])['plan']
+                old_metric = c.store.experiment_evaluation(previous['experiment_id'])['primary_metric']
+                metric = c.store.experiment_evaluation(eid)['primary_metric']
+                refresh = (old['code_artifact_id'] != plan['code_artifact_id'] or old['recipe_id'] != plan['recipe_id']
+                    or old.get('feature_steps') != plan.get('feature_steps')
+                    or abs(old_metric['value']-metric['value']) >= .01*max(abs(old_metric['value']), 1e-12)
+                    or time.monotonic()-previous['completed_monotonic'] >= 600)
+            if reports:refresh = time.monotonic()-reports[-1]['completed_monotonic'] >= 600
+            if refresh:
+                # A pending older leader is replaceable; completed reports and
+                # an already running diagnostic retain their exact identities.
+                self.pending[:] = [eid]
+                c.log.event('diagnostics.oof_queued', experiment_id=eid, reason='new_representation_progress_or_stale')
+        self.dispatch()
+
+    def dispatch(self):
+        c, cfg = self.c, self.c.config
+        if self.running or not self.pending or self.remaining() < 5 or not c.budget.snapshot()['search_allowed']:return
+        eid = next((e for e in self.pending if self.retry_at.get(e, 0) <= time.monotonic()), None)
+        if eid is None:return
+        snapshot = c.budget.snapshot()
+        reserve_cpu = int(not c.budget.analysis_active and c.budget.cpu_capacity > 1)
+        cpu = min(max(1, (c.budget.cpu_capacity-reserve_cpu)//max(1, cfg.max_workers)), snapshot['cpu_threads_available']-reserve_cpu)
+        memory = min(cfg.train_memory_mb, (c.budget.memory_capacity-c.budget.analysis_memory)//max(1, cfg.max_workers),
+                     snapshot['memory_mb_available']-(0 if c.budget.analysis_active else c.budget.analysis_memory))
+        if cpu < 1 or memory < 256:return
         owner = 'fit-diagnostics-'+uuid.uuid4().hex[:12]
-        resources = c.resources(timeout)
+        resources = {'cpu_threads': cpu, 'memory_limit_mb': memory,
+                     'timeout_seconds': int(min(cfg.research_oof_timeout_seconds, self.remaining()))}
+        lease = job = None
+        started = time.monotonic()
         try:
+            allocation = c.lease(owner, 'train', resources)
+            if not allocation['granted']:return
+            lease = allocation['lease']
             import numpy as np
-            import pandas as pd
             from agent.data_transport import transport
-            from agent.predictions import targets, validation_columns, checked_matrix
+            from agent.predictions import targets
             indices = c.artifacts.read_json(c.validation['train_rows_artifact_id'])
-            rng = np.random.default_rng(cfg.seed)
-            selected = sorted(rng.choice(indices, min(len(indices), cfg.research_oof_rows), replace=False).tolist())
+            selected = sorted(np.random.default_rng(cfg.seed).choice(indices, min(len(indices), cfg.research_oof_rows), replace=False).tolist())
             proposal = c.evaluator.protocols[c.validation['validation_id']]['proposal']
             columns = targets(c.spec)
             if proposal['strategy'] in {'group_holdout', 'temporal_holdout'}:
                 columns = list(dict.fromkeys([*columns, proposal['parameters']['column']]))
             table = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, columns=columns, rows=selected)
             folds = inner_folds(table, c.spec, proposal, cfg.seed)
-            train_art = c.artifacts.write_json('diagnostics/'+owner+'.fit.json', selected, 'diagnostic_fit_rows')
-            valid_art = c.artifacts.write_json('diagnostics/'+owner+'.unused.json', [], 'diagnostic_unused_rows')
-            resources['timeout_seconds'] = min(timeout, int(remaining-(time.monotonic()-started)))
-            if resources['timeout_seconds'] < 5:
-                return
-            allocation = c.lease(owner, 'train', resources)
-            if not allocation['granted']:
-                return
-            lease = allocation['lease']
-            payload = {'lease': lease, 'lease_owner_id': owner,
-                       'train_rows_artifact_id': train_art['artifact_id'], 'valid_rows_artifact_id': valid_art['artifact_id'],
-                       'diagnostic': {'folds': folds, 'scope': 'fit_only_inner_oof'}}
-            job = c.runner.start_diagnostics(payload, c.spec, experiment)
+            fit = c.artifacts.write_json('diagnostics/'+owner+'.fit.json', selected, 'diagnostic_fit_rows')
+            unused = c.artifacts.write_json('diagnostics/'+owner+'.unused.json', [], 'diagnostic_unused_rows')
+            job = c.runner.start_diagnostics({'lease': lease, 'lease_owner_id': owner,
+                'train_rows_artifact_id': fit['artifact_id'], 'valid_rows_artifact_id': unused['artifact_id'],
+                'diagnostic': {'folds': folds, 'scope': 'fit_only_inner_oof'}}, c.spec, c.store.get(eid))
+            self.running = {'job': job, 'eid': eid, 'selected': selected, 'folds': folds, 'proposal': proposal,
+                            'started': started, 'complete_rows': len(indices), 'owner': owner}
+            self.pending.remove(eid);self.attempted.add(eid)
             c.log.event('diagnostics.oof_started', experiment_id=eid, job_id=job.job_id,
-                        sampled_fit_rows=len(selected), complete_fit_rows=len(indices), folds=len(folds), timeout_seconds=timeout)
-            event = c.wait_jobs([job])[job.job_id]
-            if event['state'] != 'succeeded':
-                raise ValueError('Optional OOF worker ended '+event['state'])
-            raw = pd.read_csv(job.prediction_path, dtype={n: str for n in validation_columns(c.spec)}
-                              if c.spec['metric']['prediction_kind'] == 'labels' else None, keep_default_na=False)
-            actual_rows = raw['__row_index'].tolist()
-            expected = sorted(selected[position] for f in folds for position in f['predict'])
-            if actual_rows != expected or len(set(actual_rows)) != len(actual_rows):
-                raise ValueError('Diagnostic row coverage differs from trusted inner folds')
-            all_data = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, rows=actual_rows)
-            names = targets(c.spec)
-            y = all_data[names if len(names) > 1 else names[0]]
-            kind = c.spec['metric']['prediction_kind']
-            pred = checked_matrix(raw[validation_columns(c.spec)].to_numpy(), len(raw), len(validation_columns(c.spec)),
-                                  kind, labels=c.spec['allowed_labels'])
-            if kind == 'probabilities':
-                pred = np.asarray(c.spec['allowed_labels'])[pred.argmax(axis=1)]
-            report = error_profile(all_data, y, pred, raw['__fold'], c.spec,
-                                   deadline=min(started+timeout, time.monotonic()+15))
-            report.update(experiment_id=eid, validation_id=c.validation['validation_id'], sampled_fit_rows=len(selected),
-                          complete_fit_rows=len(indices), sampled=len(selected) < len(indices),
-                          folds=len(folds), split_strategy=proposal['strategy'],
-                          warmup_rows_without_oof=len(selected)-len(raw), score_authoritative=False)
-            art = c.artifacts.write_json('diagnostics/'+owner+'.json', report, 'fit_diagnostics')
-            self.records.append({'artifact_id': art['artifact_id'], 'experiment_id': eid, 'report': report})
-            c.log.event('diagnostics.oof_completed', artifact_id=art['artifact_id'], experiment_id=eid,
-                        predicted_rows=len(raw), scanned_columns=report['scanned_columns'], primary_score_changed=False)
+                sampled_fit_rows=len(selected), complete_fit_rows=len(indices), folds=len(folds),
+                cpu_threads=cpu, timeout_seconds=lease['timeout_seconds'])
         except (AgentError, ValueError, OSError, KeyError) as error:
-            c.log.event('diagnostics.oof_unavailable', experiment_id=eid, reason=str(error)[:600], retained_output=True)
+            self.postpone_failure(eid, error)
+            c.log.event('diagnostics.oof_unavailable', experiment_id=eid, reason=str(error)[:600], retryable=True)
         finally:
-            if job and not job.reported:
-                c.cancel_job(job, 'Diagnostic cleanup', 'cancelled')
-                c.wait_jobs([job])
-            elif lease and job is None:
+            if lease and job is None:
                 c.call('C13', {'operation': 'release', 'owner_id': owner, 'phase': 'train', 'requested': resources,
-                       'lease_id': lease['lease_id'], 'fencing_token': lease['fencing_token']}, c.budget.lease)
-            self.spent += time.monotonic()-started
+                    'lease_id': lease['lease_id'], 'fencing_token': lease['fencing_token']}, c.budget.lease)
+                self.spent += time.monotonic()-started
+
+    def poll(self):
+        if not self.running:
+            self.dispatch();return
+        c, state = self.c, self.running
+        job = state['job']
+        if c.runner.poll(job) is None:c._heartbeat_and_limits(job)
+        if c.runner.poll(job) is None:return
+        # Clear before wait_jobs: that routine may itself service diagnostics.
+        self.running = None
+        try:
+            event = c.wait_jobs([job])[job.job_id]
+            if event['state'] != 'succeeded':raise ValueError('OOF worker ended '+event['state'])
+            self.complete(state, event)
+        except (AgentError, ValueError, OSError, KeyError) as error:
+            self.postpone_failure(state['eid'], error)
+            if state['eid'] not in self.pending:self.pending.append(state['eid'])
+            c.log.event('diagnostics.oof_unavailable', experiment_id=state['eid'], reason=str(error)[:600], retryable=True)
+        finally:self.spent += time.monotonic()-state['started']
+        c.publish_research_updates()
+
+    def complete(self, state, event):
+        import pandas as pd
+        from agent.data_transport import transport
+        from agent.predictions import targets, validation_columns, checked_matrix
+        c = self.c
+        job, eid, selected, folds = state['job'], state['eid'], state['selected'], state['folds']
+        raw = pd.read_csv(job.prediction_path, dtype={n: str for n in validation_columns(c.spec)}
+                          if c.spec['metric']['prediction_kind'] == 'labels' else None, keep_default_na=False)
+        rows = raw['__row_index'].tolist()
+        expected = sorted(selected[i] for f in folds for i in f['predict'])
+        if rows != expected or len(set(rows)) != len(rows):raise ValueError('OOF coverage differs from trusted fit folds')
+        data = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, rows=rows)
+        names = targets(c.spec);y = data[names if len(names) > 1 else names[0]]
+        pred = checked_matrix(raw[validation_columns(c.spec)].to_numpy(), len(rows), len(validation_columns(c.spec)),
+                              c.spec['metric']['prediction_kind'], labels=c.spec['allowed_labels'])
+        report = error_profile(data, y, pred, raw['__fold'], c.spec, deadline=time.monotonic()+10)
+        prediction_id = next(a for a in event['output_artifact_ids'] if c.artifacts.meta(a)['kind'] == 'fit_oof_predictions')
+        plan = c.store.get(eid)['plan']
+        identity = {'experiment_id': eid, 'dataset_id': c.spec['dataset_id'], 'task_spec_id': c.spec['task_spec_id'],
+            'validation_id': c.validation['validation_id'], 'protocol_sha256': c.validation['protocol_sha256'],
+            'train_sha256': c.artifacts.meta(c.spec['train_artifact_id'])['sha256'],
+            'code_sha256': c.artifacts.meta(plan['code_artifact_id'])['sha256'],
+            'parameters': deepcopy(plan['model']['hyperparameters']), 'seed': c.config.seed,
+            'sample_rows': selected, 'predicted_row_ids': rows, 'folds': folds,
+            'predictions_artifact_id': prediction_id, 'predictions_sha256': c.artifacts.meta(prediction_id)['sha256']}
+        provenance = c.artifacts.write_json('diagnostics/'+state['owner']+'.identity.json', identity, 'fit_oof_identity')
+        report.update(experiment_id=eid, validation_id=c.validation['validation_id'],
+            sampled_fit_rows=len(selected), complete_fit_rows=state['complete_rows'], sampled=len(selected)<state['complete_rows'],
+            sampling='uniform_without_replacement', folds=len(folds), split_strategy=state['proposal']['strategy'],
+            warmup_rows_without_oof=len(selected)-len(rows), coverage_fraction=len(rows)/max(1, state['complete_rows']),
+            identity_artifact_id=provenance['artifact_id'], score_authoritative=False)
+        art = c.artifacts.write_json('diagnostics/'+state['owner']+'.json', report, 'fit_diagnostics')
+        record = {'artifact_id': art['artifact_id'], 'experiment_id': eid, 'report': report,
+                  'identity_artifact_id': provenance['artifact_id'], 'completed_monotonic': time.monotonic()}
+        with self.lock:self.records.append(record)
+        analysis = getattr(c.context, 'analysis', None)
+        if analysis is not None:
+            # Copy-on-write publication: model threads read immutable metadata,
+            # never SQLite, a mutable dispatcher collection or held-out labels.
+            analysis.oof_sources = {**getattr(analysis, 'oof_sources', {}), eid: {
+                **record, 'identity': deepcopy(identity),
+                'identity_sha256': provenance['sha256']}}
+        if getattr(c, 'error_research', None):c.error_research.ingest(record)
+        c.log.event('diagnostics.oof_completed', artifact_id=art['artifact_id'], experiment_id=eid,
+                    predicted_rows=len(raw), primary_score_changed=False)
+
+    def shutdown(self):
+        self.pending.clear()
+        if self.running:
+            state = self.running;self.running = None
+            self.c.cancel_job(state['job'], 'Diagnostic finalization barrier')
+            self.c.wait_jobs([state['job']])
+            self.spent += time.monotonic()-state['started']

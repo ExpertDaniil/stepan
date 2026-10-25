@@ -288,6 +288,23 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
         transcripts.append({'section': section, 'decision_artifact_id': decision_id,
             'question': question, 'preview_only': True})
     sections['transcripts_index'] = transcripts
+    sections['drafts_index'] = []
+    visible_orders = set(memory.get('visible_work_order_ids', []))
+    cutoffs = memory.get('visible_analysis_cutoffs', {})
+    with artifacts.lock:
+        drafts = [deepcopy(entry['meta']) for entry in artifacts.entries.values() if entry['meta']['kind'] == 'pipeline_draft']
+    for meta in drafts:
+        value = artifacts.read_json(meta['artifact_id'])
+        source = value.get('scope', {})
+        owner = source.get('work_order_id')
+        if (owner not in visible_orders or any(source.get(k) != scope.get(k) for k in
+                ('run_id','task_spec_id','dataset_id','validation_id','branch_id'))
+                or value.get('completed_elapsed_ms', 0) > cutoffs.get(owner, float('inf'))):
+            continue
+        section = 'draft/'+meta['artifact_id']
+        documents[section] = {**meta, 'format':'json'}
+        sections['drafts_index'].append({'draft_id':meta['artifact_id'], 'section':section,
+            'bytes':len(value['code'].encode()), 'instruction':'Use edit_solution(draft_id=...) or pipeline code_ref.'})
     sections['experiments'] = list(dict.fromkeys(experiment_ids))
     if store is not None:
         for eid in sections['experiments']:

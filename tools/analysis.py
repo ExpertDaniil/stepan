@@ -158,6 +158,20 @@ class AnalysisService:
         self.input_tables = {'fit': tables.existing(spec['train_artifact_id'], spec),
                              'test': tables.existing(spec['test_artifact_id'])}
         self.records, self.cache, self.lock = [], {}, threading.RLock()
+        self.cancelled = threading.Event()
+        self.process_lock = threading.Lock()
+        self.active_process = None
+
+    def stop(self):
+        """Fence new queries and stop the analysis process before final refit."""
+        import os, signal
+        self.cancelled.set()
+        with self.process_lock:
+            process = self.active_process
+            if process and process.poll() is None:
+                try:os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:pass
+                process.wait(timeout=1)
 
     def recent(self, visible_orders=None, cutoffs=None):
         with self.lock:
@@ -184,6 +198,8 @@ class AnalysisService:
             self.lock.release()
 
     def _check_time(self, started):
+        if getattr(self, 'cancelled', None) is not None and self.cancelled.is_set():
+            raise AgentError('RESEARCH_CANCELLED', 'Analysis closed at the finalization barrier')
         deadline = (getattr(self, 'query_context', None) or {}).get('_tool_deadline')
         if deadline is not None and time.monotonic() >= deadline:
             raise AgentError('ANALYSIS_TIMEOUT', 'Analysis reached the tool deadline reserved before the final decision')

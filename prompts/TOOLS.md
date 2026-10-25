@@ -115,3 +115,18 @@ listed tool/CALL_ID/result or tool/CALL_ID/arguments sections. Exact observation
 and code are retained; previews are not new verified conclusions. Reuse successful
 checks instead of rerunning them to rebuild the transcript. A fresh dialogue can
 read transcripts_index in its frozen details, then the listed transcript sections.
+
+## Error research and source drafts (executable mode)
+
+`run_analysis` optionally accepts `experiment_id="best"` or an exact visible ID.
+It aligns fit-only input/targets with that version's inner OOF predictions/errors
+and fold IDs in `context['oof']`. `OOF_PENDING` never authorizes selection labels.
+Large matrices stay in Python; return bounded aggregates. Diagnostics are sampled
+when declared, overlap across feature groups, and do not establish attainable gain.
+
+`edit_solution` accepts exactly one source: `experiment_id`, `draft_id` or `code`.
+Optional edits are exact `old`/`new` replacements; each old fragment must match once.
+It returns a scoped `draft_id`, including invalid source retained for repair.
+A final `{ "action":"pipeline", "code_ref":"returned-draft-id" }` uses that source
+without resending it. `drafts_index` / `draft/ID` keep visible drafts in later
+bounded dialogues. IDs and assignment/provenance are managed by the system.

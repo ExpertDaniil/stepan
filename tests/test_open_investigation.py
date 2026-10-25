@@ -117,7 +117,7 @@ class ResearchCheckpointTests(unittest.TestCase):
         finally:h.close()
 
     def test_invalid_tuning_space_is_repaired_before_leaving_the_dialogue(self):
-        h=GraphHarness('regression',research_mode='adaptive')
+        h=GraphHarness('regression',research_mode='adaptive',background_tuning_enabled=False)
         try:
             g=h.g
             class Transport:

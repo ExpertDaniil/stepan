@@ -197,6 +197,8 @@ class Evaluator:
                 "metric": self.spec["metric"], "protocol_sha256": sha}
 
     def evaluate(self, payload):
+        import time
+        started = time.monotonic()
         import numpy as np
         import pandas as pd
         from sklearn.metrics import mean_absolute_error
@@ -275,6 +277,7 @@ class Evaluator:
                 'selection_sse': diagnostics.get('sse'),
                 'predictions_sha256': self.artifacts.meta(payload['predictions_artifact_id'])['sha256']}
         self.store.save_evaluation(record)
+        if getattr(self, 'timing_observer', None):self.timing_observer(time.monotonic()-started)
         self.log.event("experiment.evaluated", experiment_id=payload["experiment_id"], recipe_id=experiment["plan"]["recipe_id"],
                        hyperparameters=experiment["plan"]["model"]["hyperparameters"], validation_id=payload["validation_id"],
                        diagnostics_artifact_id=diag["artifact_id"], **diagnostics)

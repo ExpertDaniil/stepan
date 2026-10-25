@@ -128,7 +128,7 @@ class GatewayTests(unittest.TestCase):
                         gateway.complete(args)
                     self.assertEqual(caught.exception.code, "LLM_BUDGET_EXHAUSTED")
                     self.assertFalse(caught.exception.retryable)
-                    self.assertEqual(caught.exception.details["reset_time_msk"], "03:00")
+                    self.assertFalse(caught.exception.details['reset_known'])
                 self.assertEqual(len(transport.requests), 1)
 
     def test_provider_insufficient_credits_stops_retry_without_claiming_team_budget(self):

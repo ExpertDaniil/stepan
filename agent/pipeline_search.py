@@ -1,5 +1,5 @@
 """Version-owned background Optuna. All SQL, admissions and evaluation stay on dispatcher."""
-from concurrent.futures import ThreadPoolExecutor
+from agent.research_execution import ResearchExecutor, PeerRecovery
 from copy import deepcopy
 import hashlib
 import json
@@ -22,6 +22,8 @@ class VersionSearch:
         self.publish_due = False
         self.revision = 0
         self.library = None
+        self.measurement_revision = 0
+        self.recovery = PeerRecovery()
 
     def quality(self, metric):
         value = metric['value']
@@ -36,6 +38,9 @@ class VersionSearch:
             histories[version['version_id']] = {
                 'code_artifact_id': version['anchor']['code_artifact_id'],
                 'search_space': deepcopy(version['space']),
+                'research_binding': deepcopy(version.get('research_binding')),
+                'batch_limit': version['batch_limit'], 'retry_at': version['retry_at'],
+                'blocked_inputs': deepcopy(version['blocked_inputs']),
                 'trials': [{'number': t.number, 'state': t.state.name, 'parameters': t.params,
                             'value': t.value, 'metadata': t.user_attrs}
                            for t in version['study'].get_trials()] if version['study'] is not None else []}
@@ -59,7 +64,10 @@ class VersionSearch:
         version = {'version_id': ident, 'anchor': plan, 'ticket': ticket, 'space': space,
             'initial_experiment_id': evaluated, 'initial_metric': None, 'best_experiment_id': None,
             'best_metric': None, 'trials': 0, 'paused': None, 'last_scheduled': 0,
-            'errors': 0, 'study': None, 'pending': False}
+            'errors': 0, 'study': None, 'pending': False, 'retry_at': 0,
+            'batch_limit': c.config.background_max_trials, 'batch_best': None, 'blocked_inputs': {}}
+        if getattr(c, 'error_research', None):
+            version['research_binding'] = c.error_research.bind(plan, ticket)
         self.versions[ident] = version
         if evaluated:
             ev = c.store.experiment_evaluation(evaluated)
@@ -108,8 +116,22 @@ class VersionSearch:
         return study
 
     def eligible(self):
-        return [v for v in self.versions.values() if v['initial_metric'] and v['space'] and not v['paused']
-                and not v['pending'] and v['errors'] < 4 and v['trials'] < self.c.config.background_max_trials]
+        rows = []
+        for v in self.versions.values():
+            if not v['initial_metric'] or not v['space'] or v['paused'] or v['pending'] or v['retry_at'] > time.monotonic():
+                continue
+            if v['trials'] >= v['batch_limit']:
+                admission = self.c.budget.can_train(v['anchor'])
+                if not admission['allowed']:continue
+                previous = v['batch_best']
+                current = self.quality(v['best_metric'])
+                v['batch_limit'] += self.c.config.background_max_trials
+                v['batch_best'] = current
+                self.c.log.event('pipeline.batch_extended', version_id=v['version_id'],
+                    trials=v['trials'], next_review=v['batch_limit'], measured_gain=None if previous is None else current-previous,
+                    admission=admission, study_preserved=True)
+            rows.append(v)
+        return rows
 
     def choose(self):
         candidates = self.eligible()
@@ -165,14 +187,22 @@ class VersionSearch:
                 (c.budget.memory_capacity-c.budget.analysis_memory)//max(1, c.config.max_workers)))
             if not initial:
                 trial, plan = self.ask(version)
+            input_hash = hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()
+            if version['blocked_inputs'].get(input_hash, 0) > time.monotonic():
+                if trial is not None:self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
+                return False
             plan['resources'] = {'cpu_threads': cpu, 'memory_limit_mb': memory,
                 'timeout_seconds': min(c.config.experiment_timeout_seconds, c.config.background_trial_seconds)
                                    if not initial else c.config.experiment_timeout_seconds}
             c.catalog.validate_plan(plan, c.spec, c.validation['validation_id'], c.artifacts)
             if not c.budget.can_train(plan)['allowed']:
-                version['paused'] = 'no_affordable_trial'
+                # A costly sampled configuration is not proof that the complete
+                # representation has no affordable configurations left.
+                version['paused'] = 'initial_unaffordable' if initial else None
+                version['retry_at'] = time.monotonic()+1
                 if trial is not None:
-                    self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
+                    trial.set_user_attr('not_started', 'candidate_and_finalization_do_not_fit')
+                    self.study(version).tell(trial, state=self.library.trial.TrialState.PRUNED)
                 return False
             ticket = execution_ticket(c, version['ticket'], None if initial else version['initial_experiment_id'])
             from agent.graph.controller import lineage_for
@@ -201,7 +231,8 @@ class VersionSearch:
                 cancel_queued(c, eid, 'Training reserve no longer fits')
                 if trial is not None:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
-                version['paused'] = 'no_affordable_trial'
+                version['paused'] = 'initial_unaffordable' if initial else None
+                version['retry_at'] = time.monotonic()+1
                 return False
             allocation = c.lease(eid, 'train', plan['resources'])
             if not allocation['granted']:
@@ -236,6 +267,10 @@ class VersionSearch:
             return True
         except Exception as error:
             version['errors'] += 1
+            _, failed = self.recovery.quarantine(plan['code_artifact_id'], plan['model']['hyperparameters'],
+                {'code': getattr(error, 'code', type(error).__name__), 'message': str(error)[:600]})
+            version['retry_at'] = failed['retry_at']
+            version['blocked_inputs'][hashlib.sha256(canonical(plan['model']['hyperparameters']).encode()).hexdigest()] = failed['retry_at']
             if trial is not None and trial.number in {t.number for t in self.study(version).get_trials() if not t.state.is_finished()}:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
             c.record_research_feedback(plan['researcher_id'], version['ticket']['work_order']['branch_id'],
@@ -244,6 +279,7 @@ class VersionSearch:
             return False
 
     def measured(self, version, eid, metric, trial, initial):
+        self.measurement_revision += 1
         if trial is not None:
             self.study(version).tell(trial, metric['value'])
         old_best = max((self.quality(v['best_metric']) for v in self.versions.values()
@@ -259,6 +295,11 @@ class VersionSearch:
                 self.c.log.event('pipeline.leader_replaced', version_id=version['version_id'],
                     experiment_id=eid, metric=metric, reason='New initial score exceeds previous tuned best')
         self.c.update_final_reserve()
+        version['errors'] = 0
+        if getattr(self.c, 'error_research', None):
+            self.c.error_research.compare(eid, version.get('research_binding', {}))
+        if getattr(self.c, 'science', None):
+            self.c.science.diagnostics.ensure(self.c.graph.visible_history(version['ticket']['work_order']['branch_id']))
         champion = self.c.store.champion()
         best = self.c.store.best()
         self.publish_due |= bool(best and (not champion or best != champion['experiment_id']))
@@ -298,6 +339,10 @@ class VersionSearch:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
             if event['state'] != 'cancelled':
                 version['errors'] += 1
+                signature, failure = self.recovery.quarantine(version['anchor']['code_artifact_id'],
+                    c.store.get(job.experiment_id)['plan']['model']['hyperparameters'], event.get('error'))
+                version['retry_at'] = failure['retry_at']
+                version['blocked_inputs'][hashlib.sha256(canonical(c.store.get(job.experiment_id)['plan']['model']['hyperparameters']).encode()).hexdigest()] = failure['retry_at']
                 c.record_research_feedback(version['anchor']['researcher_id'], version['ticket']['work_order']['branch_id'],
                     'pipeline_execution_failed', canonical(event.get('error')), code='PIPELINE_EXECUTION_FAILED')
             if initial:
@@ -317,18 +362,21 @@ class VersionSearch:
                                  experiment_id=job.experiment_id, reason='new_initial_version')
                 return
         if self.publish_due:
-            if self.jobs:
+            if self.jobs or (getattr(self.c, 'science', None) and self.c.science.diagnostics.running):
                 return
             self.c.finalize_best()
             self.publish_due = False
-        while len(self.jobs) < self.c.config.max_workers and self.c.budget.snapshot()['search_allowed']:
+        dispatched = 0
+        while len(self.jobs) < self.c.config.max_workers and self.c.budget.snapshot()['search_allowed'] and dispatched < self.c.config.max_workers*2:
+            dispatched += 1
             initial = bool(self.queue)
+            if initial and self.queue[0]['retry_at'] > time.monotonic():break
             version = self.queue.pop(0) if initial else self.choose()
             if version is None:
                 break
             started = self.start(version, initial=initial)
             if not started:
-                if initial and not version['paused'] and version['errors'] < 4:
+                if initial and not version['paused']:
                     self.queue.insert(0, version)
                 break
 
@@ -350,13 +398,17 @@ def search(controller, root, accepted):
         if row:
             service.add(exp['plan'], {'work_order': c.graph.order(row[0])}, evaluated=eid)
     peers = c.graph.metadata('researcher_ids')
-    pending, deferred = {}, {}
-    repeats = {}
-    pool = ThreadPoolExecutor(max_workers=len(peers), thread_name_prefix='researcher')
+    pending = {}
+    recovery = PeerRecovery()
+    pool = ResearchExecutor(max_workers=len(peers), thread_name_prefix='researcher')
     reason = 'time_reserve'
     try:
         while c.budget.snapshot()['search_allowed']:
             service.poll()
+            if c.science:
+                c.science.diagnostics.ensure(c.graph.visible_history(root))
+                c.science.diagnostics.poll()
+            generation = (service.measurement_revision, len(c.science.diagnostics.records) if c.science else 0)
             for future, ticket in list(pending.items()):
                 if not future.done():
                     continue
@@ -368,51 +420,65 @@ def search(controller, root, accepted):
                     if proposal['decision'] == 'propose':
                         service.add(proposal['plan'], ticket)
                         stop_ticket(c, ticket, 'Executable version queued; researcher continues independently')
-                        repeats.pop(peer, None)
+                        recovery.peers.pop(peer, None)
                     else:
                         stop_ticket(c, ticket, proposal.get('stop_reason') or 'Research checkpoint')
+                        c.error_research.checkpoint(peer, proposal.get('stop_reason') or '', branch=root)
                         signature = hashlib.sha256(canonical([proposal.get('stop_reason'),
                             sorted({r['artifact_id'] for r in c.context.analysis.records})]).encode()).hexdigest()
-                        previous, count = repeats.get(peer, (None, 0))
-                        repeats[peer] = (signature, count+1 if signature == previous else 1)
-                        if proposal['decision'] == 'stop' or repeats[peer][1] >= 4:
-                            deferred[peer] = service.revision
+                        kind = ('explicit_stop' if proposal['decision'] == 'stop' else
+                            'checkpoint' if proposal.get('checkpoint_kind') == 'wait' else 'continuation')
+                        old = recovery.peers.get(peer, {})
+                        if kind == 'continuation' and old.get('signature') == signature and old.get('repetitions', 0) >= 2:
+                            kind = 'checkpoint'
+                        state = recovery.defer(peer, kind, generation, signature, proposal.get('stop_reason') or '')
+                        c.log.event('research.peer_recovery', **state)
                 except Exception as error:
                     c.graph.abandon(work['work_order_id'], str(error))
                     c.record_research_feedback(peer, root, 'proposal_failed', str(error), code=getattr(error, 'code', 'PIPELINE_ERROR'))
                     c.log.exception('research.proposal_failed', error, work_order_id=work['work_order_id'])
-                    # A failed dialogue does not revoke independently completed tool reports.
-                    previous, count = repeats.get(peer, (None, 0))
-                    repeats[peer] = ('error', count+1 if previous == 'error' else 1)
-                    if repeats[peer][1] >= 3:
-                        deferred[peer] = service.revision
+                    state = recovery.failure(peer, error, generation)
+                    c.error_research.checkpoint(peer, '', error, branch=root)
+                    c.log.event('research.peer_recovery', **state)
             for peer in peers:
                 if any(t['work_order']['researcher_id'] == peer for t in pending.values()):
                     continue
-                if deferred.get(peer) == service.revision or not c.llm_available(len(pending)):
+                if not recovery.ready(peer, generation) or not c.llm_available(len(pending)):
                     continue
                 try:
                     c.context.round_no += 1
                     ticket = issue(c, root, peer)
+                    ticket['error_assignment'] = deepcopy(c.error_research.assignments.get(root+'/'+peer, {}))
                     publish_activity(c, ticket, started=True)
                     future = pool.submit(c.call, 'C09', ticket['researcher_request']['payload'], c.researcher.propose)
                     pending[future] = ticket
                     c.log.event('research.dialogue_dispatched', work_order_id=ticket['work_order']['work_order_id'],
                         researcher_id=peer, branch_id=root)
                 except AgentError as error:
-                    deferred[peer] = service.revision
+                    recovery.failure(peer, error, generation)
                     c.record_research_feedback(peer, root, 'context_unavailable', str(error), code=error.code)
             service.fill()
-            if not pending and not service.jobs and not service.queue and not service.eligible():
-                reason = 'research_and_background_exhausted'
+            diagnostic_pending = bool(c.science and (c.science.diagnostics.running or c.science.diagnostics.pending))
+            renewable = any(state['kind'] != 'explicit_stop' for state in recovery.peers.values())
+            provider_reason = c.llm_unavailable_reason(len(pending))
+            if provider_reason in {'llm_call_limit', 'llm_output_budget', 'llm_provider_credits_exhausted', 'llm_budget_exhausted'}:
+                renewable = False  # Internal quota is a pause; prepared work still executes.
+                retry_at = c.researcher.gateway.daily_retry_at
+                if provider_reason == 'llm_budget_exhausted' and retry_at is not None:
+                    renewable = retry_at < c.budget.deadline-c.budget.reserve_seconds()-1
+            cooling_versions = any(v.get('retry_at', 0) > time.monotonic() and not v['paused'] for v in service.versions.values())
+            if not pending and not service.jobs and not service.queue and not service.eligible() and not diagnostic_pending and not renewable and not cooling_versions:
+                reason = 'prepared_work_exhausted_llm_paused' if provider_reason else 'research_and_background_exhausted'
                 break
             time.sleep(.1)
     finally:
-        c.researcher.gateway.cancelled.set()
+        c.researcher.gateway.stop_research()
         for future, ticket in pending.items():
             future.cancel()
             c.graph.abandon(ticket['work_order']['work_order_id'], 'Research deadline reached')
         pool.shutdown(wait=False, cancel_futures=True)
+        if c.science:c.science.diagnostics.shutdown()
+        c.error_research.save()
         for job, _, _, _ in list(service.jobs.values()):
             c.cancel_job(job, 'Publication reserve reached')
         if service.jobs:

@@ -59,7 +59,10 @@ def finalize(controller):
     if not indices:
         controller.log.event('validation.confirmation_skipped', reason=protocol.get('confirmation_unavailable_reason', 'disabled'))
         return
-    if controller.budget.remaining() <= controller.budget.reserve_seconds()+1:
+    # Confirmation is paid from its explicit reserve, inside the finalization
+    # budget. Requiring additional time beyond the whole reserve skipped it at
+    # precisely the normal search/finalization boundary.
+    if controller.budget.remaining() <= controller.budget.output_reserve()+1:
         controller.log.event('validation.confirmation_skipped', reason='finalization_time_reserve')
         return
     best = controller.final_candidate()
@@ -71,6 +74,10 @@ def finalize(controller):
         eid = row[0]
         ev = controller.store.experiment_evaluation(eid)
         if eid not in controller.failed_refits and ev and ev['valid'] and not ev['violations'] and comparable(reference, ev['primary_metric']):
+            champion = controller.store.champion()
+            ready = champion and champion['experiment_id'] == eid
+            cost = controller.budget.duration.estimate(controller.store.get(eid)['plan'], 'refit')+controller.budget.output_reserve()
+            if not ready and cost > controller.budget.remaining():continue
             candidates.append((eid, ev['primary_metric']['value']))
     candidates.sort(key=lambda pair: pair[1], reverse=reference['direction'] == 'maximize')
     finalists = [eid for eid, _ in candidates[:2]]

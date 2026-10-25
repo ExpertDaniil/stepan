@@ -23,7 +23,9 @@ PYTHON_ANALYSIS_SCHEMA = {'type': 'object', 'properties': {
     'code': {'type': 'string', 'minLength': 1, 'maxLength': 24000},
     'columns': {'type': 'array', 'minItems': 1, 'maxItems': 40,
                 'items': {'type': 'string', 'minLength': 1}},
-    'include_target': {'type': 'boolean'}, 'compare_test': {'type': 'boolean'}},
+    'include_target': {'type': 'boolean'}, 'compare_test': {'type': 'boolean'},
+    'experiment_id': {'type': 'string', 'minLength': 1,
+        'description': 'Optional best or visible experiment ID: align X/y with its fit-only OOF predictions, errors and fold IDs in context["oof"].'}},
     'required': ['question', 'code', 'columns'], 'additionalProperties': False}
 
 
@@ -54,6 +56,15 @@ def run_analysis(service, query, context=None):
         raise AgentError('INVALID_ANALYSIS', 'Test comparison requires columns present in test')
     # The question is prose; identical computations across dialogues are cached.
     key = {k:v for k,v in query.items() if k != 'question'}
+    oof_source = None
+    if query.get('experiment_id'):
+        from agent.context_details import read_solution
+        resolved = read_solution({'experiment_id': query['experiment_id'], 'view': 'result'}, context, service.artifacts, service.log)
+        key['experiment_id'] = resolved['experiment_id']
+        oof_source = deepcopy(getattr(service, 'oof_sources', {}).get(resolved['experiment_id']))
+        if oof_source is None:
+            raise AgentError('OOF_PENDING', 'Fit-only OOF is queued, unavailable or not yet completed for this exact version. Continue other analysis; old reports retain their experiment IDs.')
+        key['oof_identity'] = oof_source['identity_sha256']
     digest = hashlib.sha256(canonical([service.validation_id, key]).encode()).hexdigest()
     with service.query_slot(context), service.budget.analysis_slot() if hasattr(service.budget, 'analysis_slot') else nullcontext():
         service.query_context = context
@@ -67,8 +78,48 @@ def run_analysis(service, query, context=None):
             response['reused'] = True
             return response
         started = time.monotonic()
+        service._check_time(started)
         selected = columns + (targets(service.spec) if query.get('include_target') else [])
-        frame, population, _ = service._sample('fit', selected, None, started)
+        oof = None
+        if oof_source:
+            from agent.artifacts import file_sha256
+            from agent.data_transport import transport
+            from agent.predictions import validation_columns
+            from agent.fit_diagnostics import error_values
+            import pandas as pd
+            import numpy as np
+            identity = oof_source['identity']
+            if (identity['validation_id'] != service.validation_id
+                    or any(identity[k] != service.spec[k] for k in ('task_spec_id', 'dataset_id'))
+                    or identity['train_sha256'] != service.artifacts.meta(service.spec['train_artifact_id'])['sha256']
+                    or not set(identity['predicted_row_ids']) <= service.fit_indices):
+                raise AgentError('MEMORY_SCOPE_DENIED', 'OOF identity is outside this fit partition')
+            if file_sha256(service.artifacts.resolve(oof_source['identity_artifact_id'])) != oof_source['identity_sha256']:
+                raise AgentError('MEMORY_SOURCE_CHANGED', 'OOF provenance changed')
+            path = service.artifacts.resolve(identity['predictions_artifact_id'])
+            if file_sha256(path) != identity['predictions_sha256']:
+                raise AgentError('MEMORY_SOURCE_CHANGED', 'OOF predictions changed')
+            names = validation_columns(service.spec)
+            raw = pd.read_csv(path, dtype={n:str for n in names} if service.spec['metric']['prediction_kind'] == 'labels' else None, keep_default_na=False)
+            rows = identity['predicted_row_ids']
+            if raw['__row_index'].tolist() != rows or len(set(rows)) != len(rows):
+                raise AgentError('MEMORY_SOURCE_CHANGED', 'OOF row identity changed')
+            frame = transport(service.artifacts).read(service.spec['train_artifact_id'], service.spec,
+                columns=list(dict.fromkeys([*selected, *targets(service.spec)])), rows=rows)
+            population = service.fit_rows
+            names_y = targets(service.spec)
+            truth = frame[names_y if len(names_y)>1 else names_y[0]]
+            values = raw[names].to_numpy()
+            yy, pp, errors, squared = error_values(truth, values, service.spec)
+            oof = {'experiment_id': identity['experiment_id'], 'row_ids': rows,
+                'predictions': pd.DataFrame(values, index=frame.index, columns=names),
+                'errors': pd.DataFrame(errors, index=frame.index),
+                'fold_ids': pd.Series(raw['__fold'].to_numpy(), index=frame.index),
+                'identity_artifact_id': oof_source['identity_artifact_id'], 'scope': 'fit_only_inner_oof'}
+            if squared is not None:
+                oof.update(squared_errors=pd.DataFrame(squared, index=frame.index), residuals=pd.DataFrame(pp-yy, index=frame.index))
+        else:
+            frame, population, _ = service._sample('fit', selected, None, started)
         y = frame[targets(service.spec)].copy() if query.get('include_target') else None
         if y is not None and len(y.columns) == 1:y = y.iloc[:,0]
         test, test_population = None, None
@@ -83,7 +134,7 @@ def run_analysis(service, query, context=None):
             source = directory/'analysis.py';source.write_text(query['code'])
             data_path = directory/'input.pkl'
             with data_path.open('wb') as stream:
-                pickle.dump((frame[columns].copy(), y, test, {'scope': 'fit_only',
+                pickle.dump((frame[columns].copy(), y, test, {'scope': 'fit_only', 'oof': oof,
                     'population_rows': population, 'analyzed_rows': len(frame),
                     'sampled': len(frame) < population, 'test_population_rows': test_population}), stream)
             output = directory/'result.json'
@@ -93,14 +144,25 @@ def run_analysis(service, query, context=None):
             process = subprocess.Popen([sys.executable, '-m', 'tools.analysis_worker', str(source),
                 str(data_path), str(output)], cwd=directory, env=env, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL, start_new_session=True)
+            with service.process_lock:
+                service.active_process = process
             try:
-                process.wait(timeout=timeout)
+                end = time.monotonic()+timeout
+                while process.poll() is None:
+                    if service.cancelled.is_set():
+                        raise AgentError('RESEARCH_CANCELLED', 'Python analysis cancelled for publication')
+                    if time.monotonic() >= end:
+                        raise subprocess.TimeoutExpired(process.args, timeout)
+                    try:process.wait(timeout=min(.1, max(.001, end-time.monotonic())))
+                    except subprocess.TimeoutExpired:pass
             except subprocess.TimeoutExpired as exc:
                 raise AgentError('ANALYSIS_TIMEOUT', 'Python analysis reached its execution budget') from exc
             finally:
                 try:os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:pass
                 process.wait()
+                with service.process_lock:
+                    service.active_process = None
             if not output.exists():
                 raise AgentError('ANALYSIS_EXECUTION_FAILED', 'Analysis process exited without a report: '+str(process.returncode))
             result = json.loads(output.read_text())

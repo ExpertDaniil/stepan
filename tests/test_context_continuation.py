@@ -309,13 +309,13 @@ class GatewayContinuationTests(unittest.TestCase):
                         'hyperparameters': {'alpha': 1}, 'hypothesis': 'Finish from the completed observations.'})}
                 return {'choices': [{'message': message, 'finish_reason': 'stop'}], 'usage': {'completion_tokens': 10}}
         self.gateway.transport = Transport()
-        with patch('agent.llm.gateway.time.sleep') as sleep:
+        with patch.object(self.gateway.cancelled, 'wait', return_value=False) as pause:
             result = self.gateway.complete({'purpose': 'research_proposal', 'context_artifact_id': ticket['work_order']['context_id'],
                 'response_schema_id': 'ResearchAction-v1', 'tool_schema_ids': ['read_memory'],
                 'max_output_tokens': 1024, 'deadline_seconds': 300, 'attempt_limit': 10})
         self.assertEqual(result['parsed_payload']['action'], 'catalog')
         self.assertEqual(len(calls), 10)
-        sleep.assert_called_once_with(1)
+        pause.assert_called_once_with(1)
         self.assertNotIn('tools', calls[-1])
         self.assertFalse(g.budget.llm_dialogues)
 

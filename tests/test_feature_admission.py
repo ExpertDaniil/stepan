@@ -72,20 +72,22 @@ class FeatureAdmissionTests(unittest.TestCase):
         self.assertEqual(frozen_execution(g.artifacts, exp, g.spec, 'refit'), frozen)
 
     def test_feature_action_rejects_target_input_before_training(self):
-        with self.assertRaises(AgentError) as error:
-            self.propose(self.h.g.spec['target_column'])
-        self.assertEqual(error.exception.code, 'INVALID_LLM_OUTPUT')
-        self.assertIn('INVALID_FEATURE_PROGRAM', str(error.exception))
+        self.assertIsNone(self.propose(self.h.g.spec['target_column']))
+        errors = [self.h.g.artifacts.read_json(e['meta']['artifact_id']) for e in self.h.g.artifacts.entries.values()
+                  if e['meta']['kind']=='llm_rejected_output']
+        self.assertTrue(any('INVALID_FEATURE_PROGRAM' in e['error'] for e in errors))
+        self.assertFalse(self.h.g.store.db.execute('SELECT 1 FROM experiments').fetchone())
 
     def test_authoritative_schema_survives_provider_context_compaction(self):
         plan = self.propose('x_numeric', compacted=True)
         self.assertEqual(plan['model']['hyperparameters']['feature_program'][0]['columns'], ['x_numeric'])
 
     def test_unknown_feature_still_rejected_with_compacted_provider_context(self):
-        with self.assertRaises(AgentError) as error:
-            self.propose('nonexistent_input', compacted=True)
-        self.assertEqual(error.exception.code, 'INVALID_LLM_OUTPUT')
-        self.assertIn('INVALID_FEATURE_PROGRAM', str(error.exception))
+        self.assertIsNone(self.propose('nonexistent_input', compacted=True))
+        errors = [self.h.g.artifacts.read_json(e['meta']['artifact_id']) for e in self.h.g.artifacts.entries.values()
+                  if e['meta']['kind']=='llm_rejected_output']
+        self.assertTrue(any('INVALID_FEATURE_PROGRAM' in e['error'] for e in errors))
+        self.assertFalse(self.h.g.store.db.execute('SELECT 1 FROM experiments').fetchone())
 
     def test_other_peers_measured_landscape_is_valid_visible_evidence(self):
         g = self.h.g

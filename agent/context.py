@@ -238,6 +238,9 @@ class ContextBuilder:
                 user['profile_summary']['comparison_evidence'] = comparison_context(self.store, self.artifacts,
                     graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]))
             user['profile_summary']['research_memory'] = deepcopy(graph.get('research_memory', {}))
+            if getattr(self, 'error_research', None):
+                user['profile_summary']['error_research'] = self.error_research.advice(
+                    graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent]), payload['researcher_id'], user['branch_id'])
             full_memory = user['profile_summary']['research_memory']
             if getattr(self, 'science', None):
                 ids = graph.get('visible_experiment_ids', [r['experiment_id'] for r in recent])

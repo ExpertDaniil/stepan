@@ -56,6 +56,10 @@ class FinalConfirmationTests(unittest.TestCase):
             c = SimpleNamespace(artifacts=h.artifacts, store=h.store, spec=h.spec, validation=split, evaluator=evaluator,
                 failed_refits=set(), budget=budget, log=h.log, final_candidate=h.store.best,
                 researcher=SimpleNamespace(gateway=gateway), submission=Submission(h.spec, h.artifacts, h.store, h.log))
+            # Normal search exits inside its finalization reserve. Confirmation
+            # must consume its budget there, rather than require another reserve.
+            budget.set_final_plan(h.store.get(ids[0])['plan'])
+            budget.deadline = time.monotonic()+budget.reserve_seconds()+.5
             finalize(c)
             self.assertEqual(c.confirmed_candidate, ids[1])
             self.assertTrue(gateway.cancelled.is_set())

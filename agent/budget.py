@@ -25,6 +25,8 @@ class Budget:
         self.last_train_duration = 0.0
         self.duration = DurationModel(config)
         self.final_plan = None
+        self.confirmation_seconds = 0.
+        self.publication_durations = deque(maxlen=16)
         self.admissions = {}
         self.search_stopped = False
         self.lock = threading.RLock()
@@ -146,13 +148,18 @@ class Budget:
         with self.lock:
             floor = self.output_reserve()
             plans = ([self.final_plan] if self.final_plan else []) + [item["plan"] for item in self.leases.values() if item.get("plan")]
-            return floor + max((self.duration.estimate(plan, "refit") for plan in plans), default=0)
+            return floor + self.confirmation_seconds + max((self.duration.estimate(plan, "refit") for plan in plans), default=0)
 
     def output_reserve(self):
-        return min(60, max(2, self.config.time_budget_seconds * .03))
+        floor = min(60, max(2, self.config.time_budget_seconds * .03))
+        return max(floor, 1.5*max(self.publication_durations, default=0))
+
+    def observe_publication(self, seconds):
+        if math.isfinite(seconds) and seconds >= 0:
+            with self.lock:self.publication_durations.append(seconds)
 
     def candidate_reserve(self, plan):
-        return max(self.reserve_seconds(), self.output_reserve() + self.duration.estimate(plan, "refit"))
+        return max(self.reserve_seconds(), self.output_reserve() + self.confirmation_seconds + self.duration.estimate(plan, "refit"))
 
     def can_train(self, plan):
         with self.lock:

@@ -1,3 +1,6 @@
+> Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [docs/ERROR-DRIVEN-RESEARCH.md](docs/ERROR-DRIVEN-RESEARCH.md).
+> Это описание имеет приоритет над историческими count stops ниже.
+
 > Профиль посылки: [recipes/platform-env.json](recipes/platform-env.json).
 > Он включён в ZIP: контекст 192 KiB, ответ 32k–64k, bootstrap 8192,
 > общий выходной бюджет 1048576 токенов, численного лимита API-вызовов нет.

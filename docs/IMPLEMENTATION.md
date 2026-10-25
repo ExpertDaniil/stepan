@@ -1,3 +1,6 @@
+> Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [ERROR-DRIVEN-RESEARCH.md](ERROR-DRIVEN-RESEARCH.md).
+> Это описание имеет приоритет над историческими count stops ниже.
+
 > Platform settings: [PLATFORM.md#настройки-в-посылке](PLATFORM.md#настройки-в-посылке).
 > The flat ZIP embeds the public allowlisted `recipes/platform-env.json` as readable
 > RESOURCE_TEXT. Its entry point supplies `main(default_env=...)`; inherited env and

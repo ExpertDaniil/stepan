@@ -310,6 +310,7 @@ def research_batch(controller, trusted_plans, trusted_tickets, llm_tickets):
             pending = dict(futures)
             branches = {ticket['work_order']['branch_id'] for ticket in llm_tickets+trusted_tickets}
             while pending:
+                if getattr(controller, 'science', None):controller.science.diagnostics.poll()
                 ready, _ = wait(pending, timeout=.1, return_when=FIRST_COMPLETED)
                 if ready:
                     for future in ready:
@@ -458,6 +459,7 @@ def search(controller):
     stop_reason, round_no = "time_reserve", 0
     controller.budget.start_data_research()
     while controller.budget.snapshot()["search_allowed"]:
+        if getattr(controller, 'science', None):controller.science.diagnostics.poll()
         controller.context.round_no = round_no
         round_no += 1
         branch = graph.branch(branch_id)

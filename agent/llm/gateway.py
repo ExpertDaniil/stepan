@@ -143,11 +143,16 @@ class Gateway:
         self.cancelled = threading.Event()
         self.availability_lock = threading.RLock()
         self.cooldown_until = 0.0
+        self.daily_retry_at = None
+        self.daily_probe_active = False
 
     def check_daily_budget(self):
         if self.daily_budget_exhausted.is_set():
-            raise AgentError("LLM_BUDGET_EXHAUSTED", "The shared provider key budget is exhausted; reset is at 03:00 MSK",
-                             details={"reset_time_msk": "03:00", "daily_key_limit_rub": 600})
+            with self.availability_lock:
+                due = self.daily_retry_at is not None and time.monotonic() >= self.daily_retry_at and not self.daily_probe_active
+            if due:return  # One availability probe, not a calendar-based balance reset.
+            raise AgentError("LLM_BUDGET_EXHAUSTED", "The provider reported budget exhaustion; resume only after a successful availability probe",
+                             details={"reset_known": self.daily_retry_at is not None})
 
     def check_availability(self):
         if self.provider_credits_exhausted.is_set():
@@ -226,7 +231,19 @@ class Gateway:
         if timeout < 1:
             raise AgentError("LLM_OPERATION_TIMEOUT", "Insufficient operation time for another API attempt")
         self.check_availability()
-        call_no = self.budget.begin_llm_call(request["max_tokens"], dialogue_id)
+        daily_probe = False
+        with self.availability_lock:
+            if self.daily_budget_exhausted.is_set():
+                if self.daily_probe_active:
+                    raise AgentError('LLM_BUDGET_EXHAUSTED', 'A single provider recovery probe is already running')
+                self.daily_probe_active = daily_probe = True
+                self.daily_retry_at = None  # A failed probe cannot poll indefinitely.
+        try:
+            call_no = self.budget.begin_llm_call(request["max_tokens"], dialogue_id)
+        except BaseException:
+            if daily_probe:
+                with self.availability_lock:self.daily_probe_active = False
+            raise
         settled = False
         started = time.monotonic()
         done = threading.Event()
@@ -255,6 +272,9 @@ class Gateway:
                     series_ids=[s['series_id'] for s in delivered['series']])
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
+            if daily_probe:
+                self.daily_budget_exhausted.clear()
+                self.log.event('llm.budget_availability_confirmed', call_no=call_no)
             with self.availability_lock:
                 recovered = self.cooldown_until > time.monotonic()
                 self.cooldown_until = 0.0
@@ -310,8 +330,19 @@ class Gateway:
                     raise error from exc
             if "budget has been exceeded" in body.casefold():
                 self.daily_budget_exhausted.set()
+                # Only explicit provider metadata supplies the expected reset.
+                # Missing/invalid metadata means unknown, never guessed funds.
+                from datetime import datetime, timezone
+                metadata = getattr(exc, 'body', None) or {}
+                if isinstance(metadata, dict):
+                    metadata = metadata.get('error', metadata)
+                reset = metadata.get('budget_reset_at', metadata.get('reset_at')) if isinstance(metadata, dict) else None
+                try:
+                    seconds = (datetime.fromisoformat(reset.replace('Z','+00:00'))-datetime.now(timezone.utc)).total_seconds()
+                    if seconds > 0:self.daily_retry_at = time.monotonic()+seconds
+                except (TypeError, ValueError, AttributeError):pass
                 self.log.event("llm.daily_budget_exhausted", level="WARNING", call_no=call_no,
-                               status_code=status, reset_time_msk="03:00", daily_key_limit_rub=600)
+                               status_code=status, reset_known=self.daily_retry_at is not None)
                 self.check_daily_budget()
             retryable = status == 429 or status is None or (isinstance(status, int) and status >= 500)
             error = AgentError("LLM_RATE_LIMIT" if status == 429 else "LLM_UNAVAILABLE", str(exc), retryable=retryable)
@@ -319,6 +350,8 @@ class Gateway:
                            attempt=attempt, status_code=status, retryable=retryable)
             raise error from exc
         finally:
+            if daily_probe:
+                with self.availability_lock:self.daily_probe_active = False
             done.set()
             if progress.ident is not None:
                 progress.join(timeout=0.2)
@@ -345,11 +378,12 @@ class Gateway:
     def complete(self, payload):
         dialogue_started = time.monotonic()
         context = self.artifacts.read_json(payload["context_artifact_id"])
+        context['_run_started_monotonic'] = self.budget.started
         messages = deepcopy(context["messages"])
         expected = deepcopy(self.output_schemas[payload["response_schema_id"]])
         executable = bool(context['metadata'].get('pipeline_execution'))
         if executable:
-            fields = {'action', 'hypothesis', 'code', 'recipe_id', 'hyperparameters', 'feature_steps',
+            fields = {'action', 'hypothesis', 'code', 'code_ref', 'recipe_id', 'hyperparameters', 'feature_steps',
                       'feature_program', 'evidence_ids', 'expected_effect', 'next_step', 'tuning'}
             expected['properties'] = {k:v for k,v in expected['properties'].items() if k in fields}
             expected['properties']['action']['enum'] = ['pipeline', 'features', 'catalog', 'research', 'stop']
@@ -437,7 +471,7 @@ class Gateway:
         if 'run_analysis' in payload['tool_schema_ids'] and self.config.python_analysis_enabled:
             from tools.python_analysis import PYTHON_ANALYSIS_SCHEMA
             tools.append({'type': 'function', 'function': {'name': 'run_analysis',
-                'description': 'Execute analyze(X_fit,y_fit,X_test,context) Python using approved libraries. Choose raw input columns. Deterministic fit-only sample <=20000 rows. y_fit only with include_target=true; X_test only with compare_test=true. No files/network/processes. Return compact dict/tables. Tracebacks are returned for repair; no authoritative model scores.',
+                'description': 'Execute analyze(X_fit,y_fit,X_test,context) Python using approved libraries. Optional experiment_id=best or a visible ID aligns X/y with that version\'s fit-only OOF context["oof"]: predictions, errors, residuals/squared_errors for regression, fold_ids and row_ids. OOF_PENDING means continue other analysis while diagnostics wait. Otherwise a uniform fit sample <=20000 rows. y_fit only with include_target=true; X_test only with compare_test=true. No files/network/processes. Return compact results; tracebacks are retained for repair. No held-out labels.',
                 'parameters': PYTHON_ANALYSIS_SCHEMA}})
         if 'read_memory' in payload['tool_schema_ids']:
             from agent.context_details import READ_SCHEMA
@@ -460,6 +494,11 @@ class Gateway:
                 'description': 'Search offline Kaggle experience and complete project-authored pipeline examples. Returns content, source IDs and current-pipeline cautions, not just links. Use ids to read a known item. External experience is not current-task evidence; cite its IDs only in knowledge_ids. No network.',
                 'parameters': KNOWLEDGE_SCHEMA}})
         token_limit = min(deep_tokens if funded_deep else payload["max_output_tokens"], self.config.llm_max_output_tokens_limit)
+        if 'edit_solution' in payload['tool_schema_ids']:
+            from agent.pipeline_drafts import EDIT_SCHEMA
+            tools.append({'type':'function', 'function':{'name':'edit_solution',
+                'description':'Save a new source draft with code, or edit a visible experiment_id/best or draft_id using exact old/new replacements. Each old fragment must match once. Returns draft_id; submit action=pipeline, code_ref=draft_id without resending full source. Invalid source is retained for repair.',
+                'parameters':EDIT_SCHEMA}})
         dialogue_id, slots = None, 0
         if payload['response_schema_id'] == 'ResearchAction-v1':
             dialogue_id, slots = self.budget.reserve_dialogue(token_limit, repair=payload['attempt_limit'] > 1)
@@ -482,6 +521,8 @@ class Gateway:
             return answer
         except AgentError as error:
             if payload['response_schema_id'] == 'ResearchAction-v1':
+                if context['metadata'].get('detail_scope'):
+                    self._archive_transcript(messages, context)
                 self.log.event('research.dialogue_summary', context_id=payload['context_artifact_id'],
                     duration_seconds=round(time.monotonic()-dialogue_started, 3),
                     decision_received=False, error_code=error.code,
@@ -493,6 +534,9 @@ class Gateway:
                     self.cooldown_until = max(self.cooldown_until, until)
                 self.log.event('llm.transport_cooldown', reason=error.code, retryable=error.retryable,
                                retry_after_seconds=max(0, until-time.monotonic()))
+            if executable and error.code in {'CONTEXT_TOO_LARGE','LLM_OUTPUT_TRUNCATED','INVALID_LLM_OUTPUT',
+                    'LLM_OPERATION_TIMEOUT','SEARCH_PHASE_BUDGET_EXHAUSTED'} and not self.cancelled.is_set():
+                return self._research_checkpoint(context, messages, error, payload['attempt_limit'])
             raise
         finally:
             if dialogue_id is not None:
@@ -521,6 +565,8 @@ class Gateway:
                            final_seconds_reserved=round(final_seconds, 3),
                            tool_window_seconds=round(max(0, tool_deadline-now), 3))
         for attempt in range(1, payload["attempt_limit"] + 1):
+            if self.cancelled.is_set():
+                raise AgentError('RESEARCH_CANCELLED', 'Research closed before another dialogue turn')
             self.check_availability()
             left = deadline-time.monotonic()
             if left < 1:
@@ -638,7 +684,8 @@ class Gateway:
                 if '_packed_messages' in context:
                     messages[:] = context.pop('_packed_messages')
             if retry_delay is not None:
-                time.sleep(retry_delay)
+                if self.cancelled.wait(retry_delay):
+                    raise AgentError('RESEARCH_CANCELLED', 'Research cancelled during provider backoff')
                 continue
             consecutive_errors = 0
             token_data = response.get("usage") or {}
@@ -709,6 +756,12 @@ class Gateway:
                                 result = {'error': error.as_dict()}
                             trace = {'call_id': call['id'], 'name': name,
                                      'experiment_id': result.get('experiment_id'), 'evidence_ids': result.get('evidence_ids', [])}
+                        elif name == 'edit_solution':
+                            from agent.pipeline_drafts import edit_solution
+                            context['_elapsed_ms'] = int((time.monotonic()-self.budget.started)*1000)
+                            try:result = edit_solution(args, context, self.artifacts, self.log)
+                            except AgentError as error:result = {'error':error.as_dict()}
+                            trace = {'call_id':call['id'], 'name':name, 'draft_id':result.get('draft_id')}
                         elif name == 'read_memory':
                             from agent.context_details import read_details
                             try:
@@ -789,14 +842,21 @@ class Gateway:
                 if payload['response_schema_id'] == 'ResearchAction-v1':
                     from agent.research_actions import normalize_action
                     if executable:
-                        from agent.pipeline_candidates import normalize_candidate
+                        from agent.pipeline_drafts import resolve_candidate
                         try:
-                            parsed = normalize_candidate(parsed)
+                            parsed = resolve_candidate(parsed, context, self.artifacts)
                         except AgentError as error:
                             raise ValueError(error.code+': '+str(error)) from error
                     else:
                         parsed = normalize_action(parsed)
-                self.bus.schemas._check(parsed, expected, "$")
+                # Keep the advertised executable form small. Older responses may
+                # still include optional explanatory records; accept their known
+                # schema without making those records a prerequisite for code.
+                accepted_schema = expected
+                if executable:
+                    accepted_schema = deepcopy(self.output_schemas[payload['response_schema_id']])
+                    accepted_schema['properties']['action']['enum'] = expected['properties']['action']['enum']
+                self.bus.schemas._check(parsed, accepted_schema, "$")
                 if payload['response_schema_id'] == 'ResearchAction-v1':
                     from agent.data_research import require_action
                     try:
@@ -833,6 +893,18 @@ class Gateway:
                 self.log.event("llm.output_truncated" if truncated else "llm.output_rejected", level="WARNING",
                                call_no=call_no, attempt=attempt, code=code, message=str(last_error), finish_reason=finish_reason,
                                max_output_tokens=token_limit)
+                if executable and context['metadata'].get('detail_scope'):
+                    content = (choice.get('message') or {}).get('content')
+                    self._archive_transcript([*messages, {'role':'assistant','content':content}], context)
+                    try:
+                        raw, _ = parse_final_json(content)
+                        if isinstance(raw, dict) and isinstance(raw.get('code'), str) and raw['code']:
+                            from agent.pipeline_drafts import edit_solution
+                            context['_elapsed_ms'] = int((time.monotonic()-self.budget.started)*1000)
+                            draft = edit_solution({'code':raw['code']}, context, self.artifacts, self.log)
+                            messages.append({'role':'user','content':'Source retained as draft_id='+draft['draft_id']+
+                                '. Use edit_solution to repair fragments; submit code_ref without repeating the full source.'})
+                    except (ValueError,AgentError):pass
                 if truncated:
                     new_limit = min(token_limit*2, self.config.llm_max_output_tokens_limit)
                     if dialogue_id is not None:
@@ -884,6 +956,27 @@ class Gateway:
         context.setdefault('_transcript_ids', []).append(art['artifact_id'])
         return {'reference_id': art['artifact_id'], 'section': 'transcript_index'}
 
+    def _research_checkpoint(self, context, messages, error, attempts):
+        from agent.context_transcript import observations
+        from agent.research_actions import normalize_action
+        records = observations(messages)
+        question = next((r.get('question') for r in reversed(records) if r.get('question')), None)
+        if not question:
+            user = json.loads(context['messages'][1]['content'])
+            question = user.get('profile_summary', user).get('error_research', {}).get('recommendation', {}).get(
+                'question', 'Continue the unresolved question from saved reports and drafts.')
+        checkpoint = normalize_action({'action': 'research', 'next_step': 'continue',
+            'evidence_ids': [],
+            'hypothesis': str(question)[:1000]+' Continue from the archived results; repair the last failed step. '+error.code})
+        art = self.artifacts.write_json('research/controller-checkpoint-'+uuid.uuid4().hex[:12]+'.json',
+                                       checkpoint, 'controller_research_checkpoint')
+        self.log.event('research.context_checkpoint', artifact_id=art['artifact_id'], reason=error.code,
+                       decision_origin='controller', question=question)
+        return {'completion_id':'checkpoint-'+uuid.uuid4().hex[:12], 'output_artifact_id':art['artifact_id'],
+            'parsed_payload':checkpoint, 'tool_calls':[{'name':'transcript_archive','reference_id':aid,'status':'archived'}
+                for aid in context.get('_transcript_ids', [])],
+            'usage':{'input_tokens':None,'output_tokens':None}, 'attempts_used':attempts}
+
     def _compact_research_request(self, request, limit, *, archive=None):
         from agent.context_budget import compact_research_request
         return compact_research_request(request, limit, self.log, archive=archive)
@@ -912,5 +1005,23 @@ class Gateway:
         return parsed.scheme+"://"+host+parsed.path
 
     def close(self):
+        self.stop_research()
+        # Third-party client shutdown is not allowed to hold publication/process
+        # exit past the deadline. Research executor threads are daemon-owned.
+        closer = threading.Thread(target=self._close_transport, daemon=True, name='llm-close')
+        closer.start()
+        closer.join(timeout=.2)
+
+    def _close_transport(self):
+        try:self.transport.close()
+        except Exception:pass
+
+    def stop_research(self):
         self.cancelled.set()
-        self.transport.close()
+        # A stuck call may already be billable. Settle its maximum reservation
+        # conservatively; a late answer is fenced and cannot create a candidate.
+        with self.budget.lock:
+            for call_no in list(self.budget.pending_llm_tokens):
+                self.budget.finish_llm_call(call_no)
+            for ident in list(self.budget.llm_dialogues):
+                self.budget.release_dialogue(ident)

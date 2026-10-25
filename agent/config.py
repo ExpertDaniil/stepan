@@ -57,7 +57,7 @@ class Config:
     research_mode: str = "adaptive"
     research_protocol: str = "compact"
     background_tuning_enabled: bool = True
-    background_max_trials: int = 128
+    background_max_trials: int = 128  # Review batch size, never a lifetime study cap.
     background_trial_seconds: int = 300
     background_cpu_threads: int = 6
     background_switch_margin: float = 0.0
@@ -78,7 +78,7 @@ class Config:
     feature_seed_timeout_seconds: int = 120
     scientific_research_enabled: bool = True
     research_oof_enabled: bool = True
-    research_oof_jobs: int = 2
+    research_oof_jobs: int = 2  # Legacy simultaneous ceiling; 0 still disables OOF.
     research_oof_rows: int = 10000
     research_oof_timeout_seconds: int = 90
     research_oof_budget_fraction: float = .04

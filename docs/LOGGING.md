@@ -1,3 +1,6 @@
+> Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [ERROR-DRIVEN-RESEARCH.md](ERROR-DRIVEN-RESEARCH.md).
+> Это описание имеет приоритет над историческими count stops ниже.
+
 > Submission configuration: [PLATFORM.md#настройки-в-посылке](PLATFORM.md#настройки-в-посылке).
 > `run.started.config` contains effective values after inherited env, explicit env file
 > and bundled public defaults are resolved. Credentials and the full environment are not logged.
@@ -275,3 +278,13 @@ limits и размеры messages/tools/прочих полей. `research.memor
 `analysis.resource_acquired/released` связывает анализ с общими CPU/RAM и временем.
 `feature_execution`/`features.json` относятся к тому же worker job, что evaluated predictions;
 `feature_execution/ID` и `execution/ID` в read_memory раскрывают операции и runtime hashes.
+
+
+Error research: diagnostics.oof_queued/started/completed/unavailable separate resource
+waits, actual starts and metric-neutral evidence. research.paired_comparison records
+proposal base and overall/segment outcomes; error-queue snapshots retain history.
+research.peer_recovery contains typed cause, input signature and retry_at, without a
+lifetime peer count stop. pipeline.batch_extended records measured return, admission
+and the preserved study. research.pipeline_draft_saved retains source and errors.
+submission.finalization_barrier fixes the deliverable and closes research before
+confirmation. llm.budget_availability_confirmed requires an actual successful probe.

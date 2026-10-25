@@ -1,0 +1,9 @@
+{
+  "experiment_id": "best",
+  "question": "Inspect measured errors on aligned fit rows",
+  "columns": [
+    "observed_input"
+  ],
+  "include_target": true,
+  "code": "def analyze(X,y,T,context):\n    o=context[\"oof\"]\n    return {\"rows\":len(X),\"aligned\":X.index.equals(o[\"errors\"].index)}\n"
+}

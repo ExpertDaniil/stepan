@@ -98,6 +98,7 @@ ACTION_SCHEMA = {
         'expected_effect': {'type': 'string', 'minLength': 1},
         'feature_steps': {'type': 'array', 'items': {'type': 'object'}},
         'code': {'anyOf': [{'type': 'string', 'minLength': 1}, {'type': 'null'}]},
+        'code_ref': {'type': 'string', 'minLength': 1},
         'tuning': {'anyOf': [TUNING_SCHEMA, {'type': 'null'}]},
         'evidence_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},
         'knowledge_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 12},

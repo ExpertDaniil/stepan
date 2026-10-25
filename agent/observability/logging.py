@@ -54,6 +54,8 @@ class RunLogger:
                                       "run_id": self.run_id, "event": event, **CURRENT_CALL.get(), **fields})
         line = json.dumps(record, ensure_ascii=False, allow_nan=False, default=str)
         with self.lock:
+            if self.handle.closed:
+                return  # Late fenced API answers cannot reopen a completed run.
             self.handle.write(line + "\n")
             self.handle.flush()
             ranks = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40}

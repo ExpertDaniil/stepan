@@ -1,3 +1,6 @@
+> Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [ERROR-DRIVEN-RESEARCH.md](ERROR-DRIVEN-RESEARCH.md).
+> Это описание имеет приоритет над историческими count stops ниже.
+
 # Исполняемые версии и фоновая настройка
 
 В adaptive graph-режиме по умолчанию включён `BACKGROUND_TUNING_ENABLED=1`.

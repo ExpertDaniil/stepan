@@ -8,13 +8,19 @@ class DurationModel:
     @staticmethod
     def sample_key(plan):
         family = plan['model']['family']
-        return family+':'+plan['code_artifact_id'] if family == 'custom' else family
+        if family == 'custom':
+            import hashlib
+            from agent.contracts import canonical
+            params = {k:v for k,v in plan['model']['hyperparameters'].items() if not k.startswith('_')}
+            return family+':'+plan['code_artifact_id']+':'+hashlib.sha256(canonical(params).encode()).hexdigest()
+        return family
 
     def __init__(self, config):
         self.config = config
         self.rows = {"train": 1, "refit": 1}
         self.features = 1
         self.target_count = 1
+        self.test_rows = 1
         self.defaults = {}
         self.samples = defaultdict(lambda: deque(maxlen=32))
 
@@ -22,6 +28,7 @@ class DurationModel:
         self.rows = {"train": max(1, validation_rows), "refit": max(1, profile["train_rows"])}
         self.features = max(1, len(profile.get("test_columns", [])))
         self.target_count = max(1, target_count)
+        self.test_rows = max(1, profile.get('test_rows', 1))
         self.defaults = {key: {name: domain["default"] for name, domain in recipe["parameters"].items()}
                          for key, recipe in recipes.items()}
 
@@ -76,7 +83,11 @@ class DurationModel:
             rate = rates[min(len(rates) - 1, math.ceil(.75 * len(rates)) - 1)]
             overheads = sorted(s['overhead'] for s in complete)
             overhead = max(overheads[math.ceil(.75 * len(overheads))-1], complete[-1]['overhead'])
-            seconds = (overhead + work * rate) * 1.35
+            # Prediction and IO live in measured overhead. Extrapolate them too
+            # when test is larger than the fit/selection prediction partition.
+            prediction_scale = max(1, self.test_rows/max(1, self.rows['refit']-self.rows['train'])) if phase == 'refit' else 1
+            growth = max(1, self.rows['refit']/self.rows['train'])**.25 if phase == 'refit' and family == 'custom' else 1
+            seconds = (overhead*prediction_scale + work*rate*growth) * 1.35
         else:
             # A bounded initial probe; subsequent estimates use this family's measurements.
             cold = min(self.config.experiment_timeout_seconds, max(2, self.config.time_budget_seconds * .01))

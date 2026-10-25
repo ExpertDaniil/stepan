@@ -44,6 +44,10 @@ class Orchestrator:
         from agent.predictions import targets
         self.budget.duration.configure(profile, len(artifacts.read_json(validation["train_rows_artifact_id"])), catalog.recipes,
                                        target_count=len(targets(spec)))
+        if evaluator.protocols[validation['validation_id']].get('confirmation_indices'):
+            self.budget.confirmation_seconds = 1.
+            evaluator.timing_observer = lambda seconds: setattr(self.budget, 'confirmation_seconds',
+                max(self.budget.confirmation_seconds, 3*seconds))
         from agent.local_search import LocalSearch
         self.local_search = LocalSearch(self)
         from agent.feature_search import FeatureSearch
@@ -75,6 +79,9 @@ class Orchestrator:
             from agent.scientific_research import ScientificResearch
             self.science = ScientificResearch(self)
             self.context.science = self.science
+        from agent.error_research import ErrorResearch
+        self.error_research = ErrorResearch(self)
+        self.context.error_research = self.error_research
 
     def call(self, cid, payload, handler, key=None):
         return self.bus.call(cid, payload, handler, key=key)["data"]
@@ -344,6 +351,11 @@ class Orchestrator:
         confirmed = getattr(self, 'confirmed_candidate', None)
         if confirmed and confirmed not in self.failed_refits:
             return confirmed
+        if getattr(self, 'finalization_started', False):
+            frozen = getattr(self, 'finalization_candidate', None)
+            if frozen and frozen not in self.failed_refits:
+                return frozen
+            return self.affordable_final_candidate()
         best = self.store.best()
         if not best or best not in self.failed_refits:
             return best
@@ -361,6 +373,48 @@ class Orchestrator:
             if comparable(candidate, reference) and (metric is None or is_better(candidate, metric)):
                 chosen, metric = eid, candidate
         return chosen
+
+    def affordable_final_candidate(self):
+        """Choose an entire deliverable, including refit/predict/validation cost."""
+        from agent.store import comparable
+        best = self.store.best()
+        if not best:return None
+        reference = self.store.experiment_evaluation(best)['primary_metric']
+        champion = self.store.champion()
+        choices = []
+        for row in self.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated'", (self.store.run_id,)):
+            eid = row[0]
+            if eid in self.failed_refits:continue
+            ev = self.store.experiment_evaluation(eid)
+            if not ev or not ev['valid'] or ev['violations'] or not comparable(ev['primary_metric'], reference):continue
+            ready = champion and champion['experiment_id'] == eid
+            cost = 0 if ready else (self.budget.duration.estimate(self.store.get(eid)['plan'], 'refit')
+                                   +self.budget.output_reserve()+self.budget.confirmation_seconds)
+            if ready or cost <= self.budget.remaining():
+                metric = ev['primary_metric']
+                choices.append((metric['value']*(1 if metric['direction']=='maximize' else -1), eid))
+        return max(choices)[1] if choices else (champion['experiment_id'] if champion else None)
+
+    def begin_finalization(self):
+        if getattr(self, 'finalization_started', False):return
+        stop = getattr(self.researcher.gateway, 'stop_research', self.researcher.gateway.cancelled.set)
+        stop()
+        self.budget.search_stopped = True
+        analysis = getattr(self.context, 'analysis', None)
+        if analysis is not None:
+            analysis.stop()
+            until = min(time.monotonic()+1, self.budget.deadline)
+            while self.budget.analysis_active and time.monotonic() < until:
+                time.sleep(.01)
+        if getattr(self, 'science', None):self.science.diagnostics.shutdown()
+        active = self.runner.active()
+        for job in active:self.cancel_job(job, 'Final confirmation/publication barrier')
+        if active:self.wait_jobs(active)
+        self.finalization_candidate = self.affordable_final_candidate()
+        self.finalization_started = True
+        self.update_final_reserve()
+        self.log.event('submission.finalization_barrier', experiment_id=self.finalization_candidate,
+                       remaining_seconds=self.budget.remaining(), research_closed=True)
 
     def submit_plan(self, payload):
         plan = self.catalog.validate_plan(payload["plan"], self.spec, self.validation["validation_id"], self.artifacts)
@@ -442,6 +496,8 @@ class Orchestrator:
                                duration_seconds=event["duration_seconds"], fit_seconds=result.get("fit_seconds"),
                                hyperparameters=plan["model"]["hyperparameters"])
             if pending:
+                if getattr(self, 'science', None) and any(not getattr(j, 'diagnostic', False) for j in jobs):
+                    self.science.diagnostics.poll()
                 time.sleep(0.1)
         return results
 
@@ -578,6 +634,10 @@ class Orchestrator:
                 raise
 
     def _finalize_best(self):
+        if getattr(self, 'science', None) and self.science.diagnostics.running:
+            self.science.diagnostics.poll()
+            if self.science.diagnostics.running and not getattr(self, 'finalization_started', False):
+                return  # Periodic publication waits for its fair resource slot.
         ident = self.final_candidate()
         champion = self.store.champion()
         if not ident or ident in self.failed_refits or (champion and champion["experiment_id"] == ident):
@@ -624,6 +684,7 @@ class Orchestrator:
         if not candidate:
             raise AgentError("REFIT_FAILED", "Refit did not produce a candidate")
         self.submission.change_state(subjob, "validating")
+        validation_started = time.monotonic()
         report = self.call("C20", {"submission_job_id": subjob, "task_spec_id": self.spec["task_spec_id"],
                                    "candidate_artifact_id": candidate, "reference_test_artifact_id": self.spec["test_artifact_id"]}, self.submission.validate_output)
         current = self.store.champion()
@@ -636,6 +697,7 @@ class Orchestrator:
         publication = self.call("C21", publication_payload, self.submission.publish,
                   key="publish/" + ident + "/" + report["candidate_sha256"] + "/" + str(current["champion_version"] if current else 0))
         self.submission.change_state(subjob, "skipped_not_better" if publication["disposition"] == "skipped_not_better" else "published")
+        self.budget.observe_publication(time.monotonic()-validation_started)
         self.update_final_reserve()
 
     def control(self, payload):
@@ -652,10 +714,13 @@ class Orchestrator:
 
     def confirm_finalists(self):
         from agent.confirmation import finalize
+        self.begin_finalization()
         try:
             finalize(self)
         except (AgentError, OSError, ValueError) as error:
             self.log.exception('validation.confirmation_failed', error, retained_output=bool(self.store.champion()))
+        finally:
+            self.budget.confirmation_seconds = 0.
 
     def run(self):
         if self.graph:
@@ -678,6 +743,7 @@ class Orchestrator:
         stop_reason, round_no = "time_reserve", 0
         self.budget.start_data_research()
         while self.budget.snapshot()["search_allowed"]:
+            if self.science:self.science.diagnostics.poll()
             self.log.event("search.round_started", round_no=round_no+1, attempted_experiments=accepted,
                            budget=self.budget.snapshot(),
                            token_budget=self.budget.token_snapshot())

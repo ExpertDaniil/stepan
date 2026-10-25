@@ -96,11 +96,11 @@ class ScientificResearch:
         reports = self.diagnostics.visible(visible_ids)
         extended = bool(episode and (len(episode['measured_experiment_ids']) >= 2 or episode['failed_experiment_ids']))
         return {'version': ('scientific-v1' if c.config.research_protocol == 'legacy' else 'research-v2'), 'episode': episode, 'fit_diagnostics': reports,
-                'decision_record_required': True,
+                'decision_record_required': c.config.research_protocol == 'legacy',
                 'deliberation': {'extended_requested': extended,
                     'reason': 'Multiple related measurements or an execution failure warrant reassessing explanations.' if extended else 'Use the normal dialogue budget for a well-specified next test.',
                     'provider_thinking_application': 'unverified'},
-                'instruction': ('Supply research_notes.test_plan. ' if c.config.research_protocol == 'legacy' else 'Supply one investigation record; legacy research_notes are optional. ')+
+                'instruction': ('Supply research_notes.test_plan. ' if c.config.research_protocol == 'legacy' else 'Analyze useful questions and submit executable changes; explanatory forms are optional. ')+
                     'Cite completed evidence. Diagnostics discover candidate patterns, not proven mechanisms. '
                     'Do not optimize private reasoning length or invent measured outcomes.'}
 

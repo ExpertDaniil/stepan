@@ -30,7 +30,7 @@ class Researcher:
         answer = self.bus.call("C10", {"purpose": "research_proposal", "context_artifact_id": payload["context_id"],
                                         "response_schema_id": research_schema(self.config.research_mode),
                                         "tool_schema_ids": (['analyze_data', 'run_analysis', 'read_memory']
-                                            + (['read_solution'] if context['metadata'].get('pipeline_execution') else [])
+                                            + (['read_solution', 'edit_solution'] if context['metadata'].get('pipeline_execution') else [])
                                             + (['search_knowledge'] if getattr(self.gateway, 'knowledge', None) else [])) if adaptive else [] if catalog_mode else ["write_code"],
                                         "max_output_tokens": self.config.llm_max_output_tokens,
                                         "deadline_seconds": self.config.llm_operation_timeout_seconds,
@@ -47,7 +47,9 @@ class Researcher:
                 self.log.event('research.checkpoint_saved' if proposed['action'] == 'research' else 'research.stop_requested',
                     researcher_id=payload['researcher_id'], reason=proposed['hypothesis'])
                 return {'proposal_id': 'proposal-'+uuid.uuid4().hex[:12], 'researcher_id': payload['researcher_id'],
-                        'plan': None, 'decision': ('research' if proposed['action'] == 'research' and proposed.get('next_step', 'continue') == 'continue' else 'stop'), 'stop_reason': proposed['hypothesis']}
+                        'plan': None, 'decision': ('research' if proposed['action'] == 'research' and proposed.get('next_step', 'continue') != 'finish' else 'stop'),
+                        'checkpoint_kind': proposed.get('next_step', 'continue') if proposed['action'] == 'research' else 'finish',
+                        'stop_reason': proposed['hypothesis']}
             catalog_mode = proposed['action'] != 'pipeline' and proposed['recipe_id'] != 'python-pipeline-v1'
         if catalog_mode and proposed["recipe_id"] not in context["metadata"]["recipe_ids"]:
             raise AgentError("INVALID_PLAN", "Recipe is outside this researcher's assigned catalogue")
@@ -342,8 +344,11 @@ class Researcher:
         if proposed['action'] == 'features':
             from agent.feature_schema import validate_program
             from agent.predictions import targets
-            program = validate_program(proposed['feature_program'], self.feature_columns,
-                                       [*targets(self.spec), *self.spec['excluded_features']])
+            try:
+                program = validate_program(proposed['feature_program'], self.feature_columns,
+                                           [*targets(self.spec), *self.spec['excluded_features']])
+            except (ValueError, KeyError) as error:
+                raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
         if proposed['action'] not in {'research', 'stop'}:
             self.catalog.normalize(proposed['recipe_id'], proposed['hyperparameters'])
         if proposed.get('code'):

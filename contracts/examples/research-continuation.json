@@ -1,0 +1,8 @@
+{
+  "proposal_id": "proposal-example",
+  "researcher_id": "researcher-1",
+  "plan": null,
+  "decision": "research",
+  "checkpoint_kind": "wait",
+  "stop_reason": "Continue from the saved fit-only reports when a resource is available."
+}

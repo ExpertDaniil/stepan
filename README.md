@@ -1,3 +1,5 @@
+> `last_test`: [optional isolated interface repair](docs/REPAIR-ENGINEER.md), with [verification results](docs/LAST-TEST-VERIFICATION.json).
+
 > Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [docs/ERROR-DRIVEN-RESEARCH.md](docs/ERROR-DRIVEN-RESEARCH.md).
 > Это описание имеет приоритет над историческими count stops ниже.
 

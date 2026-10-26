@@ -15,7 +15,7 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 CHILD=r'''
-import builtins,json,runpy,sys
+import builtins,json,os,runpy,sys
 original_import=builtins.__import__
 installed=False
 contexts={}
@@ -27,6 +27,13 @@ def importing(name,*args,**kwargs):
         cls=sys.modules['agent.llm.gateway'].MockTransport
         original=cls.complete
         def complete(self,request,timeout,context):
+            if context['metadata']['schema_id']=='RepairEngineer-v1':
+                packet=json.loads(request['messages'][1]['content'])
+                candidate=dict(packet['original'])
+                candidate.update(packet['allowed_edits'])
+                value={'status':'repaired','candidate':candidate,'reason':'Restore the declared empty service fields.'}
+                return {'choices':[{'message':{'content':json.dumps(value)},'finish_reason':'stop'}],
+                        'usage':{'prompt_tokens':100,'completion_tokens':100}}
             if context['metadata']['schema_id']!='ResearchAction-v1':return original(self,request,timeout,context)
             user=json.loads(context['messages'][1]['content'])
             ident=user['work_order_id']
@@ -54,6 +61,7 @@ def importing(name,*args,**kwargs):
                        'hypothesis':'Save the fit observation and continue.' if stage==0 else 'Measure a named product representation.',
                        'evidence_ids':evidence,'investigation':inv}
                 if stage==1:value.update(recipe_id=recipe,hyperparameters={},feature_program=[{'op':'product','name':'joint_signal','columns':columns}])
+                if stage==1 and os.environ.get('VERIFY_REPAIR_ENGINEER')=='1':value['code']=''
                 if stage==0:value['next_step']='continue'
                 message={'content':json.dumps(value)}
             return {'choices':[{'message':message,'finish_reason':'stop'}], 'usage':{'prompt_tokens':100,'completion_tokens':100}}
@@ -65,7 +73,7 @@ runpy.run_path('solution.py',run_name='__main__')
 '''
 
 
-def verify(archive,directory,kind):
+def verify(archive,directory,kind,exercise_engineer=False):
     if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
     from scripts.make_demo import make_demo
     from scripts.analyze_run import inspect_run
@@ -82,6 +90,8 @@ def verify(archive,directory,kind):
                TRAIN_CPU_THREADS='1',TRAIN_MEMORY_MB='1024',CATALOG_WARMUP_EXPERIMENTS='0',
                LLM_MAX_CALLS='12',LLM_BOOTSTRAP_OUTPUT_TOKENS='1024',LLM_MAX_OUTPUT_TOKENS='1024',LLM_MAX_OUTPUT_TOKENS_LIMIT='2048',
                GRAPH_MIN_FREE_DISK_BYTES='0',WORK_DIR=str(directory/'runs'))
+    if exercise_engineer:env.update(VERIFY_REPAIR_ENGINEER='1',LLM_REPAIR_ENGINEER_ENABLED='1')
+    else:env.pop('VERIFY_REPAIR_ENGINEER',None)
     with (directory/'terminal.log').open('w') as stream:
         proc=subprocess.run([sys.executable,'-c',CHILD,str(task)],cwd=platform,env=env,
                             stdout=stream,stderr=subprocess.STDOUT,timeout=150)
@@ -90,7 +100,7 @@ def verify(archive,directory,kind):
     events=[json.loads(l) for l in (runs[-1]/'events.jsonl').read_text().splitlines()] if runs else []
     counts={name:sum(e.get('event')==name for e in events) for name in [
         'research.python_analysis_completed','research.checkpoint_saved','research.checkpoint_completed',
-        'research.action_proposed','experiment.evaluated']}
+        'research.action_proposed','experiment.evaluated','llm.repair_engineer_accepted','llm.repair_engineer_started']}
     analyses=[e for e in events if e.get('event')=='research.python_analysis_completed']
     # Background tuning may evaluate further configurations of the same program.
     # Verify the submitted representation ran, rather than an exact trial count.
@@ -112,15 +122,17 @@ def verify(archive,directory,kind):
     (directory/'verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2))
     if (proc.returncode or report.get('state')!='completed' or not output_valid
             or len(analyses)!=2 or not all(e.get('success') for e in analyses)
-            or counts['research.checkpoint_saved']!=1 or not feature_evaluations):
+            or counts['research.checkpoint_saved']!=1 or not feature_evaluations
+            or (exercise_engineer and (counts['llm.repair_engineer_accepted']!=1 or counts['llm.repair_engineer_started']!=1))):
         raise RuntimeError('Flat ZIP replay failed; see '+str(directory/'terminal.log'))
     return result
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--zip',type=Path,required=True);p.add_argument('--directory',type=Path,required=True)
+    p.add_argument('--exercise-engineer',action='store_true',help='Inject one interface error and require a repaired feature experiment in each task')
     a=p.parse_args();results=[]
     for kind in ['regression','classification']:
-        result=verify(a.zip.resolve(),a.directory.resolve()/kind,kind);results.append(result)
+        result=verify(a.zip.resolve(),a.directory.resolve()/kind,kind,a.exercise_engineer);results.append(result)
         print(json.dumps({k:v for k,v in result.items() if k!='report'}),flush=True)
     (a.directory/'verification.json').write_text(json.dumps({'zip_sha256':hashlib.sha256(a.zip.read_bytes()).hexdigest(),'results':results},ensure_ascii=False,indent=2))

@@ -1,0 +1,87 @@
+{
+  "base_commit": "92661a66e2291638e8939c76182a84131a93230a",
+  "branch": "last_test",
+  "scope": "Optional final-action interface repair; no new ML policy or arbitrary code repair",
+  "targeted_checks": {
+    "engineer_contract_and_gateway": {
+      "tests": 9,
+      "status": "passed"
+    },
+    "existing_gateway_recovery_dialogue": {
+      "tests": 38,
+      "status": "passed"
+    },
+    "engineer_context_platform": {
+      "tests": 36,
+      "status": "passed"
+    }
+  },
+  "full_check": {
+    "command": "python scripts/check.py --jobs 3",
+    "status": "passed",
+    "tests": 720,
+    "seconds": 753.188,
+    "parallel_jobs": 3
+  },
+  "flat_zip": {
+    "file": "solution-last-test-3h.zip",
+    "sha256": "fee61e9f4276a39056d44aaf5f903677d9699c3de244aeff09b8a9a28e4b1b4d",
+    "results": [
+      {
+        "kind": "regression",
+        "exit_code": 0,
+        "state": "completed",
+        "events": {
+          "research.python_analysis_completed": 2,
+          "research.checkpoint_saved": 1,
+          "research.checkpoint_completed": 0,
+          "research.action_proposed": 1,
+          "experiment.evaluated": 49,
+          "llm.repair_engineer_accepted": 1,
+          "llm.repair_engineer_started": 1
+        },
+        "output_valid": true,
+        "scope": "scripted decisions; real EDA/fit/evaluation/publication"
+      },
+      {
+        "kind": "classification",
+        "exit_code": 0,
+        "state": "completed",
+        "events": {
+          "research.python_analysis_completed": 2,
+          "research.checkpoint_saved": 1,
+          "research.checkpoint_completed": 0,
+          "research.action_proposed": 1,
+          "experiment.evaluated": 42,
+          "llm.repair_engineer_accepted": 1,
+          "llm.repair_engineer_started": 1
+        },
+        "output_valid": true,
+        "scope": "scripted decisions; real EDA/fit/evaluation/publication"
+      }
+    ],
+    "identity_checks": {
+      "flat_files": 91,
+      "runtime_modules_and_resources_byte_equal": 111,
+      "official_requirements_byte_equal": true,
+      "default_time_budget_seconds": 10800
+    }
+  },
+  "static_audit": "passed",
+  "not_measured": [
+    "live Qwen repair reliability/latency",
+    "public or private leaderboard improvement",
+    "three-hour live provider run"
+  ],
+  "repair_request_bytes": {
+    "regression": {
+      "researcher": 58942,
+      "engineer": 4603
+    },
+    "classification": {
+      "researcher": 58886,
+      "engineer": 4604
+    },
+    "scope": "Serialized scripted requests including messages/schema/tools where offered; not a token cost or live latency estimate."
+  }
+}

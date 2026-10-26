@@ -60,3 +60,20 @@ refusal, forbidden parameter mutation, transport failure fallback, disabled mode
 and no extra call for successful actions. The existing 38 gateway, recovery and
 dialogue tests passed. Replies were scripted; no live provider behavior or public
 metric gain has been established. Final release checks are recorded separately.
+
+
+## Final release verification
+
+The full `python scripts/check.py --jobs 3` run passed 720 tests.
+The final flat ZIP completed regression and classification with an intentionally
+invalid empty service-code field, one accepted engineer repair, a real evaluated
+product feature, successful finalization and a valid CSV in each task. The
+replays evaluated 49 and 42 configurations respectively; these counts are
+observations, not fixed expectations. All 111 shipped runtime modules/resources
+match the source bytes; requirements match the official copy; the default task
+budget remains 10800 seconds.
+
+The scripted repair request was 4603/4604 bytes versus the preceding researcher
+request's 58942/58886 bytes. This demonstrates context reduction for these
+repairs, not a live latency, cost or ML-quality improvement. Details and ZIP
+SHA-256: [LAST-TEST-VERIFICATION.json](LAST-TEST-VERIFICATION.json).

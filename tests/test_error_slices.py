@@ -132,17 +132,31 @@ class LabTests(unittest.TestCase):
         self.assertFalse(any(c['column'] == 'state' for s in report['slices'] for c in s['conditions'] if len(s['conditions']) == 1))
         self.assertGreater(top['lift'], 3)
 
-    def test_pure_noise_is_labelled_noise(self):
+    def test_unexplained_slices_are_unresolved_with_a_reason_not_noise(self):
         rng = np.random.default_rng(2)
         n = 2400
         data = pd.DataFrame({'x': rng.normal(size=n), 'row_id': np.arange(n)})
         y = rng.normal(size=n)
         noise = np.where(data.x > 1.0, rng.standard_t(2, size=n)*5, rng.normal(size=n))
         report = error_slices.analyze(data, y, (y+noise).reshape(-1, 1), np.arange(n) % 3, regression_spec())
+        self.assertNotIn('noise', {item['verdict'] for item in report['slices']})
         for item in report['slices']:
-            if any(r['action'] == 'shift' and r['robust'] for r in item['remedies']):
-                continue  # a heavy-tailed slice may still have a stable shift
-            self.assertIn(item['verdict'], {'noise', 'explainable'})
+            if item['verdict'] == 'unresolved':
+                self.assertTrue(item['unresolved_reason'])
+                self.assertIn(item['unresolved_reason'], item['journal'])
+
+    def test_slices_are_chosen_without_the_holdout_fold(self):
+        rng = np.random.default_rng(4)
+        n = 3000
+        data = pd.DataFrame({'x': rng.normal(size=n), 'row_id': np.arange(n)})
+        y = rng.normal(size=n)
+        fold = np.arange(n) % 3
+        # Large errors only in the holdout fold (2): discovery folds show no hard region there.
+        prediction = y+np.where((fold == 2) & (data.x > 1).to_numpy(), 20, 0)+rng.normal(size=n)*.1
+        report = error_slices.analyze(data, y, prediction.reshape(-1, 1), fold, regression_spec())
+        self.assertEqual(report['holdout_rows'], 1000)
+        self.assertFalse(any(c['column'] == 'x' and c['op'] == 'gt' for s in report['slices'] for c in s['conditions']),
+                         'a region visible only in the holdout fold must not be mined')
 
     def test_label_remap_for_a_systematic_confusion(self):
         from agent import metrics
@@ -289,7 +303,7 @@ class SliceEndToEndTests(unittest.TestCase):
         from scripts.make_demo import make_demo
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            task = make_demo(root/'task', 'regression')
+            task = make_demo(root/'task', 'regression', rows=1500)  # enough holdout-fold rows per slice
             settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '150',
                         'DATA_RESEARCH_MIN_SECONDS': '0', 'CATALOG_WARMUP_EXPERIMENTS': '0', 'LOG_LEVEL': 'ERROR',
                         'MODEL_SNAPSHOT_MAX_BYTES': '0', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}

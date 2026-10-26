@@ -64,7 +64,7 @@ def paired_result(task, truth, base, candidate, mask, significance=True):
                 'no component causality, attainable gain or independent confirmation is inferred.'}
 
 
-VERDICT_PRIORITY = {'fixable': 3.0, 'explainable': 2.0, 'noise': 0.1}
+VERDICT_PRIORITY = {'fixable': 3.0, 'explainable': 2.0, 'unresolved': 1.0, 'noise': 1.0}
 
 
 def slice_problem(item, source_artifact_id):
@@ -84,13 +84,15 @@ def slice_question(card):
     head = f"Slice {card['slice_id']} [{card['rule']}]: {100*card['row_share']:.1f}% rows carry {100*card['loss_share']:.1f}% of the loss."
     if card['verdict'] == 'fixable' and robust:
         best = robust[0]
-        return (head+f" Verdict fixable: remedy {best['remedy_ref']} ({best['action']}) improved held-out OOF folds "
-                f"{best['folds_improved']}/{best['folds']}. Execute it with a features action (slice_remedies), alone or with features, "
-                "or explain from evidence why not.")
+        return (head+f" Verdict fixable: remedy {best['remedy_ref']} ({best['action']}) improved the untouched holdout inner fold "
+                f"({best['oof_metric_before']:.6g} -> {best['oof_metric_after']:.6g}). Execute it with a features action "
+                "(slice_remedies), alone or with features, or explain from evidence why not.")
     if card['verdict'] == 'explainable':
         features = ', '.join(t['feature'] for t in (card.get('explainability') or {}).get('top_features', [])[:4])
         return head+f" Verdict explainable: the residual is predictable (via {features}). Design a feature_program that gives the model this signal."
-    return head+' Verdict noise: no tested correction or input explains it; prefer another slice or direction.'
+    reason = card.get('unresolved_reason') or 'not resolved by the lab'
+    return (head+f' Verdict unresolved ({reason}): the fixed corrections and a small residual model found nothing; '
+            'that does not make it noise. Investigate it with analysis or new features if the loss share justifies it.')
 
 
 def rule_membership(definition, data, base_prediction, spec, history_source=None):

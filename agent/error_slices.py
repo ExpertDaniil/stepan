@@ -35,6 +35,7 @@ MIN_LIFT = 1.2
 MAX_SLICES = 5
 OVERLAP_LIMIT = 0.7          # Jaccard; overlapping candidates keep the larger excess
 MIN_RELATIVE_GAIN = 0.001    # remedy must improve the declared metric by 0.1% of its value
+MIN_HOLDOUT_SLICE_ROWS = 20  # slice rows needed in the holdout fold for a verdict
 EXPLAINABLE_R2 = 0.05
 EXPLAINABLE_AUC = 0.65
 WEIGHTS = tuple(round(0.1*i, 1) for i in range(1, 11))
@@ -354,53 +355,61 @@ def _base_output(problem):
     return problem.p if problem.regression else problem.probabilities if problem.kind == 'probabilities' else problem.predicted
 
 
-def evaluate_remedy(problem, action, mask, fold, history_last=None):
-    """Cross-fitted effect of one frozen correction on the declared metric over all OOF rows."""
-    pairs = _fold_pairs(fold)
-    if not pairs:
-        return None
-    corrected = np.array(_base_output(problem), copy=True)
-    fold_gains = []
-    for estimate, apply in pairs:
-        rows = estimate[mask[estimate]]
-        if problem.regression:
-            params = _fit_regression(problem, action, rows, history_last) if len(rows) >= 10 else None
-        elif action == 'remap':
-            params = _fit_labels(problem, mask, estimate)
-        else:
-            params = _fit_probabilities(problem, mask, estimate)
-        local = np.zeros(len(mask), dtype=bool)
-        local[apply] = mask[apply]
-        if params is not None:
-            updated = _apply(problem, action, params, local, history_last)
-            corrected[local] = updated[local]
-        try:
-            fold_gains.append(problem.gain(problem.score(apply), problem.score(apply, corrected)))
-        except ValueError:
-            fold_gains.append(0.0)
-    base, after = problem.score(), problem.score(prediction=corrected)
-    all_rows = np.arange(len(mask))
+def split_roles(fold):
+    """Discovery rows (mining and parameter fitting) and one untouched holdout inner fold.
+
+    The holdout is the last fold: the latest period under a temporal protocol.
+    Nothing measured on it influenced which slice was chosen or its parameters.
+    """
+    folds = np.asarray(fold)
+    values = np.unique(folds)
+    if len(values) < 2:
+        return None, None
+    check = folds == values.max()
+    return np.flatnonzero(~check), np.flatnonzero(check)
+
+
+def evaluate_remedy(problem, action, mask, discovery, check, history_last=None):
+    """Parameters fitted on discovery slice rows; effect measured only on the holdout fold."""
+    disc_rows = discovery[mask[discovery]]
     if problem.regression:
-        final = _fit_regression(problem, action, all_rows[mask], history_last)
+        params = _fit_regression(problem, action, disc_rows, history_last) if len(disc_rows) >= 10 else None
     elif action == 'remap':
-        final = _fit_labels(problem, mask, all_rows)
+        params = _fit_labels(problem, mask, discovery)
     else:
-        final = _fit_probabilities(problem, mask, all_rows)
-    gain = problem.gain(base, after)
-    required = max(2, math.ceil(2*len(pairs)/3)) if len(pairs) > 2 else len(pairs)
-    improved = sum(g > 0 for g in fold_gains)
-    return {'action': action, 'params': final, 'oof_metric_before': float(base), 'oof_metric_after': float(after),
-            'oof_gain': float(gain), 'relative_gain': float(gain/max(abs(base), 1e-12)),
-            'folds_improved': int(improved), 'folds': len(pairs),
-            'robust': bool(final is not None and gain > 0 and gain/max(abs(base), 1e-12) >= MIN_RELATIVE_GAIN and improved >= required)}
+        params = _fit_probabilities(problem, mask, discovery)
+    result = {'action': action, 'params': params, 'evaluation': 'held_out_inner_fold', 'folds': 1}
+    if params is None:
+        return {**result, 'robust': False, 'oof_metric_before': None, 'oof_metric_after': None, 'oof_gain': 0.0,
+                'relative_gain': 0.0, 'folds_improved': 0, 'holdout_slice_rows': 0, 'discovery_gain': 0.0}
+    def effect(rows):
+        local = np.zeros(len(mask), dtype=bool)
+        local[rows] = mask[rows]
+        corrected = np.array(_base_output(problem), copy=True)
+        corrected[local] = _apply(problem, action, params, local, history_last)[local]
+        before, after = float(problem.score(rows)), float(problem.score(rows, corrected))
+        return before, after, int(local.sum())
+    try:
+        before, after, inside = effect(check)
+        discovery_gain = problem.gain(*effect(discovery)[:2])
+    except ValueError:  # The declared metric can be undefined on a small holdout.
+        return {**result, 'robust': False, 'oof_metric_before': None, 'oof_metric_after': None, 'oof_gain': 0.0,
+                'relative_gain': 0.0, 'folds_improved': 0, 'holdout_slice_rows': 0, 'discovery_gain': 0.0}
+    gain = problem.gain(before, after)
+    relative = gain/max(abs(before), 1e-12)
+    return {**result, 'oof_metric_before': before, 'oof_metric_after': after, 'oof_gain': float(gain),
+            'relative_gain': float(relative), 'folds_improved': int(gain > 0), 'holdout_slice_rows': inside,
+            'discovery_gain': float(discovery_gain),
+            'robust': bool(inside >= MIN_HOLDOUT_SLICE_ROWS and gain > 0 and relative >= MIN_RELATIVE_GAIN)}
 
 
-def explainability(problem, data, meta, mask, fold, excluded, seed=42):
-    """Cross-fitted predictability of the slice residual (regression) or error (classification)."""
+def explainability(problem, data, meta, mask, discovery, check, excluded, seed=42):
+    """Slice residual (regression) or error (classification) predicted on the holdout fold from discovery rows."""
     import lightgbm as lgb
-    rows = np.flatnonzero(mask)
-    if len(rows) < 60:
+    train_rows, test_rows = discovery[mask[discovery]], check[mask[check]]
+    if len(train_rows) < 40 or len(test_rows) < MIN_HOLDOUT_SLICE_ROWS:
         return None
+    rows = np.concatenate([train_rows, test_rows])
     frame = data.iloc[rows].drop(columns=[c for c in data.columns if c in excluded]).reset_index(drop=True)
     for column in frame.columns:
         if not (pd.api.types.is_numeric_dtype(frame[column]) and not pd.api.types.is_bool_dtype(frame[column])):
@@ -413,37 +422,27 @@ def explainability(problem, data, meta, mask, fold, excluded, seed=42):
         model_type = lgb.LGBMRegressor
     else:
         target = (problem.predicted != problem.y)[rows].astype(int)
-        if target.min() == target.max():
-            return None
         model_type = lgb.LGBMClassifier
-    options = dict(n_estimators=150, learning_rate=0.05, num_leaves=15, min_child_samples=max(10, len(rows)//50),
-                   subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=seed, n_jobs=2, verbose=-1)
-    folds = np.asarray(fold)[rows]
-    predicted = np.full(len(rows), np.nan)
-    for value in np.unique(folds):
-        train, test = folds != value, folds == value
-        if train.sum() < 30 or not test.any() or (not problem.regression and len(set(target[train])) < 2):
-            continue
-        model = model_type(**options).fit(frame[train], target[train])
-        predicted[test] = model.predict(frame[test]) if problem.regression else model.predict_proba(frame[test])[:, 1]
-    covered = np.isfinite(predicted)
-    if covered.sum() < 30:
+    train = np.arange(len(rows)) < len(train_rows)
+    if not problem.regression and (len(set(target[train])) < 2 or len(set(target[~train])) < 2):
         return None
-    full = model_type(**options).fit(frame, target)
-    gains = full.booster_.feature_importance(importance_type='gain')
+    options = dict(n_estimators=150, learning_rate=0.05, num_leaves=15, min_child_samples=max(10, len(train_rows)//50),
+                   subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=seed, n_jobs=2, verbose=-1)
+    model = model_type(**options).fit(frame[train], target[train])
+    predicted = model.predict(frame[~train]) if problem.regression else model.predict_proba(frame[~train])[:, 1]
+    gains = model.booster_.feature_importance(importance_type='gain')
     total = float(gains.sum()) or 1.0
     top = [{'feature': str(name), 'gain_share': round(float(g)/total, 4)}
            for name, g in sorted(zip(frame.columns, gains), key=lambda pair: -pair[1])[:5] if g > 0]
     if problem.regression:
-        residual = target[covered]
-        baseline = float(np.sum((residual-residual.mean())**2)) or 1e-12
-        r2 = 1-float(np.sum((residual-predicted[covered])**2))/baseline
-        return {'measure': 'residual_r2_oof', 'value': round(r2, 4), 'explainable': r2 >= EXPLAINABLE_R2, 'top_features': top}
+        residual = target[~train]
+        reference = target[train].mean()  # The holdout mean is not available to a deployed model.
+        baseline = float(np.sum((residual-reference)**2)) or 1e-12
+        r2 = 1-float(np.sum((residual-predicted)**2))/baseline
+        return {'measure': 'residual_r2_holdout', 'value': round(r2, 4), 'explainable': r2 >= EXPLAINABLE_R2, 'top_features': top}
     from sklearn.metrics import roc_auc_score
-    if len(set(target[covered])) < 2:
-        return None
-    auc = float(roc_auc_score(target[covered], predicted[covered]))
-    return {'measure': 'error_auc_oof', 'value': round(auc, 4), 'explainable': auc >= EXPLAINABLE_AUC, 'top_features': top}
+    auc = float(roc_auc_score(target[~train], predicted))
+    return {'measure': 'error_auc_holdout', 'value': round(auc, 4), 'explainable': auc >= EXPLAINABLE_AUC, 'top_features': top}
 
 
 # --------------------------------------------------------------------------- report
@@ -482,54 +481,68 @@ def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=No
                               probabilities=problem.probabilities, history=meta_history)
     history_last = meta['__history_last'].to_numpy() if '__history_last' in meta else None
     data = data.reset_index(drop=True)
+    folds = np.asarray(fold)
+    discovery, check = split_roles(folds)
+    holdout = discovery is not None
+    if not holdout:
+        discovery, check = np.arange(len(folds)), np.arange(0)
+    # Slices are mined on discovery rows only, so the holdout fold judges a rule
+    # it never helped choose; the full-row mask is recomputed from the rule text.
+    full = actions.rule_frame(data, meta)
     try:
-        chosen = mine(problem, data, meta, fold, excluded, seed=seed, deadline=deadline)
+        from types import SimpleNamespace
+        chosen = mine(SimpleNamespace(loss=problem.loss[discovery]), data.iloc[discovery].reset_index(drop=True),
+                      meta.iloc[discovery].reset_index(drop=True), folds[discovery], excluded, seed=seed, deadline=deadline)
     except (ValueError, TypeError, MemoryError) as error:
         return {'version': VERSION, 'available': False, 'reason': 'mining_failed: '+str(error)[:200], 'slices': []}
+    for candidate in chosen:
+        candidate['mask'] = actions.rule_mask(full, candidate['conditions'])
     if history_last is not None and problem.regression:
         # Structural candidate: every row whose entity has earlier labelled periods.
         # Its excess may be zero while a history blend still helps everywhere.
         rule = [{'column': '__history_count', 'op': 'gt', 'value': 0.5}]
-        mask = actions.rule_mask(actions.rule_frame(data, meta), rule)
-        if mask.sum() >= MIN_LEAF_ROWS and not any((c['mask'] == mask).all() for c in chosen):
-            total = float(problem.loss.sum()) or 1.0
-            share = float(mask.mean())
-            loss_share = float(problem.loss[mask].sum())/total
-            folds = np.asarray(fold)
-            lifts = [float(problem.loss[mask & (folds == f)].sum()/max(problem.loss[folds == f].sum(), 1e-12))
-                     / max((mask & (folds == f)).sum()/(folds == f).sum(), 1e-12)
-                     for f in np.unique(folds) if (mask & (folds == f)).any()]
-            chosen.append({'node': -1, 'depth': 1, 'conditions': rule, 'mask': mask, 'rows': int(mask.sum()),
+        mask = actions.rule_mask(full, rule)
+        if mask[discovery].sum() >= MIN_LEAF_ROWS and not any((c['mask'] == mask).all() for c in chosen):
+            loss, inside = problem.loss[discovery], mask[discovery]
+            share, loss_share = float(inside.mean()), float(loss[inside].sum())/(float(loss.sum()) or 1.0)
+            chosen.append({'node': -1, 'depth': 1, 'conditions': rule, 'mask': mask, 'rows': int(inside.sum()),
                            'row_share': share, 'loss_share': loss_share, 'excess': loss_share-share,
-                           'lift': loss_share/max(share, 1e-12), 'fold_lifts': lifts, 'structural': True})
+                           'lift': loss_share/max(share, 1e-12), 'fold_lifts': [], 'structural': True})
     base = float(problem.score())
     menu = (actions.REGRESSION_ACTIONS if problem.regression else
             actions.PROBABILITY_ACTIONS if problem.kind == 'probabilities' else actions.LABEL_ACTIONS)
     slices = []
     for index, candidate in enumerate(chosen, 1):
-        if deadline is not None and time.monotonic() > deadline:
-            break
         mask = candidate['mask']
-        remedies = []
-        for action in menu:
-            if action == 'blend_history' and history_last is None:
-                continue
+        holdout_rows = int(mask[check].sum())
+        holdout_lift = None
+        if holdout_rows and float(problem.loss[check].sum()) > 0:
+            holdout_lift = (float(problem.loss[check][mask[check]].sum())/float(problem.loss[check].sum()))/(holdout_rows/len(check))
+        timed_out = deadline is not None and time.monotonic() > deadline
+        remedies, explain = [], None
+        if holdout and holdout_rows >= MIN_HOLDOUT_SLICE_ROWS and not timed_out:
+            for action in menu:
+                if action == 'blend_history' and history_last is None:
+                    continue
+                try:
+                    result = evaluate_remedy(problem, action, mask, discovery, check, history_last)
+                except (ValueError, TypeError, ZeroDivisionError):
+                    result = None
+                if result:
+                    remedies.append(result)
+            remedies.sort(key=lambda r: (-r['robust'], -r['oof_gain']))
             try:
-                result = evaluate_remedy(problem, action, mask, fold, history_last)
-            except (ValueError, TypeError, ZeroDivisionError):
-                result = None
-            if result:
-                remedies.append(result)
-        remedies.sort(key=lambda r: (-r['robust'], -r['oof_gain']))
-        try:
-            explain = explainability(problem, data, meta, mask, fold, excluded, seed=seed) if not (
-                deadline is not None and time.monotonic() > deadline) else None
-        except (ValueError, TypeError, MemoryError) as error:
-            explain = {'measure': 'unavailable', 'reason': str(error)[:200], 'explainable': False, 'top_features': []}
+                explain = explainability(problem, data, meta, mask, discovery, check, excluded, seed=seed)
+            except (ValueError, TypeError, MemoryError) as error:
+                explain = {'measure': 'unavailable', 'reason': str(error)[:200], 'explainable': False, 'top_features': []}
         best = remedies[0] if remedies and remedies[0]['robust'] else None
-        verdict = 'fixable' if best else 'explainable' if explain and explain.get('explainable') else 'noise'
+        verdict = 'fixable' if best else 'explainable' if explain and explain.get('explainable') else 'unresolved'
         if candidate.get('structural') and not best:
             continue  # A structural population is reported only when a remedy works on it.
+        # Unresolved is a statement about this lab, not about the data: say why.
+        reason = (None if verdict != 'unresolved' else 'no_holdout_fold' if not holdout else 'analysis_deadline' if timed_out
+                  else 'too_few_holdout_rows' if holdout_rows < MIN_HOLDOUT_SLICE_ROWS
+                  else 'tested_corrections_and_residual_model_found_nothing')
         uses_history = any(c['column'].startswith(actions.HISTORY_PREFIX) for c in candidate['conditions'])
         slice_id = 'H1' if candidate.get('structural') else f'S{index}'
         record = {'slice_id': slice_id, 'rule': actions.describe(candidate['conditions']),
@@ -539,11 +552,12 @@ def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=No
                   'loss_share': round(candidate['loss_share'], 6), 'excess': round(candidate['excess'], 6),
                   'lift': round(float(candidate['lift']), 4), 'fold_lifts': [round(float(v), 4) for v in candidate['fold_lifts']],
                   'consistent_folds': int(sum(bool(v > 1) for v in candidate['fold_lifts'])),
-                  'verdict': verdict, 'remedies': [], 'explainability': explain,
+                  'holdout_rows': holdout_rows, 'holdout_lift': round(holdout_lift, 4) if holdout_lift is not None else None,
+                  'verdict': verdict, 'unresolved_reason': reason, 'remedies': [], 'explainability': explain,
                   'examples': _examples(problem, data, meta, mask, candidate['conditions'], explain)}
         if problem.regression:
             fy, fp = actions.forward(problem.y[mask], problem.scale), actions.forward(problem.p[mask], problem.scale)
-            record['bias'] = round(float(np.mean(fp-fy)), 6)
+            record['bias'] = round(float(np.mean(fp-fy)), 6) if mask.any() else None
             record['bias_scale'] = problem.scale
         else:
             pairs = pd.DataFrame({'truth': problem.y[mask], 'prediction': problem.predicted[mask]})
@@ -556,25 +570,27 @@ def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=No
                           'params': remedy['params'], 'scale': problem.scale,
                           'entity': deepcopy(entity) if (uses_history or remedy['action'] == 'blend_history') else None}
             record['remedies'].append({'remedy_id': slice_id+'/'+remedy['action'], **{k: remedy[k] for k in (
-                'action', 'oof_metric_before', 'oof_metric_after', 'oof_gain', 'relative_gain', 'folds_improved', 'folds', 'robust')},
+                'action', 'oof_metric_before', 'oof_metric_after', 'oof_gain', 'relative_gain', 'folds_improved', 'folds',
+                'robust', 'evaluation', 'holdout_slice_rows', 'discovery_gain')},
                 'correction': correction})
         record['journal'] = journal_line(record, spec)
         slices.append(record)
     def order(record):
         robust = [r for r in record['remedies'] if r['robust']]
-        return ({'fixable': 0, 'explainable': 1, 'noise': 2}[record['verdict']],
+        return ({'fixable': 0, 'explainable': 1, 'unresolved': 2}[record['verdict']],
                 -(robust[0]['relative_gain'] if robust else record['excess']))
     slices.sort(key=order)
     return plain({'version': VERSION, 'available': True, 'metric_id': spec['metric']['metric_id'],
-            'oof_metric': base, 'loss_measure': ('absolute' if problem.regression and problem.absolute else
-                                                 'squared' if problem.regression else
+            'oof_metric': base, 'loss_measure': ('declared_metric_row_loss' if problem.regression else
                                                  'log_loss' if problem.kind == 'probabilities' else
                                                  'class_weighted_miss' if registry.class_balanced(spec) else 'miss'),
             'loss_scale': problem.scale, 'rows': len(problem.loss), 'history_meta': history_last is not None,
+            'discovery_rows': int(len(discovery)), 'holdout_rows': int(len(check)),
             'entity': entity, 'slices': slices, 'seconds': round(time.monotonic()-started, 3),
-            'interpretation': ('Slices are rules over inputs and the base model/entity meta, ranked by loss share minus row share. '
-                               'Remedies are frozen corrections cross-fitted over OOF folds; robust means held-out folds improved. '
-                               'Selection-row effects are measured only after a remedy is executed as a candidate.')})
+            'interpretation': ('Slices are mined on discovery inner folds and ranked by loss share minus row share there. '
+                               'Remedy parameters are fitted on discovery rows; robust means the untouched last inner fold improved. '
+                               'Unresolved means this lab found no correction or residual signal, not that the slice is unfixable. '
+                               'Selection and closed confirmation rows still judge every executed candidate.')})
 
 
 def plain(value):
@@ -589,16 +605,18 @@ def plain(value):
 def journal_line(record, spec):
     metric = spec['metric']['metric_id']
     text = (f"{record['slice_id']} [{record['rule']}]: {100*record['row_share']:.1f}% rows -> "
-            f"{100*record['loss_share']:.1f}% loss (x{record['lift']:.1f}, folds {record['consistent_folds']}/{len(record['fold_lifts'])})")
+            f"{100*record['loss_share']:.1f}% loss (x{record['lift']:.1f}"
+            + (f", holdout x{record['holdout_lift']:.1f}" if record.get('holdout_lift') is not None else '') + ")")
     robust = [r for r in record['remedies'] if r['robust']]
     if robust:
         best = robust[0]
-        text += (f"; {best['action']} OOF {metric} {_metric_text(best['oof_metric_before'])}->{_metric_text(best['oof_metric_after'])}"
-                 f" ({best['folds_improved']}/{best['folds']} folds)")
+        text += (f"; {best['action']} holdout {metric} {_metric_text(best['oof_metric_before'])}->{_metric_text(best['oof_metric_after'])}")
     explain = record.get('explainability') or {}
-    if explain.get('measure') in {'residual_r2_oof', 'error_auc_oof'}:
+    if explain.get('measure') in {'residual_r2_holdout', 'error_auc_holdout'}:
         features = ', '.join(t['feature'] for t in explain.get('top_features', [])[:3])
         text += f"; {explain['measure']}={explain['value']}" + (f" via {features}" if features else '')
+    if record.get('unresolved_reason'):
+        text += f" ({record['unresolved_reason']})"
     return text+f" => {record['verdict']}"
 
 
@@ -610,7 +628,8 @@ def compact_card(record, source_artifact_id=None, limit_examples=4):
         card['examples'] = card.get('examples', [])[:limit_examples]
         return card
     card = {k: deepcopy(record[k]) for k in ('slice_id', 'rule', 'rows', 'row_share', 'loss_share', 'excess', 'lift',
-                                            'consistent_folds', 'verdict', 'journal') if k in record}
+                                            'consistent_folds', 'holdout_rows', 'holdout_lift', 'verdict',
+                                            'unresolved_reason', 'journal') if k in record}
     for key in ('bias', 'bias_scale', 'confusions'):
         if key in record:
             card[key] = deepcopy(record[key])

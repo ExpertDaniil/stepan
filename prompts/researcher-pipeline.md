@@ -21,7 +21,8 @@ same entity). Each slice has a verdict tested on held-out OOF folds:
   features and earlier corrections); an added feature_program is appended.
 - explainable: the residual is predictable from top_features; give the model
   that signal with a feature_program or a pipeline.
-- noise: no tested correction or input explains it; spend research elsewhere.
+- unresolved: this lab's corrections and residual model found nothing (reason given);
+  it is not proof of noise, so analyze it yourself when its loss share matters.
 candidate_results[].paired_verdict compares your candidate with its research base on
 the same selection rows: within_noise means a paired bootstrap cannot tell the
 gain from row noise (P(better) < 0.95); do not treat it as a discovery.

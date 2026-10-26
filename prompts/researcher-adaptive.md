@@ -28,7 +28,7 @@ Actions (return JSON matching the output schema):
   slice_remedies lists remedy_ref values of fixable error slices (frozen corrections
   measured on held-out fit OOF folds); they run on the exact version they were
   measured on, so recipe_id/hyperparameters may be omitted. Explainable slices call
-  for features; noise slices are not worth research time.
+  for features; unresolved slices are open questions, not noise.
 - pipeline: recipe_id=python-pipeline-v1, complete make_pipeline(task_spec,params)
   source, hyperparameters, optional feature_steps declaration; tuning=null.
 - tune: fixed owned/custom pipeline with typed tuning.search_space, max_trials and

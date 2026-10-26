@@ -30,21 +30,29 @@ fit-only OOF predictions (no selection/confirmation label is read):
    is also tested, because a history blend can help everywhere with zero excess.
    Slice membership is always recomputed from the translated rule exactly as a
    deployed pipeline evaluates it, never from the tree's own routing.
-3. **Fixability lab**, cross-fitted over the OOF folds (parameters estimated on
-   the other folds, applied to the held-out fold, scored with the declared
-   metric on all OOF rows):
-   - regression: `shift` (mean/median residual), `shrink` toward the slice mean,
-     `blend_history` with the entity's last value;
+3. **Holdout discipline.** The last inner OOF fold (the latest period under a
+   temporal protocol) is held out. Slices are mined and remedy parameters are
+   fitted on the other (discovery) folds only; the holdout fold, which played
+   no part in choosing the rule or its parameters, decides robustness. Frozen
+   parameters are the discovery-fitted ones that were checked.
+4. **Fixability lab**:
+   - regression: `shift`, `shrink` toward the slice mean, `blend_history` with the
+     entity's last value, all chosen by the declared metric's own row loss
+     (MAPE uses |y-p|/|y|; log1p scale only for RMSLE/MSLE);
    - labels: `remap` predicted class a -> b where it raises the declared metric;
    - probabilities: `recalibrate` class ratios.
-   A remedy is **robust** when the overall OOF metric improves by >= 0.1% and
-   at least 2/3 of held-out folds improve. Final parameters are re-estimated on
-   all OOF slice rows and frozen.
-4. **Explainability**: a small cross-fitted LightGBM predicts the slice residual
-   (regression, OOF R^2) or the error indicator (classification, OOF AUC), with
-   top features by gain.
-5. **Verdict**: `fixable` (robust remedy) > `explainable` (R^2 >= 0.05 / AUC >=
-   0.65) > `noise`.
+   A remedy is **robust** when the holdout fold improves by >= 0.1% of its
+   metric with >= 20 slice rows there.
+5. **Explainability**: a small LightGBM fitted on discovery slice rows predicts
+   the holdout slice residual (R^2 against the discovery mean) or error (AUC).
+6. **Verdict**: `fixable` > `explainable` > `unresolved` with a reason
+   (`no_holdout_fold`, `too_few_holdout_rows`, `analysis_deadline`,
+   `tested_corrections_and_residual_model_found_nothing`). Unresolved is a
+   statement about this lab, not proof of noise; researchers are told so.
+
+Remaining optimism: candidate rules are still a search over many splits, the
+holdout is one inner fold of a sample, and the base model is the leader picked
+on selection rows. Selection scoring and closed confirmation remain the guards.
 
 ## What Qwen sees and does
 
@@ -62,7 +70,7 @@ features and a few worst examples. The question says what to do:
   would be meaningless (observed: shift calibrated on one linear fit worsened
   another from 1.19 to 4.11).
 - explainable -> design features from the named inputs.
-- noise -> spend research elsewhere.
+- unresolved -> an open question with its reason; not noise.
 
 `compact_report` shows slice cards instead of single-column groups; the
 selection-level single-column groups are no longer copied into graph context.

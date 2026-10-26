@@ -117,9 +117,22 @@ def supervised_reduction(task, profile, artifacts, recovered=None, reason=''):
         if values.isna().any() or values.eq('').any():
             return None
         numbers = pd.to_numeric(values, errors='coerce')
-        integral = numbers.notna().all() and bool((numbers == numbers.round()).all())
+        numeric = bool(numbers.notna().all())
+        integral = numeric and bool((numbers == numbers.round()).all())
         distinct = values.nunique()
-        if numbers.notna().all() and (not integral or distinct > REGRESSION_MIN_DISTINCT):
+        # Explicit evidence first: a declared metric's prediction kind, then the
+        # task's own words. Value shape (e.g. integers 0..4) is only a last resort.
+        from agent import metrics as registry
+        known = registry.METRICS.get(registry.ALIASES.get(registry.normalize_name(declared_metric or ''), ''))
+        stated = ('regression' if re.search(r'регресси|\bregression\b', text, re.I) else
+                  'classification' if re.search(r'классификац|\bclassification\b', text, re.I) else None)
+        intent = ('regression' if known and known.prediction_kind == 'values' else
+                  'classification' if known else stated)
+        if intent == 'regression' and numeric:
+            kind = 'regression'
+        elif intent == 'classification' and distinct >= 2:
+            kind = 'binary_classification' if distinct == 2 else 'multiclass_classification'
+        elif numeric and (not integral or distinct > REGRESSION_MIN_DISTINCT):
             kind = 'regression'
         elif distinct >= 2:
             kind = 'binary_classification' if distinct == 2 else 'multiclass_classification'

@@ -17,7 +17,7 @@ CONFIDENCE = 0.95            # P(candidate better) needed to call an improvement
 MIN_RELATIVE_GAIN = 0.001    # and at least 0.1% of the reference value
 
 
-def _row_losses(spec, truth, prediction):
+def row_losses(spec, truth, prediction):
     """Per-row losses whose weighted mean is a monotone transform of the metric, else None."""
     key = spec['metric']['metric_id']
     if spec['task_kind'] == 'regression':
@@ -67,7 +67,7 @@ def paired_bootstrap(spec, truth, reference, candidate, *, seed=0, resamples=Non
     gain = direction*(value-base)
     n = len(np.asarray(truth))
     rng = np.random.default_rng(seed)
-    a_loss, b_loss = _row_losses(spec, truth, reference), _row_losses(spec, truth, candidate)
+    a_loss, b_loss = row_losses(spec, truth, reference), row_losses(spec, truth, candidate)
     if a_loss is not None and b_loss is not None:
         count = resamples or RESAMPLES
         weights = rng.multinomial(n, np.full(n, 1.0/n), size=count).astype(float)

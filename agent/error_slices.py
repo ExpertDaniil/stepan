@@ -66,11 +66,17 @@ class Problem:
         if self.regression:
             self.y = np.asarray(truth, dtype=float).reshape(-1)
             self.p = np.asarray(prediction, dtype=float).reshape(len(self.y), -1)[:, 0]
-            objective = registry.regression_objective(spec)
-            self.scale = 'log1p' if objective == registry.LOG_SQUARED else 'identity'
-            self.absolute = objective == registry.ABSOLUTE
-            fy, fp = actions.forward(self.y, self.scale), actions.forward(self.p, self.scale)
-            self.loss = np.abs(fy-fp) if self.absolute else (fy-fp)**2
+            from agent.significance import row_losses
+            self.scale = actions.correction_scale(spec)
+            self.absolute = registry.regression_objective(spec) == registry.ABSOLUTE
+            # The declared metric's own per-row loss (MAPE: |y-p|/|y|, RMSLE: log1p
+            # difference squared); never a log of clipped negatives.
+            loss = row_losses(spec, self.y, self.p)
+            if loss is None:
+                residual = self.y-self.p
+                loss = np.abs(residual) if self.absolute else residual**2
+            self.loss = np.asarray(loss, dtype=float)
+            self._row_loss = row_losses
             self.predicted = None
             self.probabilities = None
         else:
@@ -91,6 +97,14 @@ class Problem:
                     self.loss = miss*weight
                 else:
                     self.loss = miss
+
+    def row_loss(self, truth, prediction):
+        """Per-row declared-metric loss on original units (regression)."""
+        loss = self._row_loss(self.spec, truth, prediction)
+        if loss is None:
+            residual = np.asarray(truth, dtype=float)-np.asarray(prediction, dtype=float)
+            loss = np.abs(residual) if self.absolute else residual**2
+        return np.asarray(loss, dtype=float)
 
     def score(self, rows=None, prediction=None):
         rows = np.arange(len(self.y)) if rows is None else rows
@@ -264,12 +278,14 @@ def _fit_regression(problem, action, rows, history_last):
     """Frozen params for ``action`` estimated on ``rows`` (slice rows of the estimation folds)."""
     fy = actions.forward(problem.y[rows], problem.scale)
     fp = actions.forward(problem.p[rows], problem.scale)
+    truth = problem.y[rows]
+    def loss(values):
+        # Candidate parameters are judged by the declared metric's own row loss.
+        return float(np.mean(problem.row_loss(truth, actions.inverse(values, problem.scale))))
     if action == 'shift':
         residual = fy-fp
         value = float(np.median(residual) if problem.absolute else np.mean(residual))
-        return {'value': value} if math.isfinite(value) and value != 0 else None
-    def loss(values):
-        return float(np.mean(np.abs(fy-values)) if problem.absolute else np.mean((fy-values)**2))
+        return {'value': value} if math.isfinite(value) and value != 0 and loss(fp+value) < loss(fp) else None
     if action == 'shrink':
         center = float(np.median(fy) if problem.absolute else np.mean(fy))
         best = min(WEIGHTS, key=lambda w: loss((1-w)*fp+w*center))

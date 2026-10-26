@@ -320,6 +320,54 @@ class TaskResolutionTests(unittest.TestCase):
             resolved = resolve_spec(demo_metadata(task.read_text())['draft'], profile, task.parent, artifacts, schemas)
             self.assertEqual((resolved['output']['prediction_kind'], resolved['output']['positive_label']), ('probabilities', 'yes'))
 
+    def test_reduction_follows_stated_regression_for_small_integer_targets(self):
+        from agent.task_interpreter import supervised_reduction
+        with tempfile.TemporaryDirectory() as temp:
+            task, artifacts, profile, _ = self.harness(temp, 'regression', None)
+            train = pd.read_csv(task.parent/'train.csv', dtype=str, keep_default_na=False)
+            train['label'] = [str(i % 5) for i in range(len(train))]
+            train.to_csv(task.parent/'train.csv', index=False)
+            text = '# Task\nRegression of label. Metric: RMSE.\n'
+            from tools.data import profile_data
+            profile = profile_data({'candidate_paths': {'train': str(task.parent/'train.csv'), 'test': str(task.parent/'test.csv'),
+                                                        'sample_submission': str(task.parent/'sample_submission.csv')},
+                                    'max_report_bytes': 24000}, artifacts)
+            draft = supervised_reduction({'task_text': text, 'candidate_paths': {}, 'task_root': str(task.parent)},
+                                         profile, artifacts, None, 'unsupported')
+            self.assertEqual((draft['task_kind'], draft['metric']['metric_id']), ('regression', 'rmse'))
+
+    def test_probability_metric_with_numeric_binary_labels_submits_scores(self):
+        from agent.context import demo_metadata
+        from agent.task import resolve_spec
+        from tools.data import profile_data
+        with tempfile.TemporaryDirectory() as temp:
+            task, artifacts, _, schemas = self.harness(temp, 'binary', 'roc_auc')
+            for name in ('train.csv',):
+                frame = pd.read_csv(task.parent/name, dtype=str, keep_default_na=False)
+                frame['label'] = frame['label'].map({'yes': '1', 'no': '0'})
+                frame.to_csv(task.parent/name, index=False)
+            sample = pd.read_csv(task.parent/'sample_submission.csv', dtype=str)
+            sample['label'] = '0'
+            sample.to_csv(task.parent/'sample_submission.csv', index=False)
+            profile = profile_data({'candidate_paths': {'train': str(task.parent/'train.csv'), 'test': str(task.parent/'test.csv'),
+                                                        'sample_submission': str(task.parent/'sample_submission.csv')},
+                                    'max_report_bytes': 24000}, artifacts)
+            resolved = resolve_spec(demo_metadata(task.read_text())['draft'], profile, task.parent, artifacts, schemas)
+            self.assertEqual((resolved['output']['prediction_kind'], resolved['output']['positive_label']), ('probabilities', '1'))
+
+    def test_mape_with_negative_targets_keeps_metric_losses_in_slices(self):
+        from agent import error_slices
+        rng = np.random.default_rng(0)
+        y = rng.normal(size=900)*10
+        data = pd.DataFrame({'x': rng.normal(size=900), 'row_id': np.arange(900)})
+        prediction = np.where(data.x > 1, y*3, y*1.1)
+        task = {'task_spec_id': 't', 'task_kind': 'regression', 'target_column': 'y', 'target_columns': ['y'],
+                'excluded_features': ['row_id'], 'allowed_labels': [], 'metric': registry.resolve({'metric_id': 'mape'}, 'regression', [], y)}
+        report = error_slices.analyze(data, y, prediction.reshape(-1, 1), np.arange(900) % 3, task)
+        self.assertEqual(report['loss_scale'], 'identity')
+        self.assertAlmostEqual(report['oof_metric'], registry.score(task, y, prediction.reshape(-1, 1)))
+        self.assertTrue(any(c['column'] in {'x', '__prediction'} for s in report['slices'] for c in s['conditions']))
+
     def test_reduction_refuses_tables_without_one_requested_target(self):
         from agent.task_interpreter import supervised_reduction
         with tempfile.TemporaryDirectory() as temp:

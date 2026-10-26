@@ -30,7 +30,11 @@ def _default_output_kind(kind, metric, output, labels, profile, artifacts):
         sample = pd.read_csv(artifacts.resolve(profile['sample_submission_artifact_id']), usecols=columns,
                              dtype=str, keep_default_na=False)[columns[0]]
         numbers = pd.to_numeric(sample, errors='coerce')
-        if len(sample) and numbers.notna().all() and numbers.between(0, 1).all() and not set(sample) <= set(labels):
+        # Class names such as 0/1 make a sample of zeros ambiguous; a probability
+        # metric then decides for scores, since ranking metrics on hard labels lose.
+        numeric_labels = bool(pd.to_numeric(pd.Series(labels), errors='coerce').notna().all())
+        if (len(sample) and numbers.notna().all() and numbers.between(0, 1).all()
+                and (numeric_labels or not set(sample) <= set(labels))):
             if len(labels) != 2:
                 return 'labels'
             output['positive_label'] = (metric['parameters'].get('positive_label')

@@ -122,6 +122,16 @@ def rule_frame(X, meta):
 
 # --------------------------------------------------------------------------- actions
 
+def correction_scale(spec):
+    """log1p only where the metric itself is defined on log1p of nonnegative values (RMSLE/MSLE)."""
+    from agent.metrics import definition_of
+    try:
+        definition = definition_of(spec)
+    except Exception:  # Unknown or classification metric: corrections act on original values.
+        return 'identity'
+    return 'log1p' if spec.get('task_kind') == 'regression' and definition.nonnegative_target else 'identity'
+
+
 def forward(values, scale):
     values = np.asarray(values, dtype=float)
     return np.log1p(np.maximum(values, 0.0)) if scale == 'log1p' else values
@@ -179,7 +189,6 @@ def apply_probabilities(probabilities, mask, params, labels):
 
 def validate_corrections(corrections, task_spec, columns=None):
     """Structural check shared by the controller and worker; returns a normalized copy."""
-    from agent.metrics import LOG_SQUARED, regression_objective
     if not isinstance(corrections, list) or not 1 <= len(corrections) <= MAX_CORRECTIONS:
         raise ValueError(f'slice_corrections must contain 1..{MAX_CORRECTIONS} corrections')
     regression = task_spec['task_kind'] == 'regression'
@@ -189,7 +198,7 @@ def validate_corrections(corrections, task_spec, columns=None):
     allowed_actions = REGRESSION_ACTIONS if regression else PROBABILITY_ACTIONS if kind == 'probabilities' else LABEL_ACTIONS
     meta = ({PREDICTION} if regression else {PREDICTED_CLASS} | ({CONFIDENCE} if kind == 'probabilities' else set()))
     labels = [str(label) for label in task_spec.get('allowed_labels') or []]
-    expected_scale = 'log1p' if regression and regression_objective(task_spec) == LOG_SQUARED else 'identity'
+    expected_scale = correction_scale(task_spec)
     entity = None
     result = []
     for index, raw in enumerate(corrections):

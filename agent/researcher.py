@@ -1,4 +1,5 @@
 import hashlib
+from copy import deepcopy
 import json
 import time
 import uuid
@@ -38,7 +39,8 @@ class Researcher:
         proposed = answer["parsed_payload"]
         if adaptive:
             checked = self.validate_adaptive(proposed, context, answer)
-            user, program = checked['user'], checked['program']
+            user, program, corrections = checked['user'], checked['program'], checked['corrections']
+            decision_rule = checked['decision_rule']
             memory, evidence, knowledge = checked['memory'], checked['evidence'], checked['knowledge']
             protocol, landscape = checked['protocol'], checked['landscape']
             investigation_check = checked['investigation_check']
@@ -87,8 +89,16 @@ class Researcher:
             params = {'base_recipe_id': plan_recipe, 'model_parameters': params, 'feature_program': program}
             plan_recipe = 'python-pipeline-v1'
             source = FACTORY_SOURCE
-            feature_manifest = [{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only',
-                'execution_specification': operation_facts(program)}]
+            feature_manifest = ([{'step': 'owned_feature_program', 'program': program, 'fit_scope': 'train_only',
+                'execution_specification': operation_facts(program)}] if program else [])
+            if corrections:
+                from agent.slice_actions import describe
+                params['slice_corrections'] = corrections
+                if decision_rule:
+                    params['decision_rule'] = decision_rule
+                feature_manifest.append({'step': 'slice_corrections', 'fit_scope': 'frozen_parameters_from_fit_only_oof',
+                    'corrections': [{'slice_id': c['slice_id'], 'rule': describe(c['conditions']), 'action': c['action'],
+                                     'params': c['params']} for c in corrections]})
         else:
             source = factory_source(proposed["recipe_id"]) if catalog_mode else user['base_code'] if custom_base else proposed["code"]
         args = {"researcher_id": payload["researcher_id"], "filename": "experiment.py", "content": source, "declared_entrypoint": "make_pipeline"}
@@ -197,6 +207,7 @@ class Researcher:
         if context['metadata'].get('pipeline_execution'):
             return self.validate_executable(proposed, context)
         program = None
+        corrections, decision_rule = self.slice_corrections(proposed)
         validate_action(proposed, self.catalog)
         from agent.data_research import require_action, require_feature_parameters
         window = self.gateway.budget.data_research_snapshot()
@@ -209,7 +220,8 @@ class Researcher:
                 user['base_code'] = sections.get('base_code')
             if user.get('profile_summary', {}).get('base_result_details'):
                 user['base_result'] = sections.get('base_result')
-        require_feature_parameters(proposed, self.catalog, window, user.get('restrictions'))
+        if not corrections:  # A bound remedy keeps its measured base parameters by design.
+            require_feature_parameters(proposed, self.catalog, window, user.get('restrictions'))
         from agent.feature_search import validate_focus
         validate_focus(proposed, user)
         if proposed['action'] == 'features':
@@ -221,7 +233,7 @@ class Researcher:
                 program = validate_for_task(proposed['feature_program'], self.spec,
                     ([c for c in self.feature_columns if c not in excluded] if self.feature_columns is not None
                      else [c for c in profile['train_columns'] if c not in excluded] if 'train_columns' in profile
-                     else None))
+                     else None)) if proposed.get('feature_program') else []
             except (ValueError, KeyError) as error:
                 raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
         memory = user.get('profile_summary', user).get('research_memory', {})
@@ -328,7 +340,57 @@ class Researcher:
             if proposed['code']:
                 from tools.code import validate_code
                 validate_code(proposed['code'])
-        return dict(user=user, program=program, memory=memory, evidence=evidence, knowledge=knowledge, protocol=protocol, landscape=landscape, investigation_check=investigation_check)
+        return dict(user=user, program=program, corrections=corrections, decision_rule=decision_rule, memory=memory, evidence=evidence, knowledge=knowledge,
+                    protocol=protocol, landscape=landscape, investigation_check=investigation_check)
+
+    def slice_corrections(self, proposed):
+        """Bind referenced fit-OOF remedies to the exact version they were measured on.
+
+        A frozen correction is only valid on the base whose OOF predictions estimated
+        it, so the base recipe, parameters, feature program and earlier corrections
+        come from the immutable diagnostic report, not from the proposal. A proposed
+        feature_program is appended. Mutates ``proposed`` accordingly; returns the
+        complete correction list and the base decision rule (([], None) without remedies).
+        """
+        if proposed['action'] != 'features' or not proposed.get('slice_remedies'):
+            return [], None
+        from agent.error_slices import resolve_remedy
+        from agent.research_actions import CUSTOM_RECIPE
+        from agent.slice_actions import validate_corrections
+        resolved = [resolve_remedy(reference, self.artifacts, self.spec, self.feature_columns)
+                    for reference in proposed['slice_remedies']]
+        sources = sorted({str(item['base']['experiment_id']) for item in resolved})
+        if len(sources) != 1:
+            raise AgentError('INVALID_SLICE_REMEDY', 'Combine remedies measured on one version; these come from '+', '.join(sources))
+        base = resolved[0]['base']
+        if not base['recipe_id'] or base['hyperparameters'] is None:
+            raise AgentError('INVALID_SLICE_REMEDY', 'The diagnostic report does not identify its measured base version')
+        if base['recipe_id'] == CUSTOM_RECIPE:
+            if not base['feature_factory'] or 'base_recipe_id' not in base['hyperparameters']:
+                raise AgentError('INVALID_SLICE_REMEDY', 'This remedy was measured on custom code; reproduce the correction '
+                                 'in a pipeline action or use a remedy of an owned/feature-program version')
+            settings = base['hyperparameters']
+            recipe, model = settings['base_recipe_id'], deepcopy(settings.get('model_parameters', {}))
+            program, existing = deepcopy(settings.get('feature_program', [])), deepcopy(settings.get('slice_corrections', []))
+            decision = settings.get('decision_rule')
+        else:
+            recipe, model, program, existing, decision = base['recipe_id'], deepcopy(base['hyperparameters']), [], [], None
+        known = {step['name'] for step in program}
+        program += [step for step in proposed.get('feature_program') or [] if step['name'] not in known]
+        requested = [item['correction'] for item in resolved]
+        corrections = [c for c in existing if c['slice_id'] not in {r['slice_id'] for r in requested}]+requested
+        try:
+            corrections = validate_corrections(corrections, self.spec, self.feature_columns)
+        except ValueError as error:
+            raise AgentError('INVALID_SLICE_REMEDY', str(error)) from error
+        proposed.update(recipe_id=recipe, hyperparameters=model)
+        if program:
+            proposed['feature_program'] = program
+        else:
+            proposed.pop('feature_program', None)
+        self.log.event('research.slice_remedies_bound', base_experiment_id=base['experiment_id'], recipe_id=recipe,
+                       remedies=list(proposed['slice_remedies']), corrections=len(corrections), feature_operations=len(program))
+        return corrections, decision
 
     def validate_executable(self, proposed, context):
         """Operational checks only; explanatory prose never gates an executable candidate."""
@@ -345,11 +407,13 @@ class Researcher:
             if not user.get('base_result'):
                 user['base_result'] = sections.get('base_result')
         program = None
+        corrections, decision_rule = self.slice_corrections(proposed)
         if proposed['action'] == 'features':
             from agent.feature_schema import validate_for_task
             from agent.predictions import targets
             try:
-                program = validate_for_task(proposed['feature_program'], self.spec, self.feature_columns)
+                program = (validate_for_task(proposed['feature_program'], self.spec, self.feature_columns)
+                           if proposed.get('feature_program') else [])
             except (ValueError, KeyError) as error:
                 raise AgentError('INVALID_FEATURE_PROGRAM', str(error)) from error
         if proposed['action'] not in {'research', 'stop'}:
@@ -361,6 +425,6 @@ class Researcher:
             automatic_space(self.catalog, {'recipe_id': proposed['recipe_id'],
                 'model': {'hyperparameters': proposed['hyperparameters']}}, proposed['code'])
         profile = user.get('profile_summary', user)
-        return dict(user=user, program=program, memory=profile.get('research_memory', {}), evidence=set(),
+        return dict(user=user, program=program, corrections=corrections, decision_rule=decision_rule, memory=profile.get('research_memory', {}), evidence=set(),
             knowledge=profile.get('knowledge', {}), protocol={}, landscape=profile.get('research_landscape', {}),
             investigation_check={'verification': 'executable_interface_checked', 'warnings': []})

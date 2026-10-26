@@ -105,7 +105,7 @@ def compact_updates(value):
     result = deepcopy({k: v for k, v in value.items() if k != 'solution_catalog'})
     from agent.fit_diagnostics import compact_report
     for record in result.get('fit_diagnostics', []):
-        record['report'] = compact_report(record.get('report', {}))
+        record['report'] = compact_report(record.get('report', {}), source_artifact_id=record.get('artifact_id'))
     # Source/parameter documents are read by the gateway from the authorized
     # immutable snapshot, never copied into every API request.
     result.pop('solution_catalog', None)

@@ -37,9 +37,23 @@ def compact_group(group):
     return result
 
 
-def compact_report(report, limit=4):
-    """The full computed groups stay in the immutable scoped diagnostic artifact."""
+def compact_report(report, limit=4, source_artifact_id=None):
+    """The full computed groups stay in the immutable scoped diagnostic artifact.
+
+    When rule slices exist they replace single-column groups in the displayed view:
+    a large population is not a hard region, and slices carry tested remedies.
+    """
     result = deepcopy({k:v for k,v in report.items() if k != 'diagnostic_groups'})
+    slices = (result.pop('error_slices', None) or {})
+    if slices.get('slices'):
+        from agent.error_slices import compact_card
+        result['error_slices'] = {'slices': [compact_card(s, source_artifact_id) for s in slices['slices'][:limit]],
+            'omitted_slices': max(0, len(slices['slices'])-limit),
+            'remedy_base_experiment_id': report.get('experiment_id'),
+            **{k: slices.get(k) for k in ('metric_id', 'oof_metric', 'loss_measure', 'loss_scale', 'history_meta', 'interpretation')}}
+        result['omitted_hard_groups'] = result.get('omitted_hard_groups', 0)+len(result.pop('hard_groups', []))
+        result.pop('error_associations', None)
+        return result
     for field in ('hard_groups', 'error_associations'):
         values = result.get(field, [])
         result['omitted_'+field] = result.get('omitted_'+field, 0)+max(0, len(values)-limit)
@@ -401,6 +415,7 @@ class FitDiagnostics:
         pred = checked_matrix(raw[validation_columns(c.spec)].to_numpy(), len(rows), len(validation_columns(c.spec)),
                               c.spec['metric']['prediction_kind'], labels=c.spec['allowed_labels'])
         report = error_profile(data, y, pred, raw['__fold'], c.spec, deadline=time.monotonic()+10)
+        report['error_slices'] = self.error_slices(data, y, pred, raw['__fold'].to_numpy())
         prediction_id = next(a for a in event['output_artifact_ids'] if c.artifacts.meta(a)['kind'] == 'fit_oof_predictions')
         plan = c.store.get(eid)['plan']
         identity = {'experiment_id': eid, 'dataset_id': c.spec['dataset_id'], 'task_spec_id': c.spec['task_spec_id'],
@@ -411,7 +426,10 @@ class FitDiagnostics:
             'sample_rows': selected, 'predicted_row_ids': rows, 'folds': folds,
             'predictions_artifact_id': prediction_id, 'predictions_sha256': c.artifacts.meta(prediction_id)['sha256']}
         provenance = c.artifacts.write_json('diagnostics/'+state['owner']+'.identity.json', identity, 'fit_oof_identity')
-        report.update(experiment_id=eid, validation_id=c.validation['validation_id'],
+        from agent.feature_schema import FACTORY_SOURCE
+        report.update(source_recipe_id=plan['recipe_id'], source_hyperparameters=deepcopy(plan['model']['hyperparameters']),
+            source_feature_factory=c.artifacts.resolve(plan['code_artifact_id']).read_text(encoding='utf-8') == FACTORY_SOURCE)
+        report.update(experiment_id=eid, validation_id=c.validation['validation_id'], task_spec_id=c.spec['task_spec_id'],
             sampled_fit_rows=len(selected), complete_fit_rows=state['complete_rows'], sampled=len(selected)<state['complete_rows'],
             sampling='uniform_without_replacement', folds=len(folds), split_strategy=state['proposal']['strategy'],
             warmup_rows_without_oof=len(selected)-len(rows), coverage_fraction=len(rows)/max(1, state['complete_rows']),
@@ -430,6 +448,59 @@ class FitDiagnostics:
         if getattr(c, 'error_research', None):c.error_research.ingest(record)
         c.log.event('diagnostics.oof_completed', artifact_id=art['artifact_id'], experiment_id=eid,
                     predicted_rows=len(raw), primary_score_changed=False)
+        for item in report['error_slices'].get('slices', []):
+            c.log.event('research.journal', kind='error_slice', experiment_id=eid, artifact_id=art['artifact_id'],
+                        slice_id=item['slice_id'], verdict=item['verdict'], line=item['journal'])
+
+    def entity_history(self, data):
+        """Fit-partition entity and strictly earlier target history for the rows of ``data``.
+
+        The entity key is discovered once per run from fit rows (agent.strong); history
+        values come only from fit-partition labels of earlier periods.
+        """
+        c = self.c
+        proposal = c.evaluator.protocols[c.validation['validation_id']]['proposal']
+        if proposal['strategy'] != 'temporal_holdout':
+            return None, None
+        from agent.data_transport import transport
+        from agent.predictions import targets
+        from agent.strong import EntityHistory, discover_entity
+        names = targets(c.spec)
+        if len(names) != 1:
+            return None, None
+        period = proposal['parameters']['column']
+        if getattr(self, '_entity', None) is None:
+            self._entity = False
+            fit_rows = c.artifacts.read_json(c.validation['train_rows_artifact_id'])
+            table = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, rows=fit_rows)
+            features = table.drop(columns=[x for x in [*names, *c.spec['excluded_features']] if x in table.columns])
+            found = discover_entity(features, table[names[0]].to_numpy(dtype=float), period, seconds=15)
+            if found:
+                self._entity = {'columns': list(found['columns']), 'period_column': period}
+                keep = list(dict.fromkeys([*found['columns'], period]))
+                self._history_rows = (features[keep].copy(), table[names[0]].to_numpy(dtype=float))
+                c.log.event('diagnostics.entity_discovered', columns=found['columns'], period_column=period,
+                            multi_period=found['multi_period'], within_share=found['within_share'], keys=found['keys'])
+        if not self._entity:
+            return None, None
+        fit_x, fit_y = self._history_rows
+        history = EntityHistory(self._entity['columns'], period, prefix='__history_').fit(fit_x, fit_y)
+        return deepcopy(self._entity), history.transform(data[fit_x.columns]).reset_index(drop=True)
+
+    def error_slices(self, data, truth, prediction, fold):
+        """Rule slices of concentrated loss with cross-fitted remedies; never fails the diagnostic."""
+        from agent.error_slices import analyze
+        c = self.c
+        try:
+            from agent.predictions import targets
+            if c.spec['task_kind'] == 'regression' and len(targets(c.spec)) != 1:
+                return {'available': False, 'reason': 'multi_target_regression', 'slices': []}
+            entity, history = self.entity_history(data)
+            return analyze(data, truth, prediction, fold, c.spec, meta_history=history, entity=entity,
+                           seed=c.config.seed, deadline=time.monotonic()+20)
+        except (AgentError, ValueError, KeyError, TypeError, MemoryError) as error:
+            c.log.event('diagnostics.slices_unavailable', reason=str(error)[:500])
+            return {'available': False, 'reason': str(error)[:300], 'slices': []}
 
     def shutdown(self):
         self.pending.clear()

@@ -14,7 +14,7 @@ def compact_protocol(protocol):
     result = deepcopy(protocol)
     from agent.fit_diagnostics import compact_report
     for index, record in enumerate(result.get('fit_diagnostics', [])):
-        record['report'] = compact_report(record.get('report', {}))
+        record['report'] = compact_report(record.get('report', {}), source_artifact_id=record.get('artifact_id'))
         record['detail_hint'] = 'read_memory section=fit_diagnostics/'+str(index)
     episode = result.get('episode')
     if episode and episode.get('last_test_plan'):

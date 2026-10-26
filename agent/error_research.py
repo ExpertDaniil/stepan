@@ -55,6 +55,63 @@ def paired_result(task, truth, base, candidate, mask):
                 'no component causality, attainable gain or independent confirmation is inferred.'}
 
 
+VERDICT_PRIORITY = {'fixable': 3.0, 'explainable': 2.0, 'noise': 0.1}
+
+
+def slice_problem(item, source_artifact_id):
+    """A mined slice as an error-research problem; its card is what researchers read."""
+    from agent.error_slices import compact_card
+    robust = [r for r in item.get('remedies', []) if r['robust']]
+    gain = robust[0]['relative_gain'] if robust else 0.0
+    definition = {'kind': 'rule', 'slice_id': item['slice_id'], 'conditions': deepcopy(item['conditions']),
+                  'entity': deepcopy(item.get('entity'))}
+    return {'definition': definition, 'priority_cost': VERDICT_PRIORITY[item['verdict']]+100*gain+item['excess'],
+            'row_membership_sha256': hashlib.sha256(canonical(definition).encode()).hexdigest(),
+            'card': compact_card(item, source_artifact_id), 'fixability': item['verdict']}
+
+
+def slice_question(card):
+    robust = [r for r in card.get('remedies', []) if r['robust']]
+    head = f"Slice {card['slice_id']} [{card['rule']}]: {100*card['row_share']:.1f}% rows carry {100*card['loss_share']:.1f}% of the loss."
+    if card['verdict'] == 'fixable' and robust:
+        best = robust[0]
+        return (head+f" Verdict fixable: remedy {best['remedy_ref']} ({best['action']}) improved held-out OOF folds "
+                f"{best['folds_improved']}/{best['folds']}. Execute it with a features action (slice_remedies), alone or with features, "
+                "or explain from evidence why not.")
+    if card['verdict'] == 'explainable':
+        features = ', '.join(t['feature'] for t in (card.get('explainability') or {}).get('top_features', [])[:4])
+        return head+f" Verdict explainable: the residual is predictable (via {features}). Design a feature_program that gives the model this signal."
+    return head+' Verdict noise: no tested correction or input explains it; prefer another slice or direction.'
+
+
+def rule_membership(definition, data, base_prediction, spec, history_source=None):
+    """Rows of ``data`` inside a rule slice, using the research base's own predictions as meta."""
+    import numpy as np
+    from agent import slice_actions as actions
+    regression = spec['task_kind'] == 'regression'
+    kind = spec['metric']['prediction_kind']
+    labels = list(spec.get('allowed_labels') or [])
+    values = np.asarray(base_prediction)
+    if regression:
+        base, probabilities = values.astype(float).reshape(len(values), -1)[:, 0], None
+    elif kind == 'probabilities':
+        probabilities = values.astype(float)
+        base = np.asarray(labels)[probabilities.argmax(axis=1)]
+    else:
+        base, probabilities = values.reshape(-1).astype(str), None
+    history = None
+    if definition.get('entity') and any(c['column'].startswith(actions.HISTORY_PREFIX) for c in definition['conditions']):
+        if history_source is None:
+            raise ValueError('History rule needs fit-partition rows')
+        from agent.strong import EntityHistory
+        entity = definition['entity']
+        fit_x, fit_y = history_source
+        history = EntityHistory(entity['columns'], entity['period_column'], prefix=actions.HISTORY_PREFIX).fit(fit_x, fit_y)
+        history = history.transform(data[fit_x.columns]).reset_index(drop=True)
+    meta = actions.meta_frame(base, regression=regression, probabilities=probabilities, history=history)
+    return actions.rule_mask(actions.rule_frame(data, meta), definition['conditions'])
+
+
 class ErrorResearch:
     def __init__(self, controller):
         self.c = controller
@@ -81,17 +138,19 @@ class ErrorResearch:
         if self.c.artifacts.read_json(record['artifact_id']) != record['report']:
             raise AgentError('MEMORY_SOURCE_CHANGED', 'Diagnostic report differs from its immutable artifact')
         scope = self.publication(record['experiment_id'])
-        for group in record['report'].get('hard_groups', []):
+        slices = (record['report'].get('error_slices') or {}).get('slices') or []
+        groups = [slice_problem(item, record['artifact_id']) for item in slices] or record['report'].get('hard_groups', [])
+        for group in groups:
             key = hashlib.sha256(canonical([identity, record['artifact_id'], group['definition']]).encode()).hexdigest()
             if key in self.problems:continue
-            self.problems[key] = {'key': key, 'observation': deepcopy(group), 'source_artifact_id': record['artifact_id'],
+            self.problems[key] = {'key': key, 'observation': deepcopy(group.get('card', group)), 'source_artifact_id': record['artifact_id'],
                 'identity_artifact_id': identity_id, 'scope': deepcopy(scope),
                 'base_experiment_id': record['experiment_id'], 'definition': deepcopy(group['definition']),
                 'status': 'open', 'attempts': [], 'completed_monotonic': record['completed_monotonic'],
                 'priority': group['priority_cost'],
                 'focus_key': hashlib.sha256(canonical([self.identity(),
                     group.get('row_membership_sha256', group['definition'])]).encode()).hexdigest(),
-                'fixability': 'unknown; high error is measured cost, not evidence of recoverable signal',
+                'fixability': group.get('fixability', 'unknown; high error is measured cost, not evidence of recoverable signal'),
                 'sampled': record['report']['sampled'], 'support_scope': 'diagnostic_sample_only'}
         self.save()
 
@@ -169,7 +228,8 @@ class ErrorResearch:
                 'source_artifact_id': problem['source_artifact_id'] if problem else None,
                 'observation': deepcopy(problem['observation']) if problem else None,
                 'definition': deepcopy(problem['definition']) if problem else None,
-                'status': 'active', 'question': ('Investigate '+canonical(problem['definition']) if problem else
+                'status': 'active', 'question': (slice_question(problem['observation']) if problem and problem['definition'].get('kind') == 'rule' else
+                    'Investigate '+canonical(problem['definition']) if problem else
                     ('Investigate representation and systematic bias.' if peer.endswith('1') else 'Investigate alternate error explanation or estimator structure.')),
                 'next_step': 'Read the current solution and available fit OOF errors; analyze a useful question and submit executable changes.'}
             if shared:assigned['question'] += ' Same observed rows as the peer; consider an alternative explanation or remedy.'
@@ -179,7 +239,8 @@ class ErrorResearch:
         from agent.fit_diagnostics import compact_group
         return {'leader': {'experiment_id': base, 'metric': metric},
             'recommendation': {k: deepcopy(assigned[k]) for k in ('question', 'next_step', 'base_experiment_id')},
-            'observation': compact_group(assigned['observation']) if assigned.get('observation') else None,
+            'observation': (deepcopy(assigned['observation']) if (assigned.get('observation') or {}).get('slice_id')
+                            else compact_group(assigned['observation']) if assigned.get('observation') else None),
             'source_experiment_id': problem['base_experiment_id'] if problem else None,
             'source_artifact_id': assigned['source_artifact_id'], 'shared_focus': assigned.get('shared_focus', False),
             'detail_hint': 'read_memory section=error_observation for the frozen source report',
@@ -191,6 +252,8 @@ class ErrorResearch:
                 for name, a in self.assignments.items() if name != assignment_key and a.get('branch_id') == branch
                 and a['base_experiment_id'] in visible and self.allowed(a.get('scope'), branch)],
             'instruction': 'Recommendation only. Change direction or combine changes freely. No problem IDs, expected gain or provenance forms are required. '
+                'Slices are ranked by loss share minus row share on fit-only OOF; a fixable slice lists remedy_ref values '
+                'you may execute via a features action field slice_remedies (frozen, cross-fitted corrections). '
                 'Use run_analysis(experiment_id="best") for aligned fit-only OOF data; old reports remain tied to their source.'}
 
     def bind(self, plan, ticket):
@@ -212,7 +275,8 @@ class ErrorResearch:
             assigned['last_error'] = str(error)[:600] if error else None
             self.save()
 
-    def compare(self, eid, binding):
+    def compare(self, eid, binding, journal=True):
+        """Paired selection comparison; ``journal`` adds the readable research line (research candidates only)."""
         c = self.c
         base = binding.get('base_experiment_id')
         if not base or base == eid:return
@@ -246,10 +310,25 @@ class ErrorResearch:
                 sources.append(source['predictions_artifact_id'])
             definition = binding.get('definition')
             names = targets(c.spec)
-            wanted = [*names, *([definition['column']] if definition and definition.get('column') else [])]
+            if definition and definition.get('kind') == 'rule':
+                entity = definition.get('entity') or {}
+                wanted = [*names, *[x['column'] for x in definition['conditions'] if not x['column'].startswith('__')],
+                          *entity.get('columns', []), *([entity['period_column']] if entity else [])]
+            else:
+                wanted = [*names, *([definition['column']] if definition and definition.get('column') else [])]
             data = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, columns=list(dict.fromkeys(wanted)), rows=rows)
             truth = data[names if len(names) > 1 else names[0]]
-            mask = group_mask(data, truth, definition) if definition else np.zeros(len(rows), dtype=bool)
+            if definition and definition.get('kind') == 'rule':
+                source = None
+                if definition.get('entity'):
+                    entity = definition['entity']
+                    columns = list(dict.fromkeys([*entity['columns'], entity['period_column']]))
+                    fit = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, columns=[*columns, names[0]],
+                                                      rows=protocol['train_indices'])
+                    source = (fit[columns], fit[names[0]].to_numpy(dtype=float))
+                mask = rule_membership(definition, data, matrices[0], c.spec, source)
+            else:
+                mask = group_mask(data, truth, definition) if definition else np.zeros(len(rows), dtype=bool)
             result = paired_result(c.spec, truth, matrices[0], matrices[1], mask)
             result['versus_current_leader'] = (
                 {'experiment_id': leader, **paired_result(c.spec, truth, matrices[2], matrices[1], mask)['overall']}
@@ -281,5 +360,39 @@ class ErrorResearch:
             c.log.event('research.paired_comparison', artifact_id=art['artifact_id'], experiment_id=eid,
                         base_experiment_id=base, status=result['status'], leader_experiment_id=leader,
                         improvement_vs_leader=result['versus_current_leader'].get('improvement'))
+            if journal:
+                c.log.event('research.journal', kind='candidate', experiment_id=eid, researcher_id=peer,
+                            slice_id=(definition or {}).get('slice_id'), status=result['status'],
+                            line=candidate_line(c, eid, peer, definition, result))
         except (AgentError, ValueError, OSError, KeyError) as error:
             c.log.event('research.paired_unavailable', experiment_id=eid, base_experiment_id=base, reason=str(error)[:500])
+
+
+def candidate_line(c, eid, peer, definition, result):
+    """One human-readable journal line: what was tried, on which slice, with what paired effect."""
+    plan = c.store.get(eid)['plan']
+    params = plan['model']['hyperparameters']
+    changes = []
+    if params.get('slice_corrections'):
+        changes.append('remedies '+', '.join(f"{x['slice_id']}:{x['action']}" for x in params['slice_corrections']))
+    if params.get('feature_program'):
+        changes.append('features '+', '.join(step['name'] for step in params['feature_program'][:4])
+                       +(f" (+{len(params['feature_program'])-4})" if len(params['feature_program']) > 4 else ''))
+    if not changes:
+        changes.append(plan['recipe_id'])
+    metric = c.spec['metric']['metric_id']
+    def pair(part):
+        if part.get('base') is None or part.get('candidate') is None:
+            return 'n/a'
+        return f"{part['base']:.6g}->{part['candidate']:.6g}"
+    where = ''
+    if definition and definition.get('kind') == 'rule':
+        from agent.slice_actions import describe
+        where = f" on {definition.get('slice_id')} [{describe(definition['conditions'])}]"
+    elif definition:
+        where = ' on '+canonical(definition)[:120]
+    leader = result.get('versus_current_leader', {})
+    versus = (f"; vs leader {leader.get('improvement'):+.6g}" if isinstance(leader.get('improvement'), (int, float)) else '')
+    return (f"{peer}: {'; '.join(changes)}{where}: slice {metric} {pair(result['inside_group'])}, "
+            f"overall {pair(result['overall'])}{versus} => {result['status']}")
+

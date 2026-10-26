@@ -23,8 +23,12 @@ Actions (return JSON matching the output schema):
   next_step=continue requests a fresh dialogue; wait pauses until new evidence;
   finish closes this direction. A checkpoint or renamed question is not new evidence.
 - catalog: train one owned learned recipe with chosen hyperparameters.
-- features: owned learned recipe, hyperparameters and named feature_program;
-  code/tuning=null, feature_steps=[]. Every operation names its real inputs.
+- features: owned learned recipe, hyperparameters and a named feature_program and/or
+  slice_remedies; code/tuning=null, feature_steps=[]. Every operation names its real inputs.
+  slice_remedies lists remedy_ref values of fixable error slices (frozen corrections
+  measured on held-out fit OOF folds); they run on the exact version they were
+  measured on, so recipe_id/hyperparameters may be omitted. Explainable slices call
+  for features; noise slices are not worth research time.
 - pipeline: recipe_id=python-pipeline-v1, complete make_pipeline(task_spec,params)
   source, hyperparameters, optional feature_steps declaration; tuning=null.
 - tune: fixed owned/custom pipeline with typed tuning.search_space, max_trials and

@@ -5811,6 +5811,7 @@
       "properties": {
         "action": {
           "enum": [
+            "research",
             "catalog",
             "pipeline",
             "features",
@@ -5845,7 +5846,9 @@
                   "dayofweek",
                   "hour",
                   "cyclic_sin",
-                  "cyclic_cos"
+                  "cyclic_cos",
+                  "target_mean",
+                  "target_count"
                 ]
               },
               "name": {
@@ -5873,6 +5876,11 @@
               "origin": {
                 "type": "number"
               },
+              "alpha": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
+              },
               "input_units": {
                 "type": "object",
                 "additionalProperties": {
@@ -5894,6 +5902,23 @@
             ],
             "additionalProperties": false
           }
+        },
+        "slice_remedies": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          }
+        },
+        "next_step": {
+          "enum": [
+            "continue",
+            "wait",
+            "finish"
+          ]
         },
         "coordination": {
           "type": "object",
@@ -5997,6 +6022,10 @@
               "type": "null"
             }
           ]
+        },
+        "code_ref": {
+          "type": "string",
+          "minLength": 1
         },
         "tuning": {
           "anyOf": [
@@ -6551,13 +6580,7 @@
       },
       "required": [
         "action",
-        "recipe_id",
-        "hyperparameters",
         "hypothesis",
-        "expected_effect",
-        "feature_steps",
-        "code",
-        "tuning",
         "evidence_ids"
       ],
       "additionalProperties": false

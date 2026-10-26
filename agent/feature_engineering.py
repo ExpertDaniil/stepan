@@ -157,6 +157,7 @@ def make_feature_pipeline(task_spec, params):
     requested = options.pop('feature_program', [])
     program = validate_for_task(requested,task_spec) if requested else []
     decision = options.pop('decision_rule',None)
+    corrections = options.pop('slice_corrections', None)
     for key in ('_cpu_threads', '_seed'):
         if key in options:
             model[key] = options.pop(key)
@@ -171,4 +172,8 @@ def make_feature_pipeline(task_spec, params):
         if decision!='macro_f1' or task_spec['task_kind']=='regression' or task_spec['metric']['metric_id']!='f1_macro':
             raise ValueError('macro_f1 decision rule requires the Macro F1 classification contract')
         estimator=MacroF1DecisionClassifier(estimator)
+    if corrections:
+        # Frozen fit-OOF remedies wrap the complete pipeline; rules read raw inputs.
+        from agent.slice_actions import SliceCorrectionModel
+        estimator=SliceCorrectionModel(estimator, corrections, task_spec)
     return estimator

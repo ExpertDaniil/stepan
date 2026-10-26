@@ -80,6 +80,8 @@ ACTION_SCHEMA = {
     'type': 'object', 'properties': {
         'action': {'enum': ['research', 'catalog', 'pipeline', 'features', 'tune', 'stop']},
         'feature_program': FEATURE_PROGRAM_SCHEMA,
+        'slice_remedies': {'type': 'array', 'minItems': 1, 'maxItems': 4,
+                           'items': {'type': 'string', 'minLength': 3, 'maxLength': 200}},
         'next_step': {'enum': ['continue', 'wait', 'finish']},
         'coordination': {'type': 'object', 'properties': {
             'related_series_ids': {'type': 'array', 'items': {'type': 'string', 'minLength': 1}, 'maxItems': 4},
@@ -154,10 +156,13 @@ def validate_action(action, catalog):
     if kind == 'features':
         if (action['code'] is not None or action['tuning'] is not None
                 or action['recipe_id'] == CUSTOM_RECIPE or action['recipe_id'].startswith('dummy-')
-                or not action.get('feature_program') or action['feature_steps']):
-            raise AgentError('INVALID_RESEARCH_ACTION', 'features needs an owned learned recipe, feature_program, code/tuning=null and feature_steps=[]')
-    elif 'feature_program' in action:
-        raise AgentError('INVALID_RESEARCH_ACTION', 'feature_program belongs only to features actions')
+                or not (action.get('feature_program') or action.get('slice_remedies')) or action['feature_steps']):
+            raise AgentError('INVALID_RESEARCH_ACTION', 'features needs an owned learned recipe, a feature_program and/or slice_remedies, '
+                             'code/tuning=null and feature_steps=[]')
+        if len(set(action.get('slice_remedies', []))) != len(action.get('slice_remedies', [])):
+            raise AgentError('INVALID_RESEARCH_ACTION', 'slice_remedies must be distinct remedy_ref values')
+    elif 'feature_program' in action or 'slice_remedies' in action:
+        raise AgentError('INVALID_RESEARCH_ACTION', 'feature_program and slice_remedies belong only to features actions')
     if kind in {'stop', 'research'}:
         if action['code'] is not None or action['tuning'] is not None:
             raise AgentError('INVALID_RESEARCH_ACTION', 'Stop cannot execute code or start tuning')

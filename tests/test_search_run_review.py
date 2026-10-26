@@ -214,7 +214,10 @@ class SearchRunReviewTests(unittest.TestCase):
                 ev['diagnostics_artifact_id'] = artifact['artifact_id']
                 h.g.db.execute('UPDATE evaluations SET record=? WHERE evaluation_id=?', (json.dumps(ev), ev['evaluation_id']))
             memory = h.g.memory_record(reply['lead_submission']['experiment_id'])
-            self.assertEqual(memory['diagnostics']['hard_groups'][0]['rmse'], 5)
+            # Single-column selection groups stay in the immutable artifact but no longer
+            # reach research memory: fit-only error slices replace them (docs/ERROR-SLICES.md).
+            self.assertNotIn('hard_groups', memory['diagnostics'])
+            self.assertEqual(h.g.artifacts.read_json(artifact['artifact_id'])['hard_groups'][0]['rmse'], 5)
             h.g.schemas.validate(memory, 'GExperimentMemory')
         finally:
             h.close()

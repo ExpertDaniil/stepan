@@ -82,7 +82,9 @@ class WorkService:
         diagnostics = {}
         if trusted:
             raw = self.artifacts.read_json(ev["diagnostics_artifact_id"])
-            diagnostics = {k: raw[k] for k in ("mae", "absolute_error_p50", "absolute_error_p90", "class_summary", "hard_groups", "prediction_behavior") if k in raw}
+            # Single-column selection groups rank large populations, not hard regions;
+            # fit-only error slices replace them in research context (artifact keeps them).
+            diagnostics = {k: raw[k] for k in ("mae", "absolute_error_p50", "absolute_error_p90", "class_summary", "prediction_behavior") if k in raw}
         return {"experiment_id": experiment_id, "state": exp["state"], "recipe_id": plan["recipe_id"],
                 "code_artifact_id": plan["code_artifact_id"],
                 "hypothesis": plan["hypothesis"][:600], "metric": ev["primary_metric"] if trusted else None,

@@ -9,12 +9,23 @@ its code, parameters, features and measured metric. The graph assignment base ca
 be older. Use an exact experiment_id for another visible version and follow
 next_read for long source. Smaller views: code/result/features/diagnostics.
 
-error_research gives a short recommendation, source version, measured observation,
-relevant attempts and the other researcher's status. It is advice. A large error
-is a cost, not proof that available features can fix it. Overlapping groups do
-not have additive shares. Unknown units remain unknown; useful statistical ideas
-do not need a physical story. Do not use true test targets or worst residual rank
-to define a prediction-time correction rule.
+error_research and fit_diagnostics.error_slices show rule slices of the best
+version's fit-only OOF loss, ranked by loss share minus row share, not by size.
+Rules use raw inputs and meta: __prediction/__predicted_class/__confidence (the
+base model's own output) and __history_* (strictly earlier target history of the
+same entity). Each slice has a verdict tested on held-out OOF folds:
+- fixable: remedies give remedy_ref values for frozen corrections (shift, shrink,
+  blend_history, remap, recalibrate). Execute up to 4 refs of one report as
+  {"action":"features","slice_remedies":["<remedy_ref>"]}: the controller runs
+  them on the exact version they were measured on (its recipe, parameters,
+  features and earlier corrections); an added feature_program is appended.
+- explainable: the residual is predictable from top_features; give the model
+  that signal with a feature_program or a pipeline.
+- noise: no tested correction or input explains it; spend research elsewhere.
+It is advice; the evaluator decides. Overlapping slices do not have additive
+shares. Unknown units remain unknown; useful statistical ideas do not need a
+physical story. Never use true test targets or worst residual rank to define a
+prediction-time rule.
 
 Use run_analysis for analyze(X_fit,y_fit,X_test,context) with approved libraries,
 or analyze_data for standard queries. Optional experiment_id="best" aligns X/y
@@ -35,7 +46,8 @@ network, environment or subprocess access are available to generated code.
 Return a small JSON object:
 - pipeline: action="pipeline", code exporting make_pipeline(task_spec, params),
   optional short hypothesis. Or use code_ref from edit_solution below.
-- catalog/features: an owned recipe/parameters, or an explicit feature_program.
+- catalog/features: an owned recipe/parameters, an explicit feature_program and/or
+  slice_remedies (remedy_ref values from error slices).
 - research: short unresolved question and concrete next step; next_step="continue"
   opens another bounded dialogue, "wait" pauses temporarily, "finish" closes it.
 - stop: explain why no useful research is currently available.

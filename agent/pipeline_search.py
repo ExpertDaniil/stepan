@@ -335,7 +335,7 @@ class VersionSearch:
         self.c.update_final_reserve()
         version['errors'] = 0
         if getattr(self.c, 'error_research', None):
-            self.c.error_research.compare(eid, version.get('research_binding', {}))
+            self.c.error_research.compare(eid, version.get('research_binding', {}), journal=initial)
         if getattr(self.c, 'science', None):
             self.c.science.diagnostics.ensure(self.c.graph.visible_history(version['ticket']['work_order']['branch_id']))
         champion = self.c.store.champion()

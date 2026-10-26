@@ -118,16 +118,24 @@ class MockTransport:
                 if user.get('profile_summary', user).get('data_research', {}).get('active'):
                     payload['hyperparameters'] = {}
                 from agent.feature_search import feature_focus
+                column = None
                 if feature_focus(user):
                     data = user.get('profile_summary', {}).get('data', user.get('profile', {}))
                     column = next(c for c in data['train_columns'] if c in data['test_columns'] and c != 'id')
                     payload.update(action='features', feature_program=[
                         {'op': 'missing', 'name': '__mock_missing_'+str(round_no), 'columns': [column]}])
+                observation = (user.get('profile_summary', user).get('error_research') or {}).get('observation') or {}
+                robust = [r for r in observation.get('remedies', []) if r.get('robust') and '#' in r.get('remedy_ref', '')]
+                if robust and not recipe.startswith('dummy-'):
+                    # Synthetic demo: execute the top tested slice remedy (bound to its measured base).
+                    payload.update(action='features', slice_remedies=[robust[0]['remedy_ref']])
+                    payload.pop('feature_program', None)
+                    column = None
                 from agent.scientific_research import synthetic_notes
                 payload['research_notes'] = synthetic_notes(payload, user)
                 payload['investigation'] = {
                     'question': 'Does this complete synthetic configuration improve the measured base?',
-                    'basis_ids': [], 'columns': [column] if payload['action'] == 'features' else [],
+                    'basis_ids': [], 'columns': [column] if column else [],
                     'interpretation': 'exploratory', 'mechanism': 'Synthetic demo reference, not a physical interpretation.',
                     'assumptions': ['Synthetic demo only.'], 'expected_observation': 'A valid independent configuration score.',
                     'alternative_explanation': 'Differences may reflect the joint estimator and representation.',
@@ -436,7 +444,7 @@ class Gateway:
         executable = bool(context['metadata'].get('pipeline_execution'))
         if executable:
             fields = {'action', 'hypothesis', 'code', 'code_ref', 'recipe_id', 'hyperparameters', 'feature_steps',
-                      'feature_program', 'evidence_ids', 'expected_effect', 'next_step', 'tuning'}
+                      'feature_program', 'slice_remedies', 'evidence_ids', 'expected_effect', 'next_step', 'tuning'}
             expected['properties'] = {k:v for k,v in expected['properties'].items() if k in fields}
             expected['properties']['action']['enum'] = ['pipeline', 'features', 'catalog', 'research', 'stop']
             expected['required'] = ['action']

@@ -33,12 +33,48 @@ class ValidationTests(unittest.TestCase):
             self.assertEqual(protocol['fold_plan'], [
                 {'valid_periods': {'first': '4', 'last': '4', 'count': 1}, 'fit_rows': 60, 'valid_rows': 15},
                 {'valid_periods': {'first': '5', 'last': '5', 'count': 1}, 'fit_rows': 75, 'valid_rows': 15}])
-            self.assertEqual(protocol['confirmation_indices'], [])
+            self.assertEqual(protocol['confirmation_indices'], [])  # 15-row periods are too small to split
             folds = json.loads(h.artifacts.safe_path('validation/'+result['validation_id']+'.folds.json').read_text())
             period = read_table(h.task.parent / "train.csv")["period"]
             for fold in folds:
                 self.assertLess(period.iloc[fold['fit']].max(), period.iloc[fold['valid']].min())
             self.assertEqual(sorted(i for fold in folds for i in fold['valid']), protocol['valid_indices'])
+        finally:
+            h.close()
+
+    def test_rolling_blocks_withhold_a_share_of_every_period_for_confirmation(self):
+        import numpy as np
+        import pandas as pd
+        from agent.predictions import validation_columns
+        h = Harness('regression', with_periods=True, rows=480)
+        try:
+            evaluator = Evaluator(h.spec, h.artifacts, h.store, h.log)
+            result = evaluator.create_protocol({"task_spec_id": h.spec["task_spec_id"], "dataset_id": h.spec["dataset_id"],
+                                                 "proposal": {"strategy": "temporal_holdout", "parameters": {"column": "period", "valid_fraction": 0.3}, "seed": 42, "reason": "synthetic ordered periods"}})
+            protocol = evaluator.protocols[result["validation_id"]]
+            h.schemas.validate(protocol, 'RProtocol')
+            frame = read_table(h.task.parent / "train.csv")
+            selection, confirmation = protocol['selection_indices'], protocol['confirmation_indices']
+            self.assertIsNone(protocol['confirmation_unavailable_reason'])
+            self.assertFalse(set(selection) & set(confirmation))
+            self.assertEqual(sorted(selection+confirmation), protocol['valid_indices'])
+            # Both scored periods keep selection rows and contribute withheld rows.
+            self.assertEqual(set(frame.loc[confirmation, 'period']), set(frame.loc[protocol['valid_indices'], 'period']))
+            self.assertEqual(set(frame.loc[selection, 'period']), set(frame.loc[protocol['valid_indices'], 'period']))
+            # Research scores read selection rows only: wrong withheld predictions cannot move them.
+            plan = h.plan(task_spec_id=h.spec['task_spec_id'], dataset_id=h.spec['dataset_id'], validation_id=result['validation_id'],
+                          recipe_id='linear-regressor-v1', model={'family': 'linear', 'hyperparameters': {'alpha': 1}})
+            eid = h.store.reserve(plan, h.code['sha256'])['experiment_id']
+            with h.store.db:
+                h.store.db.execute("UPDATE experiments SET state='trained' WHERE experiment_id=?", (eid,))
+            truth = frame.loc[protocol['valid_indices'], h.spec['target_column']].to_numpy(float)
+            values = np.where(np.isin(protocol['valid_indices'], confirmation), truth+1000, truth)
+            path = h.run/'rolling-predictions.csv'
+            pd.DataFrame({'__row_index': protocol['valid_indices'], validation_columns(h.spec)[0]: values}).to_csv(path, index=False)
+            art = h.artifacts.register(path, 'validation_predictions', 'text/csv')
+            ev = evaluator.evaluate({'experiment_id': eid, 'task_spec_id': h.spec['task_spec_id'], 'dataset_id': h.spec['dataset_id'],
+                'validation_id': result['validation_id'], 'predictions_artifact_id': art['artifact_id'], 'fidelity': 'full'})['evaluation']
+            self.assertAlmostEqual(ev['primary_metric']['value'], 0.0, places=9)
         finally:
             h.close()
 

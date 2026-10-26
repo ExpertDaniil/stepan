@@ -17,16 +17,16 @@ from tools.data import profile_data
 
 
 class Harness:
-    def __init__(self, kind="classification", with_periods=False, with_duplicates=False):
+    def __init__(self, kind="classification", with_periods=False, with_duplicates=False, rows=90):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.task = make_demo(self.root / "task", kind, rows=90, test_rows=12)
+        self.task = make_demo(self.root / "task", kind, rows=rows, test_rows=12)
         if with_periods:
             import pandas as pd
             for name in ("train.csv", "test.csv"):
                 path = self.task.parent / name
                 frame = pd.read_csv(path, dtype={"id": str}, keep_default_na=False)
-                frame["period"] = [i // 15 for i in range(len(frame))]
+                frame["period"] = [i*6 // len(frame) for i in range(len(frame))]
                 frame.to_csv(path, index=False)
         if with_duplicates:
             import pandas as pd

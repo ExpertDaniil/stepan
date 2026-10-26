@@ -201,8 +201,15 @@ class Evaluator:
         from agent.semantic_planning import validation_scenario
         scenario = validation_scenario(proposal, self.spec, self.artifacts)
         if fold_plan:
-            # Every rolling block is a scored deployment period; none is withheld.
-            selection, confirmation, confirmation_reason = list(b), [], 'rolling_temporal_folds_score_every_period'
+            # Every period keeps a scored selection share; a seeded row share of
+            # each period is withheld. Each block already predicts all of its
+            # rows, so the final confirmation needs no extra fit.
+            selection, confirmation, reasons = [], [], []
+            for fold in fold_plan:
+                kept, held, reason = partition(frame, fold['valid'], {**proposal, 'strategy': 'random_holdout'}, self.spec)
+                selection += kept;confirmation += held;reasons.append(reason)
+            selection, confirmation = sorted(selection), sorted(confirmation)
+            confirmation_reason = None if confirmation else 'rolling_periods:'+','.join(sorted({str(r) for r in reasons}))
         else:
             selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
         protocol = {"dataset_id": payload["dataset_id"], "metric": self.spec["metric"], "proposal": proposal,

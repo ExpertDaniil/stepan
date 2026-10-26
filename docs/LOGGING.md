@@ -78,7 +78,14 @@ fit/predict rows и число признаков; result.json сохраняе�
 неподтверждённость применения необязательных provider-параметров.
 
 `research.feedback_delivered` связывает реально отправленный запрос с revision/артефактом,
-experiment IDs и series IDs. `research.peer_resumed_while_waiting` показывает rolling dispatch;
+experiment IDs и series IDs; `changed_since_previous_turn`/`changes` показывают, принёс ли ход
+новое для исследования (лучшее решение, feedback контроллера, pending, diagnostics, series),
+а `research_base_experiment_id`/`utility_reference_experiment_id` — неизменную базу диалога и
+текущего лидера. `research.paired_comparison.improvement_vs_leader` отделяет полезность
+относительно лидера от эффекта относительно базы. `job.finished.error.code`
+`GUARD_ENVIRONMENT_BLOCKED` означает отказ guard внутри собственной обёртки (не измерение
+кандидата), `GUARD_POLICY_BLOCKED` — вызов из сгенерированного кода; `experiment.requeued`
+фиксирует повторный запуск того же кандидата. `research.peer_resumed_while_waiting` показывает rolling dispatch;
 `research.peer_deferred` — повтор без новой информации и условие возобновления.
 `search.fallback_started/finished` содержат причину и длительность; fallback_seconds не надо
 складывать с перекрывающимися API/train durations для расчёта wall time.

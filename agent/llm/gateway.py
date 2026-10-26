@@ -304,7 +304,11 @@ class Gateway:
                     revision=delivered['revision'], feedback_artifact_id=delivered['artifact_id'],
                     experiment_ids=[v['experiment_id'] for v in delivered['results']],
                     active_series_ids=[s['series_id'] for s in delivered.get('activity', {}).get('active_searches', [])],
-                    series_ids=[s['series_id'] for s in delivered['series']])
+                    series_ids=[s['series_id'] for s in delivered['series']],
+                    changed_since_previous_turn=delivered.get('changed_since_previous_turn'),
+                    changes=[c['kind'] for c in delivered.get('changes', [])],
+                    research_base_experiment_id=(delivered.get('research_frame') or {}).get('research_base_experiment_id'),
+                    utility_reference_experiment_id=((delivered.get('research_frame') or {}).get('utility_reference') or {}).get('experiment_id'))
             progress.start()
             response = self.transport.complete(request, max(0.1, min(timeout, deadline-time.monotonic())), context)
             with self.availability_lock:

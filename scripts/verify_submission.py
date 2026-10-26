@@ -3,8 +3,10 @@
 The child sees only root files copied by the platform. No repository PYTHONPATH.
 """
 import argparse
+import csv
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -87,11 +89,30 @@ def verify(archive,directory,kind):
     report=inspect_run(runs[-1])[0] if runs else {}
     events=[json.loads(l) for l in (runs[-1]/'events.jsonl').read_text().splitlines()] if runs else []
     counts={name:sum(e.get('event')==name for e in events) for name in [
-        'research.python_analysis_completed','research.checkpoint_completed','research.action_proposed','experiment.evaluated']}
+        'research.python_analysis_completed','research.checkpoint_saved','research.checkpoint_completed',
+        'research.action_proposed','experiment.evaluated']}
+    analyses=[e for e in events if e.get('event')=='research.python_analysis_completed']
+    # Background tuning may evaluate further configurations of the same program.
+    # Verify the submitted representation ran, rather than an exact trial count.
+    feature_evaluations=[e for e in events if e.get('event')=='experiment.evaluated'
+        and any(step.get('name')=='joint_signal' and step.get('op')=='product'
+                for step in e.get('hyperparameters',{}).get('feature_program',[]))]
+    with (task.parent/'test.csv').open(newline='') as stream:test=list(csv.DictReader(stream))
+    output=task.parent/'submission.csv'
+    with output.open(newline='') as stream:
+        reader=csv.DictReader(stream);columns=reader.fieldnames;submission=list(reader)
+    output_valid=(columns==['id','label'] and [r['id'] for r in submission]==[r['id'] for r in test])
+    if kind=='regression':output_valid=output_valid and all(math.isfinite(float(r['label'])) for r in submission)
+    else:
+        with (task.parent/'train.csv').open(newline='') as stream:labels={r['label'] for r in csv.DictReader(stream)}
+        output_valid=output_valid and all(r['label'] in labels for r in submission)
     result={'kind':kind,'exit_code':proc.returncode,'state':report.get('state'),
-            'events':counts,'report':report,'scope':'scripted decisions; real EDA/fit/evaluation/publication'}
+            'events':counts,'output_valid':output_valid,'report':report,
+            'scope':'scripted decisions; real EDA/fit/evaluation/publication'}
     (directory/'verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2))
-    if proc.returncode or report.get('state')!='completed' or counts['research.python_analysis_completed']!=2 or counts['research.checkpoint_completed']!=1 or report.get('research_summary',{}).get('evaluated_owned_feature_programs',0)!=1:
+    if (proc.returncode or report.get('state')!='completed' or not output_valid
+            or len(analyses)!=2 or not all(e.get('success') for e in analyses)
+            or counts['research.checkpoint_saved']!=1 or not feature_evaluations):
         raise RuntimeError('Flat ZIP replay failed; see '+str(directory/'terminal.log'))
     return result
 

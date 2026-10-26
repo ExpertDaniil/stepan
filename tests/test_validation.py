@@ -42,7 +42,7 @@ class ValidationTests(unittest.TestCase):
         finally:
             h.close()
 
-    def test_rolling_blocks_withhold_a_share_of_every_period_for_confirmation(self):
+    def test_rolling_confirmation_holds_whole_latest_periods_out_of_every_fit(self):
         import numpy as np
         import pandas as pd
         from agent.predictions import validation_columns
@@ -58,9 +58,17 @@ class ValidationTests(unittest.TestCase):
             self.assertIsNone(protocol['confirmation_unavailable_reason'])
             self.assertFalse(set(selection) & set(confirmation))
             self.assertEqual(sorted(selection+confirmation), protocol['valid_indices'])
-            # Both scored periods keep selection rows and contribute withheld rows.
-            self.assertEqual(set(frame.loc[confirmation, 'period']), set(frame.loc[protocol['valid_indices'], 'period']))
-            self.assertEqual(set(frame.loc[selection, 'period']), set(frame.loc[protocol['valid_indices'], 'period']))
+            self.assertLess(frame.loc[selection, 'period'].max(), frame.loc[confirmation, 'period'].min())
+            import json
+            folds = json.loads(h.artifacts.safe_path('validation/'+result['validation_id']+'.folds.json').read_text())
+            self.assertTrue(all(not set(confirmation).intersection(fold['fit']) for fold in folds))
+            # Perturbing only withheld labels cannot influence any rolling fit,
+            # selection prediction or selection diagnostic used by the search.
+            target = frame[h.spec['target_column']].to_numpy(float)
+            changed = target.copy();changed[confirmation] += 10000
+            for fold in folds:
+                np.testing.assert_array_equal(target[fold['fit']], changed[fold['fit']])
+            np.testing.assert_array_equal(target[selection], changed[selection])
             # Research scores read selection rows only: wrong withheld predictions cannot move them.
             plan = h.plan(task_spec_id=h.spec['task_spec_id'], dataset_id=h.spec['dataset_id'], validation_id=result['validation_id'],
                           recipe_id='linear-regressor-v1', model={'family': 'linear', 'hyperparameters': {'alpha': 1}})
@@ -89,6 +97,38 @@ class ValidationTests(unittest.TestCase):
             self.assertFalse(set(frame.iloc[protocol["train_indices"]]["category"]) & set(frame.iloc[protocol["valid_indices"]]["category"]))
         finally:
             h.close()
+
+    def test_temporal_confirmation_labels_cannot_change_selection_fits_in_either_task(self):
+        import json
+        import numpy as np
+        from sklearn.dummy import DummyClassifier, DummyRegressor
+        for kind in ['regression', 'classification']:
+            h = Harness(kind, with_periods=True, rows=480)
+            try:
+                evaluator = Evaluator(h.spec, h.artifacts, h.store, h.log)
+                result = evaluator.create_protocol({'task_spec_id': h.spec['task_spec_id'], 'dataset_id': h.spec['dataset_id'],
+                    'proposal': {'strategy': 'temporal_holdout', 'parameters': {'column': 'period', 'valid_fraction': .3},
+                                 'seed': 42, 'reason': 'Synthetic forward prediction'}})
+                protocol = evaluator.protocols[result['validation_id']]
+                folds = json.loads(h.artifacts.safe_path('validation/'+result['validation_id']+'.folds.json').read_text())
+                held = protocol['confirmation_indices'];self.assertTrue(held)
+                data = read_table(h.task.parent/'train.csv')
+                original = data[h.spec['target_column']].to_numpy()
+                changed = original.copy()
+                if kind == 'regression':changed[held] += 10000
+                else:
+                    labels = sorted(set(original))
+                    changed[held] = [labels[(labels.index(label)+1)%len(labels)] for label in original[held]]
+                self.assertFalse(np.array_equal(original[held], changed[held]))
+                model_type = DummyRegressor if kind == 'regression' else DummyClassifier
+                for fold in folds:
+                    self.assertFalse(set(held).intersection(fold['fit']))
+                    x = data[['period']]
+                    before = model_type().fit(x.iloc[fold['fit']], original[fold['fit']]).predict(x.iloc[fold['valid']])
+                    after = model_type().fit(x.iloc[fold['fit']], changed[fold['fit']]).predict(x.iloc[fold['valid']])
+                    np.testing.assert_array_equal(before, after)
+                self.assertEqual(len(folds), 2)  # Existing predictions are reused, no extra confirmation fit.
+            finally:h.close()
 
     def test_duplicate_groups_never_straddle_the_holdout(self):
         import pandas as pd

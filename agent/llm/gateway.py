@@ -229,7 +229,8 @@ class Gateway:
                 context['metadata'].setdefault('authorized_feedback_ids', []).append(delivered['artifact_id'])
                 from agent.research_feedback import compact_updates, frame_updates
                 delivered = frame_updates(compact_updates(delivered), context)
-                context['metadata'].setdefault('delivered_experiment_ids', []).extend(r['experiment_id'] for r in delivered['results'])
+                context['metadata'].setdefault('delivered_experiment_ids', []).extend(
+                    r['experiment_id'] for r in [*delivered['results'], *delivered.get('candidate_results', [])])
             if delivered:
                 feedback_message = {'role': 'user', 'content': json.dumps(
                     {'research_updates': delivered}, ensure_ascii=False)}
@@ -295,7 +296,7 @@ class Gateway:
             if delivered:
                 evidence_ids = [delivered['artifact_id']]
                 evidence_ids.extend(r['artifact_id'] for r in delivered.get('fit_diagnostics', []))
-                for result in delivered['results']:
+                for result in [*delivered['results'], *delivered.get('candidate_results', [])]:
                     evidence_ids.extend(result[k] for k in ('experiment_id', 'evaluation_id', 'diagnostics_artifact_id'))
                 evidence_ids.extend(s['artifact_id'] for s in delivered['series'])
                 evidence_ids.extend(r['artifact_id'] for r in delivered.get('fit_diagnostics', []))
@@ -864,6 +865,12 @@ class Gateway:
                             trace = {'call_id': call['id'], 'name': name, 'artifact_id': result.get('artifact_id'),
                                      'knowledge_ids': [r['id'] for r in result.get('results', [])]}
                         calls.append(trace)
+                        tool_error = result.get('error')
+                        if isinstance(tool_error, dict):
+                            self.log.event('research.tool_failed', level='WARNING', call_no=call_no, tool=name,
+                                tool_call_id=call['id'], code=tool_error.get('code'),
+                                message=str(tool_error.get('message', ''))[:600],
+                                artifact_id=result.get('artifact_id'))
                         if not result.get('error'):
                             delivered_ids = set(result.get('evidence_ids', []))
                             if result.get('artifact_id'):
@@ -1026,7 +1033,8 @@ class Gateway:
                 'question', 'Continue the unresolved question from saved reports and drafts.')
         checkpoint = normalize_action({'action': 'research', 'next_step': 'continue',
             'evidence_ids': [],
-            'hypothesis': str(question)[:1000]+' Continue from the archived results; repair the last failed step. '+error.code})
+            'hypothesis': str(question)[:650]+' Continue from the archived results and last rejected proposal; repair it rather than '
+                'restarting the investigation. Last failure: '+error.code+': '+str(error)[:300]})
         art = self.artifacts.write_json('research/controller-checkpoint-'+uuid.uuid4().hex[:12]+'.json',
                                        checkpoint, 'controller_research_checkpoint')
         self.log.event('research.context_checkpoint', artifact_id=art['artifact_id'], reason=error.code,

@@ -15981,7 +15981,7 @@
         "experiment_id": {
           "type": "string",
           "minLength": 1,
-          "description": "Optional best or visible experiment ID: align X/y with its fit-only OOF predictions, errors and fold IDs in context[\"oof\"]."
+          "description": "Optional best or visible experiment ID. context[\"oof\"] contains aligned DataFrames predictions/errors, Series fold_ids, list row_ids; regression also residuals/squared_errors. y is a Series for one target only when include_target=true; X_test is None unless compare_test=true."
         }
       },
       "required": [

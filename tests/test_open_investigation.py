@@ -45,6 +45,13 @@ class PythonAnalysisTests(unittest.TestCase):
         first = run_analysis(service,q)
         self.assertFalse(first['report']['success'])
         self.assertIn('KeyError',first['report']['error'])
+        self.assertEqual(first['report']['error_type'], 'KeyError')
+        self.assertEqual(first['report']['failure_scope'], 'analysis_code')
+        self.assertIn('X.columns', first['report']['repair_hint'])
+        self.assertEqual(service.artifacts.resolve(first['code_artifact_id']).read_text(), q['code'])
+        event = next(fields for (name, *rest), fields in self.events if name == 'research.python_analysis_completed')
+        self.assertEqual(event['error_code'], 'ANALYSIS_CODE_FAILED')
+        self.assertEqual(event['error_type'], 'KeyError')
         second = run_analysis(service,{**q,'code':q['code'].replace('absent','x')})
         self.assertTrue(second['report']['success'],second)
         for code in ["import os\ndef analyze(a,b,c,d):\n return os.environ\n",
@@ -56,6 +63,45 @@ class PythonAnalysisTests(unittest.TestCase):
         with self.assertRaises(AgentError):
             run_analysis(service,{'question':'Bad columns','columns':['target'],
                 'code':'def analyze(a,b,c,d):\n return 1\n'})
+
+    def test_numpy_nonfinite_scalars_and_pandas_missing_values_are_json_safe(self):
+        service = self.service();service.budget.reserve_seconds = lambda: 0
+        reply = run_analysis(service, {'question': 'Summarize missing aggregates', 'columns': ['x'],
+            'code': 'import numpy as np\nimport pandas as pd\ndef analyze(X,y,T,context):\n'
+                    '    return {"missing":np.float32("nan"), "limit":np.float64("inf"), "nullable":pd.NA, "date":pd.NaT}\n'})
+        self.assertTrue(reply['report']['success'], reply)
+        self.assertEqual(reply['report']['result'], dict.fromkeys(['missing', 'limit', 'nullable', 'date']))
+
+    def test_analysis_can_fit_an_owned_lazy_backend_under_the_guard(self):
+        service = self.service();service.budget.reserve_seconds = lambda: 0
+        reply = run_analysis(service, {'question': 'Check an affordable owned model', 'columns': ['x'], 'include_target': True,
+            'code': 'from agent.ml import build_pipeline\ndef analyze(X,y,T,context):\n'
+                    '    task={"task_kind":"regression","metric":{"metric_id":"rmse"}}\n'
+                    '    model=build_pipeline("strong-regressor-v1",task,{"bags":1,"_cpu_threads":1}).fit(X.iloc[:100],y.iloc[:100])\n'
+                    '    return {"rows":len(model.predict(X.iloc[:5]))}\n'})
+        self.assertTrue(reply['report']['success'], reply)
+        self.assertEqual(reply['report']['result']['rows'], 5)
+
+    def test_process_start_failure_is_retained_with_its_code(self):
+        service = self.service();service.budget.reserve_seconds = lambda: 0
+        query = {'question': 'A refused process is not a scientific result', 'columns': ['x'],
+                 'code': 'def analyze(X,y,T,context):\n    return len(X)\n'}
+        with patch('tools.python_analysis.subprocess.Popen', side_effect=OSError('synthetic process start refusal')):
+            result = run_analysis(service, query)
+        self.assertFalse(result['report']['success'])
+        self.assertEqual(result['report']['error_code'], 'ANALYSIS_EXECUTION_FAILED')
+        self.assertEqual(result['report']['failure_scope'], 'execution_environment')
+        self.assertEqual(service.artifacts.resolve(result['code_artifact_id']).read_text(), query['code'])
+
+    def test_timed_out_analysis_is_stopped_and_returns_a_resource_report(self):
+        from tools.python_analysis import execute_analysis
+        service = self.service()
+        result = execute_analysis(service, 'def analyze(X,y,T,context):\n    while True: pass\n',
+                                  (None, None, None, {}), .5)
+        self.assertFalse(result['success'])
+        self.assertEqual(result['error_code'], 'ANALYSIS_TIMEOUT')
+        self.assertEqual(result['failure_scope'], 'resource_limit')
+        self.assertIsNone(service.active_process)
 
 
 class ResearchCheckpointTests(unittest.TestCase):

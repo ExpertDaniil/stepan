@@ -26,12 +26,26 @@ FACTORY_SOURCE = ('from agent.feature_engineering import make_feature_pipeline\n
                   'def make_pipeline(task_spec, params):\n'
                   '    return make_feature_pipeline(task_spec, params)\n')
 
+
+def normalize_program(program):
+    """An absent optional group and JSON null mean the same for non-group ops.
+
+    Never discard an actual grouping column or guess target-statistic keys.
+    """
+    result = deepcopy(program)
+    if isinstance(result, list):
+        for step in result:
+            if isinstance(step, dict) and step.get('op') not in GROUP_OPS and step.get('group_by', False) is None:
+                step.pop('group_by')
+    return result
+
 def validate_program(program, columns=None, excluded=()):
+    program = normalize_program(program)
     if not isinstance(program, list) or not 1 <= len(program) <= 24:
         raise ValueError('feature_program must contain 1..24 operations')
     available = set(columns) if columns is not None else None
     generated = set()
-    for step in program:
+    for index, step in enumerate(program):
         if not isinstance(step, dict) or set(step)-{'op', 'name', 'columns', 'group_by', 'input_units', 'output_unit', 'period', 'origin', 'alpha'}:
             raise ValueError('Unknown feature operation fields')
         op, name, inputs = step.get('op'), step.get('name'), step.get('columns')
@@ -60,9 +74,11 @@ def validate_program(program, columns=None, excluded=()):
         elif 'period' in step or 'origin' in step:
             raise ValueError('period/origin belong only to cyclic operators')
         group = step.get('group_by')
-        if ((op in GROUP_OPS and not (isinstance(group, str) and group))
-                or (op not in GROUP_OPS and 'group_by' in step)):
-            raise ValueError('group_by is required only for grouped numeric operations')
+        if op in GROUP_OPS and not (isinstance(group, str) and group):
+            raise ValueError(f'feature_program[{index}].group_by: {op} requires a nonempty input column name')
+        if op not in GROUP_OPS and 'group_by' in step:
+            hint = 'Put the 1..4 grouping keys in columns; omit group_by.' if op in TARGET_OPS else 'Omit group_by for this operator.'
+            raise ValueError(f'feature_program[{index}].group_by: unsupported for {op}. '+hint)
         dependencies = inputs + ([group] if group is not None else [])
         if any(c in excluded or (available is not None and c not in available) for c in dependencies):
             raise ValueError('Feature depends on an absent or excluded column')

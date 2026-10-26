@@ -22,6 +22,13 @@ with that version's fit-only inner OOF context["oof"]: predictions, errors,
 fold_ids and row_ids; regression adds residuals/squared_errors. include_target=true
 supplies fit targets. OOF_PENDING means continue other analysis while diagnostics
 wait. Old reports name their exact source; they are not automatically current.
+X_fit/X_test are DataFrames; X_test is None unless compare_test=true. y_fit is
+None unless include_target=true, a Series for one target and a DataFrame for
+multiple targets. OOF predictions/errors/residuals are DataFrames: for a single
+target use .iloc[:,0], aligned on X_fit.index. residuals mean prediction minus
+truth. context['oof'] is None without experiment_id. Inspect column names and
+dtypes before indexing; failed reports give error_code/error_message/repair_hint
+and retain the exact code. Repair that computation rather than restarting it.
 Return compact results; large tables stay in Python. No held-out labels or file,
 network, environment or subprocess access are available to generated code.
 
@@ -66,6 +73,12 @@ the worker binds group/time/random folds to the frozen validation protocol.
 Unseen keys use the fitted prior/count=0; the first temporal block has no future
 history and remains missing/count=0. Check general quality and new-key slices.
 These operations are not physical entity-ID proof and currently support regression.
+For target_mean/target_count, grouping keys belong in columns, not group_by.
+group_by is used only by group_mean/group_std/group_rank/relative_to_group.
+Omit inapplicable optional fields. Native tree models can combine missing-value
+branches already; an explicit missing flag changes representation, not the
+available information. A whole-pipeline gain alone does not prove its proposed
+physical explanation; distinguish observations from interpretations.
 
 For classification with metric_id=f1_macro, an executable candidate may use:
 from agent.feature_engineering import make_feature_pipeline

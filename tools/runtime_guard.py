@@ -31,7 +31,7 @@ def recipe_modules(value):
     return found
 
 
-def prepare_pipeline_imports(code_path, parameters=None):
+def prepare_pipeline_imports(code_path, parameters=None, *, analysis=False):
     """Initialize declared allowed libraries before sealing generated execution.
 
     Only package imports run here, never the generated module or its functions.
@@ -42,7 +42,12 @@ def prepare_pipeline_imports(code_path, parameters=None):
     import importlib
     from tools.code import validate_code
 
-    tree = validate_code(Path(code_path).read_text(encoding='utf-8'))
+    source = Path(code_path).read_text(encoding='utf-8')
+    if analysis:
+        from tools.python_analysis import validate_analysis
+        tree = validate_analysis(source)
+    else:
+        tree = validate_code(source)
     modules = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

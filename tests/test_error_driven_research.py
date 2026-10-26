@@ -402,6 +402,7 @@ class FinalBudgetTests(unittest.TestCase):
         h=GraphHarness(research_mode='adaptive',graph_hard_decisions=False,time_budget_seconds=900)
         try:
             c=h.controller;c.graph=h.g;c.failed_refits=set();c.science=None
+            c.submission=SimpleNamespace(ready_candidate=lambda eid:None)
             c.researcher=SimpleNamespace(gateway=SimpleNamespace(cancelled=threading.Event()))
             for name in ('begin_finalization','affordable_final_candidate','final_candidate','update_final_reserve'):
                 setattr(c,name,MethodType(getattr(Orchestrator,name),c))

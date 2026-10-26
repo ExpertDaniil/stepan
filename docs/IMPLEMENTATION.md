@@ -238,3 +238,12 @@ C00–C24 не меняются. Snapshot весов необязателен, �
 
 В рамках этого изменения тесты не запускались по просьбе пользователя.
 
+## Research reliability update — 2026-10-26
+
+Research/tool repair and independent temporal confirmation are documented in
+[RESEARCH-RELIABILITY-20261026.md](RESEARCH-RELIABILITY-20261026.md).
+Temporal selection uses earlier validation periods; confirmation withholds the
+latest whole periods from every rolling fit and from adaptive metrics. The
+existing saved predictions are reused after the research barrier. This update
+passed 636 tests via `scripts/check.py --jobs 3`.
+

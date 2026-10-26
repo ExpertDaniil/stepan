@@ -166,6 +166,7 @@ class Orchestrator:
                     measured.append({'experiment_id': eid, 'evaluation_id': ev['evaluation_id'],
                         'primary_metric': ev['primary_metric'], 'diagnostics_artifact_id': ev['diagnostics_artifact_id'],
                         'plan_id': exp['plan']['plan_id'], 'recipe_id': exp['plan']['recipe_id'],
+                        'execution_kind': ('background_tuning' if exp['plan']['plan_id'].startswith('background-trial-') else 'candidate'),
                         'effective_parameters': exp['plan']['model']['hyperparameters']})
             memory = self.graph.research_memory(scope, []) if self.graph else None
             if memory is None:
@@ -173,6 +174,11 @@ class Orchestrator:
                 memory = build_research_memory(self.store, self.artifacts, ids)
             series = [s for d in memory['decisions'] for s in d.get('tuning_series', [])]
             latest = measured[-8:]
+            # Candidate outcomes must survive the fast-moving trial window, even
+            # when a researcher's submitted representation does not become best.
+            candidate_results = [{k:r[k] for k in ('experiment_id', 'evaluation_id', 'primary_metric',
+                'diagnostics_artifact_id', 'plan_id', 'recipe_id', 'execution_kind')}
+                for r in measured if r['execution_kind'] == 'candidate'][-4:]
             incumbent = max(measured, key=lambda v: v['primary_metric']['value']*(
                 1 if v['primary_metric']['direction'] == 'maximize' else -1), default=None)
             if incumbent and incumbent not in latest:
@@ -201,11 +207,12 @@ class Orchestrator:
                 if exp['state'] in {'queued', 'running', 'trained'}:
                     pending_experiments.append({'experiment_id': eid, 'state': exp['state'],
                         'researcher_id': exp['plan']['researcher_id'], 'recipe_id': exp['plan']['recipe_id'],
-                        'plan_id': exp['plan']['plan_id']})
+                        'plan_id': exp['plan']['plan_id'],
+                        'execution_kind': ('background_tuning' if exp['plan']['plan_id'].startswith('background-trial-') else 'candidate')})
             from agent.evidence import comparison_context
             from agent.context_details import solution_record
             solution_catalog = {r['experiment_id']: solution_record(self.store, self.artifacts, r['experiment_id'])
-                                for r in latest}
+                                for r in [*latest, *candidate_results]}
             mailbox.publish(scope, {'branch_id': scope, 'dataset_id': self.spec['dataset_id'],
                 'task_spec_id': self.spec['task_spec_id'], 'validation_id': self.validation['validation_id'],
                 'comparison_evidence': comparison_context(self.store, self.artifacts, ids),
@@ -213,6 +220,7 @@ class Orchestrator:
                 'pending_experiments': pending_experiments[-4:],
                 'admission_feedback': [r for r in self.research_feedback if r['branch_id'] == scope][-4:],
                 'results': latest, 'omitted_result_count': len(measured)-len(latest),
+                'candidate_results': candidate_results,
                 'solution_catalog': solution_catalog,
                 'best_solution': ({'experiment_id': incumbent['experiment_id'], 'recipe_id': incumbent['recipe_id'],
                     'metric': incumbent['primary_metric'], 'read': {'experiment_id': incumbent['experiment_id'], 'view': 'pipeline'}}

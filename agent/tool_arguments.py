@@ -33,6 +33,9 @@ def normalize_tool_arguments(name, args):
         value.setdefault('offset', 0)
         value.setdefault('limit_bytes', 4000)
     elif name == 'analyze_data':
+        if 'derived' in value:
+            from agent.feature_schema import normalize_program
+            value['derived'] = normalize_program(value['derived'])
         if value.get('kind') == 'report':
             # Explicit incompatible new-analysis fields remain errors, not silently ignored.
             value.setdefault('columns', [])

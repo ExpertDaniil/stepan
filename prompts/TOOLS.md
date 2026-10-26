@@ -124,6 +124,26 @@ and fold IDs in `context['oof']`. `OOF_PENDING` never authorizes selection label
 Large matrices stay in Python; return bounded aggregates. Diagnostics are sampled
 when declared, overlap across feature groups, and do not establish attainable gain.
 
+`X_fit` and `X_test` are DataFrames; `X_test` is None without compare_test=true.
+`y_fit` is None without include_target=true; otherwise it is a Series for one
+target or a DataFrame for multiple targets. `context['oof']` is None without
+experiment_id. Its predictions/errors (and regression residuals/squared_errors)
+are DataFrames aligned on X_fit.index; fold_ids is a Series and row_ids a list.
+Regression residuals are prediction minus truth. Example for a one-target task:
+```python
+def analyze(X_fit, y_fit, X_test, context):
+    oof = context['oof']
+    if oof is None:
+        return {'columns': list(X_fit.columns), 'rows': len(X_fit)}
+    residual = oof['residuals'].iloc[:, 0]
+    return {'mean_bias': float(residual.mean()), 'rows': len(residual)}
+```
+Failed executions retain their source and traceback and return error_code,
+error_type, error_message, failure_scope and repair_hint. Fix the saved code;
+identical failed computations are cached, not retrained. Read large reports
+through analyze_data kind=report. Target-statistic feature operations use
+columns=[grouping keys]; group_by belongs only to grouped numeric operations.
+
 `edit_solution` accepts exactly one source: `experiment_id`, `draft_id` or `code`.
 Optional edits are exact `old`/`new` replacements; each old fragment must match once.
 It returns a scoped `draft_id`, including invalid source retained for repair.

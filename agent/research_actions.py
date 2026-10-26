@@ -186,6 +186,9 @@ def validate_action(action, catalog):
 
 def normalize_action(action):
     action = dict(action)
+    if 'feature_program' in action:
+        from agent.feature_schema import normalize_program
+        action['feature_program'] = normalize_program(action['feature_program'])
     for key, value in {'recipe_id': 'none', 'hyperparameters': {}, 'feature_steps': [],
                        'code': None, 'tuning': None, 'expected_effect': action.get('hypothesis', '')}.items():
         action.setdefault(key, value)

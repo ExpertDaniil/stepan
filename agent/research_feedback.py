@@ -138,6 +138,11 @@ def frame_updates(view, context):
     research base (effect of the change) and the current best (utility).
     """
     import json
+    view = deepcopy(view)
+    # Background trial IDs/states churn after every fit. They stay in the exact
+    # mailbox details but cannot by themselves refresh the researcher's feed.
+    view['pending_experiments'] = [r for r in view.get('pending_experiments', [])
+                                   if r.get('execution_kind') != 'background_tuning']
     frame = context.get('_research_frame')
     if frame is None:
         user = json.loads(context['messages'][1]['content'])
@@ -152,6 +157,7 @@ def frame_updates(view, context):
         context['_research_frame'] = frame
     best = view.get('best_solution') or {}
     relevant = canonical([best.get('experiment_id'), best.get('metric'), view.get('admission_feedback', []),
+                          view.get('candidate_results', []),
                           view.get('pending_experiments', []), [r.get('artifact_id') for r in view.get('fit_diagnostics', [])],
                           [{k: s.get(k) for k in ('series_id', 'status', 'best_experiment_id')} for s in view.get('series', [])]])
     previous = context.get('_feedback_turn')
@@ -169,6 +175,10 @@ def frame_updates(view, context):
         seen = {canonical(r) for r in previous['view'].get('admission_feedback', [])}
         changes.extend({'kind': 'controller_feedback', 'status': r.get('status'), 'code': r.get('code')}
                        for r in view.get('admission_feedback', []) if canonical(r) not in seen)
+        for field, kind in (('candidate_results', 'candidate_result'), ('pending_experiments', 'pending_research'),
+                            ('fit_diagnostics', 'fit_diagnostics'), ('series', 'tuning_series')):
+            if canonical(previous['view'].get(field, [])) != canonical(view.get(field, [])):
+                changes.append({'kind': kind})
     result = deepcopy(view)
     result['research_frame'] = {**frame,
         'utility_reference': {k: best.get(k) for k in ('experiment_id', 'recipe_id', 'metric')} if best else None,

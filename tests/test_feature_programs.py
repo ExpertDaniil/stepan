@@ -73,3 +73,17 @@ class FeatureProgramTests(unittest.TestCase):
     def test_schema_matches_runtime_declaration(self):
         schemas = Schemas()
         self.assertEqual(schemas.schema['$defs']['ResearchAction'], ACTION_SCHEMA)
+
+    def test_null_optional_group_is_canonical_but_real_invalid_group_needs_repair(self):
+        from agent.research_actions import normalize_action
+        original = [{'op': 'target_mean', 'name': 'prior', 'columns': ['a'], 'group_by': None}]
+        action = normalize_action({'action': 'features', 'hypothesis': 'Measure a prior', 'evidence_ids': [],
+                                   'feature_program': original})
+        self.assertNotIn('group_by', action['feature_program'][0])
+        self.assertIn('group_by', original[0])
+        Schemas().validate(action, 'ResearchAction')
+        self.assertEqual(validate_program(original), action['feature_program'])
+        with self.assertRaisesRegex(ValueError, r'feature_program\[0\].group_by: unsupported for target_mean.*keys in columns'):
+            validate_program([{**original[0], 'group_by': 'a'}])
+        with self.assertRaisesRegex(ValueError, r'feature_program\[0\].group_by: group_mean requires'):
+            validate_program([{'op': 'group_mean', 'name': 'avg', 'columns': ['a'], 'group_by': None}])

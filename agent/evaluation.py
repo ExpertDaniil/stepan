@@ -200,18 +200,15 @@ class Evaluator:
         from agent.confirmation import partition
         from agent.semantic_planning import validation_scenario
         scenario = validation_scenario(proposal, self.spec, self.artifacts)
-        if fold_plan:
-            # Every period keeps a scored selection share; a seeded row share of
-            # each period is withheld. Each block already predicts all of its
-            # rows, so the final confirmation needs no extra fit.
-            selection, confirmation, reasons = [], [], []
-            for fold in fold_plan:
-                kept, held, reason = partition(frame, fold['valid'], {**proposal, 'strategy': 'random_holdout'}, self.spec)
-                selection += kept;confirmation += held;reasons.append(reason)
-            selection, confirmation = sorted(selection), sorted(confirmation)
-            confirmation_reason = None if confirmation else 'rolling_periods:'+','.join(sorted({str(r) for r in reasons}))
-        else:
-            selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
+        # Temporal confirmation keeps the latest whole periods closed. Random
+        # rows from an earlier block would enter the next rolling model's fit
+        # and could influence adaptive selection through that model's score.
+        # Reuse the saved predictions; no extra fit is needed for confirmation.
+        selection, confirmation, confirmation_reason = partition(frame, b, proposal, self.spec)
+        if fold_plan and confirmation:
+            held = set(confirmation)
+            if any(held.intersection(fold['fit']) for fold in fold_plan):
+                raise AgentError('INVALID_SPLIT', 'Confirmation labels must be absent from every rolling fit')
         protocol = {"dataset_id": payload["dataset_id"], "metric": self.spec["metric"], "proposal": proposal,
                     "train_indices": a, "valid_indices": b, "evaluator_version": "sklearn-metrics-v2",
                     'selection_indices': selection, 'confirmation_indices': confirmation, 'scenario': scenario,

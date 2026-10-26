@@ -56,6 +56,7 @@ python3 solution.py "data_for_participants/Регрессия/task.md" --env-fil
 | Настройка | Значение в профиле посылки |
 |---|---|
 | AUTOML_PROFILE | platform |
+| TIME_BUDGET_SECONDS | 10800 — 3 часа на одну задачу |
 | RESEARCH_MODE | adaptive |
 | CATALOG_WARMUP_EXPERIMENTS / RESEARCH_SERIES_SIZE | 4 / 4 |
 | LLM_MAX_CALLS | 0 — без численного лимита вызовов |

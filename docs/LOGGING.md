@@ -301,3 +301,16 @@ lifetime peer count stop. pipeline.batch_extended records measured return, admis
 and the preserved study. research.pipeline_draft_saved retains source and errors.
 submission.finalization_barrier fixes the deliverable and closes research before
 confirmation. llm.budget_availability_confirmed requires an actual successful probe.
+# Research reliability (2026-10-26)
+
+`research.python_analysis_completed` includes `error_code`, `error_type`,
+`error_message`, `failure_scope`, `guard_origin` and `repair_hint` for unsuccessful
+executions. Its artifact retains the traceback and its source artifact retains
+the exact code. Time/memory/process failures also produce readable reports.
+`research.tool_failed` reports rejected tool calls (including invalid arguments)
+with the call ID, code and short message. These are not model-quality measurements.
+
+Per-turn feedback distinguishes submitted `candidate_results` from background
+trials. Pending background trial IDs do not alone change the research view;
+candidate outcomes remain visible when they leave the recent trial window.
+The full branch mailbox remains available through its scoped detail reference.

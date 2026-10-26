@@ -25,7 +25,7 @@ PYTHON_ANALYSIS_SCHEMA = {'type': 'object', 'properties': {
                 'items': {'type': 'string', 'minLength': 1}},
     'include_target': {'type': 'boolean'}, 'compare_test': {'type': 'boolean'},
     'experiment_id': {'type': 'string', 'minLength': 1,
-        'description': 'Optional best or visible experiment ID: align X/y with its fit-only OOF predictions, errors and fold IDs in context["oof"].'}},
+        'description': 'Optional best or visible experiment ID. context["oof"] contains aligned DataFrames predictions/errors, Series fold_ids, list row_ids; regression also residuals/squared_errors. y is a Series for one target only when include_target=true; X_test is None unless compare_test=true.'}},
     'required': ['question', 'code', 'columns'], 'additionalProperties': False}
 
 
@@ -38,6 +38,51 @@ def validate_analysis(code):
         raise AgentError('INVALID_ANALYSIS_CODE', 'Export analyze(X_fit, y_fit, X_test, context)')
     # Reuse the pipeline's import/IO policy, without its estimator entrypoint.
     validate_code(code+'\n\ndef make_pipeline(task_spec, params):\n    return None\n')
+    return tree
+
+
+def execute_analysis(service, code, inputs, timeout):
+    """Return a retained report even for import, process, memory or time failures."""
+    from agent.config import ROOT
+    from tools.analysis_worker import failure_report
+    try:
+        with tempfile.TemporaryDirectory(prefix='stepan-analysis-') as directory:
+            directory = Path(directory)
+            source = directory/'analysis.py';source.write_text(code)
+            data_path = directory/'input.pkl'
+            with data_path.open('wb') as stream:pickle.dump(inputs, stream)
+            output = directory/'result.json'
+            env = {k:v for k,v in os.environ.items() if k in {'PATH','SYSTEMROOT','LANG','LC_ALL'}}
+            env.update(PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE='1', OMP_NUM_THREADS='1',
+                       OPENBLAS_NUM_THREADS='1', MKL_NUM_THREADS='1', NUMEXPR_NUM_THREADS='1')
+            process = subprocess.Popen([sys.executable, '-m', 'tools.analysis_worker', str(source),
+                str(data_path), str(output)], cwd=directory, env=env, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True)
+            with service.process_lock:service.active_process = process
+            try:
+                end = time.monotonic()+timeout
+                while process.poll() is None:
+                    if service.cancelled.is_set():
+                        raise AgentError('RESEARCH_CANCELLED', 'Python analysis cancelled for publication')
+                    if time.monotonic() >= end:
+                        raise AgentError('ANALYSIS_TIMEOUT', 'Python analysis reached its execution budget')
+                    try:process.wait(timeout=min(.1, max(.001, end-time.monotonic())))
+                    except subprocess.TimeoutExpired:pass
+            finally:
+                try:os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:pass
+                process.wait()
+                with service.process_lock:service.active_process = None
+            if not output.exists():
+                code = 'ANALYSIS_MEMORY_LIMIT' if process.returncode == 137 else 'ANALYSIS_EXECUTION_FAILED'
+                raise AgentError(code, 'Analysis process exited without a report: '+str(process.returncode))
+            return json.loads(output.read_text())
+    except AgentError as error:
+        if error.code == 'RESEARCH_CANCELLED':raise
+        return failure_report(error)
+    except (OSError, ValueError) as error:
+        wrapped = AgentError('ANALYSIS_EXECUTION_FAILED', str(error)[:600])
+        return failure_report(wrapped)
 
 
 def run_analysis(service, query, context=None):
@@ -129,43 +174,10 @@ def run_analysis(service, query, context=None):
         if (context or {}).get('_tool_deadline') is not None:
             timeout = min(timeout, context['_tool_deadline']-time.monotonic()-.1)
         if timeout < 1:raise AgentError('SEARCH_CLOSED', 'No analysis time before publication reserve')
-        with tempfile.TemporaryDirectory(prefix='stepan-analysis-') as directory:
-            directory = Path(directory)
-            source = directory/'analysis.py';source.write_text(query['code'])
-            data_path = directory/'input.pkl'
-            with data_path.open('wb') as stream:
-                pickle.dump((frame[columns].copy(), y, test, {'scope': 'fit_only', 'oof': oof,
-                    'population_rows': population, 'analyzed_rows': len(frame),
-                    'sampled': len(frame) < population, 'test_population_rows': test_population}), stream)
-            output = directory/'result.json'
-            env = {k:v for k,v in os.environ.items() if k in {'PATH','SYSTEMROOT','LANG','LC_ALL'}}
-            env.update(PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE='1', OMP_NUM_THREADS='1',
-                       OPENBLAS_NUM_THREADS='1', MKL_NUM_THREADS='1', NUMEXPR_NUM_THREADS='1')
-            process = subprocess.Popen([sys.executable, '-m', 'tools.analysis_worker', str(source),
-                str(data_path), str(output)], cwd=directory, env=env, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL, start_new_session=True)
-            with service.process_lock:
-                service.active_process = process
-            try:
-                end = time.monotonic()+timeout
-                while process.poll() is None:
-                    if service.cancelled.is_set():
-                        raise AgentError('RESEARCH_CANCELLED', 'Python analysis cancelled for publication')
-                    if time.monotonic() >= end:
-                        raise subprocess.TimeoutExpired(process.args, timeout)
-                    try:process.wait(timeout=min(.1, max(.001, end-time.monotonic())))
-                    except subprocess.TimeoutExpired:pass
-            except subprocess.TimeoutExpired as exc:
-                raise AgentError('ANALYSIS_TIMEOUT', 'Python analysis reached its execution budget') from exc
-            finally:
-                try:os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:pass
-                process.wait()
-                with service.process_lock:
-                    service.active_process = None
-            if not output.exists():
-                raise AgentError('ANALYSIS_EXECUTION_FAILED', 'Analysis process exited without a report: '+str(process.returncode))
-            result = json.loads(output.read_text())
+        result = execute_analysis(service, query['code'], (frame[columns].copy(), y, test,
+            {'scope': 'fit_only', 'oof': oof, 'target_columns': targets(service.spec),
+             'population_rows': population, 'analyzed_rows': len(frame),
+             'sampled': len(frame) < population, 'test_population_rows': test_population}), timeout)
         result.update(scope='fit_only', validation_id=service.validation_id, query={**query,'kind':'python'},
                       fit_rows=service.fit_rows, matched_fit_rows=population, analyzed_rows=len(frame),
                       sampled=population > len(frame), duration_seconds=time.monotonic()-started)
@@ -181,5 +193,6 @@ def run_analysis(service, query, context=None):
             'scope': 'fit_only', 'work_order_id': (context or {}).get('metadata', {}).get('graph_binding', {}).get('work_order_id')})
         service.log.event('research.python_analysis_completed', artifact_id=art['artifact_id'],
             code_artifact_id=code_art['artifact_id'], success=result['success'], rows=len(frame),
-            duration_seconds=result['duration_seconds'])
+            duration_seconds=result['duration_seconds'],
+            **{k:result[k] for k in ('error_code', 'error_type', 'error_message', 'failure_scope', 'guard_origin', 'repair_hint') if k in result})
         return response

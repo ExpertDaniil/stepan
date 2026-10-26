@@ -1060,14 +1060,20 @@ class Gateway:
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
                 if (not truncated and not engineer_used and executable and dialogue_id is not None
                         and getattr(self.config, 'llm_repair_engineer_enabled', False)
-                        and attempt < payload['attempt_limit'] and deadline-time.monotonic() > 2):
+                        and attempt < payload['attempt_limit'] and deadline-time.monotonic() > 2
+                        # Never spend the researcher's last funded repair turn:
+                        # the engineer runs only when a fallback turn remains.
+                        and self.budget.dialogue_slots(dialogue_id) >= 2):
                     from agent.llm.repair_engineer import prepare
-                    source_user = json.loads(context['messages'][1]['content'])
-                    base = source_user.get('base_result')
-                    detail = context['metadata'].get('detail_artifact_id')
-                    if base is None and detail:
-                        base = self.artifacts.read_json(detail).get('sections', {}).get('base_result')
-                    engineer_packet = prepare(content, exc, expected, base)
+                    try:
+                        source_user = json.loads(context['messages'][1]['content'])
+                        base = source_user.get('base_result')
+                        detail = context['metadata'].get('detail_artifact_id')
+                        if base is None and detail:
+                            base = self.artifacts.read_json(detail).get('sections', {}).get('base_result')
+                        engineer_packet = prepare(content, exc, expected, base)
+                    except (AgentError, OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+                        engineer_packet = None  # Optional helper; ordinary repair remains.
                     if engineer_packet is not None:
                         engineer_used = True
                         record = self.artifacts.write_json('llm/engineer-'+uuid.uuid4().hex[:12]+'.json',

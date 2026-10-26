@@ -120,7 +120,7 @@ class EngineerGatewayTests(unittest.TestCase):
         return result, transport, events, g, bad
 
     def test_real_validator_accepts_repair_in_existing_reserved_attempt(self):
-        result, transport, events, g, bad = self.run_case(calls=2)
+        result, transport, events, g, bad = self.run_case(calls=3)
         self.assertEqual(result['decision'], 'propose')
         self.assertEqual(len(transport.requests), 2)
         packet = json.loads(transport.requests[1]['messages'][1]['content'])
@@ -142,6 +142,13 @@ class EngineerGatewayTests(unittest.TestCase):
                 self.assertIn('llm.repair_engineer_fallback', [e['event'] for e in events])
                 self.assertNotIn('llm.repair_engineer_accepted', [e['event'] for e in events])
                 self.assertGreater(len(transport.requests[2]['messages']), 2)
+
+    def test_last_funded_repair_turn_stays_with_the_researcher(self):
+        result, transport, events, g, _ = self.run_case('decline', calls=2)
+        self.assertEqual(result['decision'], 'research')
+        self.assertEqual(result['stop_reason'], 'Continue with the saved observation.')
+        self.assertEqual(len(transport.requests), 2)
+        self.assertNotIn('llm.repair_engineer_started', [e['event'] for e in events])
 
     def test_valid_actions_and_disabled_feature_have_no_extra_engineer(self):
         for mode, enabled in (('valid', True), ('repair', False)):

@@ -240,6 +240,10 @@ class Budget:
             return (requested if growth <= free else
                     item['max_tokens']+max(0, int(free//item['slots'])))
 
+    def dialogue_slots(self, ident):
+        with self.lock:
+            return self.llm_dialogues.get(ident, {}).get('slots', 0)
+
     def prepare_dialogue_turn(self, ident, max_tokens, *, allow_tools):
         """Atomically fund an optional tool request or use the protected final slot."""
         with self.lock:

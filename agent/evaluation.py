@@ -138,6 +138,28 @@ class Evaluator:
             self._selection_truth = cached
         return cached[1]
 
+    def bootstrap_units(self, validation_id, rows):
+        """Protocol-defined units, read without any confirmation targets."""
+        import pandas as pd
+        proposal = self.protocols[validation_id]['proposal']
+        strategy, params = proposal['strategy'], proposal['parameters']
+        key = (validation_id, tuple(rows))
+        cached = getattr(self, '_bootstrap_units', None)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        result = {'unit': 'row'}  # IID is an assumption when the protocol declares no groups.
+        if strategy in {'group_holdout', 'temporal_holdout'}:
+            column = params['column']
+            table = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec, columns=[column], rows=rows)
+            result = {'clusters': table[column].tolist(), 'unit': 'group' if strategy == 'group_holdout' else 'period'}
+        elif params.get('duplicate_groups'):
+            table = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec, rows=rows)
+            columns = [c for c in table if c not in {*targets(self.spec), *self.spec['excluded_features']}]
+            result = {'clusters': pd.util.hash_pandas_object(table[columns].astype(str), index=False).tolist(),
+                      'unit': 'observable_duplicate_group'}
+        self._bootstrap_units = (key, result)
+        return result
+
     def paired_significance(self, reference_id, candidate_id):
         """Paired bootstrap of candidate vs reference on the same selection rows; cached per pair."""
         key = (reference_id, candidate_id)
@@ -150,7 +172,8 @@ class Evaluator:
             raise AgentError('INCOMPARABLE_EVALUATIONS', 'Significance needs the same validation rows')
         truth = self.selection_truth(rows)
         seed = int(hashlib.sha256((reference_id+'|'+candidate_id).encode()).hexdigest()[:8], 16)
-        result = paired_bootstrap(self.spec, truth, reference, candidate, seed=seed)
+        result = paired_bootstrap(self.spec, truth, reference, candidate, seed=seed,
+                                  **self.bootstrap_units(validation, rows))
         result.update(reference_experiment_id=reference_id, candidate_experiment_id=candidate_id, rows=len(rows))
         self.significance_cache[key] = result
         return result

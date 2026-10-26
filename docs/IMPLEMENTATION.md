@@ -1,5 +1,7 @@
 > Текущие OOF, очередь ошибок, продолжение, черновики и финализация: [ERROR-DRIVEN-RESEARCH.md](ERROR-DRIVEN-RESEARCH.md).
 > Это описание имеет приоритет над историческими count stops ниже.
+> Completion of slice diagnostics, isolated model fits, cluster resampling and stable
+> research utility: [RESEARCH-COMPLETION-20261026.md](RESEARCH-COMPLETION-20261026.md).
 
 > Platform settings: [PLATFORM.md#настройки-в-посылке](PLATFORM.md#настройки-в-посылке).
 > The flat ZIP embeds the public allowlisted `recipes/platform-env.json` as readable

@@ -51,13 +51,14 @@ def partition(frame, valid, proposal, spec):
 def select_finalists(controller, reference):
     """Rank deliverable measured candidates, including previous verified outputs."""
     candidates = []
+    from agent.duration import refit_seconds
     champion = controller.store.champion()
     for row in controller.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated'", (controller.store.run_id,)):
         eid = row[0]
         ev = controller.store.experiment_evaluation(eid)
         if eid not in controller.failed_refits and ev and ev['valid'] and not ev['violations'] and comparable(reference, ev['primary_metric']):
             ready = (champion and champion['experiment_id'] == eid) or bool(controller.submission.ready_candidate(eid))
-            cost = controller.budget.duration.estimate(controller.store.get(eid)['plan'], 'refit')+controller.budget.output_reserve()
+            cost = refit_seconds(controller.budget.duration, controller.store.get(eid)['plan'])+controller.budget.output_reserve()
             if not ready and cost > controller.budget.remaining():continue
             candidates.append((eid, ev['primary_metric']['value']))
     candidates.sort(key=lambda pair: pair[1], reverse=reference['direction'] == 'maximize')

@@ -208,6 +208,9 @@ class ErrorResearch:
                     if self.visible_source(eid, visible)]
         if not measured:return {'instruction': 'Establish a learned reference; useful analysis and executable changes need no research forms.'}
         metric, base = max(measured, key=lambda p: p[0]['value']*(1 if p[0]['direction'] == 'maximize' else -1))
+        if hasattr(c, 'research_reference'):
+            reference = c.research_reference([{'experiment_id': eid, 'primary_metric': m} for m, eid in measured], branch)
+            metric, base = reference['primary_metric'], reference['experiment_id']
         visible = {eid for _, eid in measured}
         assignment_key = branch+'/'+peer
         previous = self.assignments.get(assignment_key)
@@ -340,7 +343,9 @@ class ErrorResearch:
                 mask = rule_membership(definition, data, matrices[0], c.spec, source)
             else:
                 mask = group_mask(data, truth, definition) if definition else np.zeros(len(rows), dtype=bool)
-            result = paired_result(c.spec, truth, matrices[0], matrices[1], mask)
+            result = paired_result(c.spec, truth, matrices[0], matrices[1], mask, significance=False)
+            if (result['overall']['improvement'] or 0) > 0:
+                result['significance'] = c.evaluator.paired_significance(base, eid)
             result['versus_current_leader'] = (
                 {'experiment_id': leader, **paired_result(c.spec, truth, matrices[2], matrices[1], mask, significance=False)['overall']}
                 if versus_leader else {'experiment_id': leader, 'same_as': 'candidate' if leader == eid else 'research_base'})
@@ -352,6 +357,7 @@ class ErrorResearch:
             # distinguish from zero is reported as such, never as a discovery.
             improvement = result['overall']['improvement'] or 0
             result['status'] = ('overall_improved' if improvement > 0 and result['significance'].get('significant') else
+                'unconfirmed_gain' if improvement > 0 and result['significance'].get('probability_better') is None else
                 'within_noise' if improvement > 0 else
                 'partial_group_improvement' if (result['inside_group']['improvement'] or 0) > 0 else 'no_gain')
             art = c.artifacts.write_json('research/paired-'+eid+'.json', result, 'paired_research_result')
@@ -359,6 +365,7 @@ class ErrorResearch:
                 'candidate_experiment_id','proposal_base_experiment_id','status','overall','inside_group','outside_group',
                 'versus_current_leader')},
                 'probability_better': result['significance'].get('probability_better'),
+                **{k: result['significance'].get(k) for k in ('resampling_unit', 'independent_units', 'unavailable')},
                 'scope': self.publication(eid, binding.get('branch_id')),
                 'source_artifact_id': binding.get('source_artifact_id')}
             self.results.append(summary)
@@ -410,7 +417,9 @@ def candidate_line(c, eid, peer, definition, result):
     leader = result.get('versus_current_leader', {})
     versus = (f"; vs leader {leader.get('improvement'):+.6g}" if isinstance(leader.get('improvement'), (int, float)) else '')
     probability = result.get('significance', {}).get('probability_better')
-    noise = f", P(better)={probability:.2f}" if isinstance(probability, float) else ''
+    support = result.get('significance', {})
+    noise = (f", bootstrap_win_fraction={probability:.2f}" if isinstance(probability, float) else
+             ', uncertainty='+support['unavailable'] if support.get('unavailable') else '')
     return (f"{peer}: {'; '.join(changes)}{where}: slice {metric} {pair(result['inside_group'])}, "
             f"overall {pair(result['overall'])}{noise}{versus} => {result['status']}")
 

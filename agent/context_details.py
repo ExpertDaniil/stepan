@@ -42,6 +42,7 @@ def read_solution(query, context, artifacts, log):
     if not frozen:
         raise AgentError('MEMORY_SCOPE_DENIED', 'No scoped solution snapshot is available')
     catalog = {}
+    preferred = None
     # Newest delivered snapshots override old state; never open a sibling's ID.
     for aid in reversed(metadata.get('authorized_feedback_ids', [])):
         update = artifacts.read_json(aid)
@@ -50,6 +51,8 @@ def read_solution(query, context, artifacts, log):
             raise AgentError('MEMORY_SCOPE_DENIED', 'Solution feedback outside this task/branch/validation')
         for eid, record in update.get('solution_catalog', {}).items():
             catalog.setdefault(eid, record)
+        if preferred is None:
+            preferred = (update.get('best_solution') or {}).get('experiment_id')
         requested = query['experiment_id']
         if requested in catalog or (requested == 'best' and (update.get('best_solution') or {}).get('experiment_id') in catalog):
             break
@@ -64,7 +67,9 @@ def read_solution(query, context, artifacts, log):
         measured = [v for v in catalog.values() if v.get('metric')]
         if not measured:
             raise AgentError('SOLUTION_UNAVAILABLE', 'No measured solution in this scope')
-        eid = max(measured, key=lambda v: v['metric']['value']*(1 if v['metric']['direction'] == 'maximize' else -1))['experiment_id']
+        preferred = preferred or (snapshot['sections'].get('research_incumbent') or {}).get('experiment_id')
+        eid = (preferred if preferred in catalog and catalog[preferred].get('metric') else
+               max(measured, key=lambda v: v['metric']['value']*(1 if v['metric']['direction'] == 'maximize' else -1))['experiment_id'])
     if eid not in catalog:
         raise AgentError('MEMORY_SCOPE_DENIED', 'Experiment is not visible in this task/branch snapshot',
                          details={'available_experiment_ids': list(catalog)[:16], 'hint': 'Use experiment_id=best for the scoped incumbent.'})
@@ -335,10 +340,13 @@ def prepare_details(user, spec, artifacts, log, *, validation_id=None, validatio
                     documents['execution/'+eid] = {'artifact_id': meta['artifact_id'], 'sha256': meta['sha256'], 'format': 'json'}
     measured = [r for k, r in sections.items() if k.startswith('experiment/') and r.get('metric')]
     if measured:
-        best = max(measured, key=lambda r: r['metric']['value']*(1 if r['metric']['direction'] == 'maximize' else -1))
+        preferred = (profile.get('error_research') or {}).get('leader', {}).get('experiment_id')
+        best = next((r for r in measured if r['experiment_id'] == preferred), None)
+        best = best or max(measured, key=lambda r: r['metric']['value']*(1 if r['metric']['direction'] == 'maximize' else -1))
         profile['research_incumbent'] = {'experiment_id': best['experiment_id'], 'metric': best['metric'],
             'recipe_id': best['plan']['recipe_id'], 'read': {'experiment_id': best['experiment_id'], 'view': 'pipeline'},
-            'instruction': 'Strongest visible measured solution. The assignment base records graph lineage; improve this solution or a justified alternative.'}
+            'instruction': 'Stable visible utility reference. Raw trial results remain readable by ID; support is conditional, not proof of transfer.'}
+        sections['research_incumbent'] = deepcopy(profile['research_incumbent'])
     for name in ('decisions', 'ideas', 'semantics', 'dictionary', 'facts', 'analyses', 'quantities', 'relations', 'research_feedback'):
         for index, item in enumerate(sections.get(name, [])):
             sections[name+'/'+str(index)] = item

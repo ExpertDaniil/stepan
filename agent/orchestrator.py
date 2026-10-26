@@ -187,9 +187,8 @@ class Orchestrator:
                     # Row-noise verdict of the paired comparison with the research base.
                     row['paired_verdict'] = {'status': verdict['status'], 'base_experiment_id': verdict['proposal_base_experiment_id'],
                                              'improvement': verdict['overall'].get('improvement'),
-                                             'probability_better': verdict.get('probability_better')}
-            incumbent = max(measured, key=lambda v: v['primary_metric']['value']*(
-                1 if v['primary_metric']['direction'] == 'maximize' else -1), default=None)
+                                             **{k: verdict.get(k) for k in ('probability_better', 'resampling_unit', 'independent_units', 'unavailable')}}
+            incumbent = self.research_reference(measured, scope)
             if incumbent and incumbent not in latest:
                 latest.insert(0, incumbent)
             for result in latest[:-2]:
@@ -238,8 +237,29 @@ class Orchestrator:
                 'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
                 'instruction': 'Controller measurements at request dispatch. Compare only compatible protocols. '
                     'Metrics here are exact; a result read repeats them. The assignment base is graph lineage, not '
-                    'necessarily the best solution; read_solution(experiment_id="best") returns the strongest visible '
-                    'version when its code or parameters matter to your question.'})
+                    'necessarily the utility reference; read_solution(experiment_id="best") returns the stable visible '
+                    'reference. Individual trial IDs remain readable; bootstrap support does not prove transfer.'})
+
+    def research_reference(self, measured, scope):
+        """Stable branch-local utility reference; raw best/results remain intact."""
+        if not measured:return None
+        best = max(measured, key=lambda r: r['primary_metric']['value']*(
+            1 if r['primary_metric']['direction'] == 'maximize' else -1))
+        leaders = getattr(self, 'research_leaders', {})
+        old = next((r for r in measured if r['experiment_id'] == leaders.get(scope)), None)
+        chosen = best
+        if old and old['experiment_id'] != best['experiment_id'] and getattr(self.config, 'noise_aware_publication', True):
+            from agent.significance import admits_update
+            try:
+                verdict = self.evaluator.paired_significance(old['experiment_id'], best['experiment_id'])
+                if not admits_update(verdict):chosen = old
+            except (AgentError, ValueError, KeyError):
+                chosen = old  # Missing evidence is not a reason to interrupt research.
+        self.research_leaders = {**leaders, scope: chosen['experiment_id']}
+        if leaders.get(scope) != chosen['experiment_id']:
+            self.log.event('research.utility_reference_changed', branch_id=scope,
+                           previous_experiment_id=leaders.get(scope), experiment_id=chosen['experiment_id'])
+        return chosen
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
         if self.budget.data_research_snapshot()['active']:
@@ -363,6 +383,12 @@ class Orchestrator:
     def update_final_reserve(self):
         best = self.final_candidate()
         champion = self.store.champion()
+        # Publication may keep a stable champion while raw-best is still a final
+        # confirmation contender. Its refit must not become an unreserved cost.
+        if not getattr(self, 'finalization_started', False):
+            raw = self.store.best()
+            if raw and raw not in self.failed_refits and not self.submission.ready_candidate(raw):
+                best = raw
         if best and best not in self.failed_refits and (not champion or champion["experiment_id"] != best):
             self.budget.set_final_plan(self.store.get(best)["plan"])
         else:
@@ -421,12 +447,15 @@ class Orchestrator:
             logged.add((incumbent, best))
             self.log.event('submission.noise_gate', experiment_id=best, champion_experiment_id=incumbent,
                            significant=verdict['significant'], gain=verdict['gain'], probability_better=verdict['probability_better'],
-                           interval=verdict['interval'], method=verdict['method'], rule=verdict.get('rule'))
-        return best if verdict['significant'] else incumbent
+                           interval=verdict['interval'], method=verdict['method'], rule=verdict.get('rule'),
+                           **{k: verdict.get(k) for k in ('resampling_unit', 'independent_units', 'unavailable')})
+        from agent.significance import admits_update
+        return best if admits_update(verdict) else incumbent
 
     def affordable_final_candidate(self):
         """Choose an entire deliverable, including refit/predict/validation cost."""
         from agent.store import comparable
+        from agent.duration import refit_seconds
         best = self.store.best()
         if not best:return None
         reference = self.store.experiment_evaluation(best)['primary_metric']
@@ -438,7 +467,7 @@ class Orchestrator:
             ev = self.store.experiment_evaluation(eid)
             if not ev or not ev['valid'] or ev['violations'] or not comparable(ev['primary_metric'], reference):continue
             ready = (champion and champion['experiment_id'] == eid) or bool(self.submission.ready_candidate(eid))
-            cost = 0 if ready else (self.budget.duration.estimate(self.store.get(eid)['plan'], 'refit')
+            cost = 0 if ready else (refit_seconds(self.budget.duration, self.store.get(eid)['plan'])
                                    +self.budget.output_reserve()+self.budget.confirmation_seconds)
             if ready or cost <= self.budget.remaining():
                 metric = ev['primary_metric']
@@ -708,7 +737,8 @@ class Orchestrator:
                 candidate_artifact_id=ready['submission_artifact_id'], refit_seconds=0)
             return
         self.budget.set_final_plan(experiment["plan"])
-        predicted = self.budget.duration.estimate(experiment["plan"], "refit")
+        from agent.duration import refit_seconds
+        predicted = refit_seconds(self.budget.duration, experiment["plan"])
         if champion and self.budget.remaining() < predicted + self.budget.output_reserve():
             self.log.event("submission.refit_deferred", experiment_id=ident, estimated_seconds=predicted,
                            remaining_seconds=self.budget.remaining())

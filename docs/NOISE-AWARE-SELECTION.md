@@ -1,40 +1,49 @@
-# Noise-aware acceptance
+# Conditional support and stable research references
 
-In the reviewed regression run every result after minute 23 was the same
-representation with jittered LightGBM parameters (36.79 -> 36.49 RMSE). The
-team's own fixed-parameter ablation shows about 0.7 RMSE between seeds, and
-about 300 candidates were ranked on one selection set: the argmin was largely
-selection noise, yet each new argmin triggered a refit and was reported to the
-researchers as progress.
+`agent/significance.py` compares saved prediction vectors on selection rows.
+RMSE/MSE/MAE/R2, RMSLE/MSLE, MAPE/SMAPE, accuracy and log loss use aggregated
+row losses; other metrics are recomputed on each resample. Aggregation is batched
+to keep memory bounded. No confirmation targets are read.
 
-`agent/significance.py` compares two fixed prediction vectors on the same
-selection rows with a paired bootstrap of the declared metric:
+The evaluator chooses units from the frozen validation protocol:
 
-- metrics that are means of a per-row loss (RMSE/MSE/MAE/R2, RMSLE/MSLE,
-  MAPE/SMAPE, accuracy, log loss) resample weight vectors (200 resamples,
-  vectorized); others (F1 family, kappas, MCC, AUC, ...) are recomputed per
-  resample (100);
-- an improvement is real when P(candidate better) >= 0.95 and the relative
-  gain is at least 0.1% of the reference value.
+- group holdout: resample entire declared groups;
+- temporal holdout: resample entire observed validation periods;
+- duplicate-group random holdout: resample observable duplicate feature groups;
+- otherwise: IID rows, an explicit assumption rather than proof of independence.
 
-A consistent small gain (every row a little closer) passes; parameter jitter
-that helps some rows and hurts others does not.
+A conditional bootstrap win fraction >= 0.95 and relative gain >= 0.1% gives
+`significant=true` for compatibility with the previous internal wire shape.
+`bootstrap_win_fraction` is its descriptive name; `probability_better` is retained
+as an alias. This is not a posterior probability of transfer, a correction for
+adaptive multiple search, or an estimate of training-seed variance. Dependencies
+not represented by the protocol remain unknown.
 
-Where it acts:
+With one observed period (or one group), between-unit uncertainty is unavailable.
+The result has `significant=false`, a null win fraction and an explicit reason.
+A material positive selection gain (the same 0.1% policy floor) may still advance
+publication and the utility reference; it is reported as `unconfirmed_gain`, not
+as statistical support. Thus a short history does not freeze useful measured
+progress or manufacture thousands of independent periods from their rows.
 
-1. **Publication during search.** `Orchestrator.noise_gate` keeps the
-   published champion while a newer raw-best is not significantly better
-   (`submission.noise_gate` logs each decision once per pair). This saves the
-   refit and keeps a measured output instead of an indistinguishable one. It
-   never acts during finalization: closed confirmation still chooses among the
-   finalists on its own rows. `NOISE_AWARE_PUBLICATION=0` disables it.
-2. **Research verdicts.** Paired comparisons of a research candidate with its
-   base report `significance`; status `overall_improved` now requires it,
-   otherwise `within_noise`. Researchers see `paired_verdict` in
-   `candidate_results`, and the journal line shows `P(better)`.
+## Where it acts
 
-`Store.best()` stays the raw argmin: graph export and research references
-depend on that invariant. Seed variance of the learners themselves is not
-re-measured here (that would cost extra fits); the strong learner already
-averages three seeds, and averaging the final top configurations (a separate
-change) reduces it further.
+- Search publication retains the last verified CSV until the candidate passes
+  this policy and refit/output validation. Final confirmation is independent of
+  this publication heuristic and runs only after research closes.
+- Research paired verdicts use the evaluator's same cached protocol-aware
+  comparison. Non-supported positive gains are `within_noise` or
+  `unconfirmed_gain`, with unit/count/unavailability details.
+- Each branch's utility reference advances under the same policy. Advice,
+  feedback, fresh context snapshots and `read_solution("best")` use that reference.
+  Raw results and explicit experiment IDs remain readable; `Store.best()` keeps
+  its exact raw ranking for evaluation, export and finalization.
+- Background trial changes alone do not wake a waiting researcher. A supported
+  utility change, candidate outcome, diagnostic or controller feedback can;
+  timed recovery and explicit continuation retain their existing behavior.
+
+Tests include four dependent groups repeated hundreds of times: IID row
+resampling promotes a gain that group resampling leaves unsupported. Duplicating
+those rows again does not increase the group win fraction. Tests also cover a
+single temporal period, class metrics, stable aliases, branch isolation and
+research recovery without parameter-trial churn.

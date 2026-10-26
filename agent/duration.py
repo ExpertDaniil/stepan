@@ -4,6 +4,15 @@ from copy import deepcopy
 import math
 
 
+def refit_seconds(duration, plan):
+    """Deliverable job cost: an integral lease plus one dispatcher handoff second.
+
+    Admission must not accept a fractional estimate that the integer lease will
+    truncate. The search-to-refit transition also includes preparation/dispatch.
+    """
+    return math.ceil(duration.estimate(plan, 'refit'))+1
+
+
 class DurationModel:
     @staticmethod
     def sample_key(plan):

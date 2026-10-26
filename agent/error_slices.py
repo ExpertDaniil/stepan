@@ -1,18 +1,10 @@
-"""Error slices: where the leader's fit-only OOF loss concentrates and whether it is fixable.
+"""Fit-only error slices and executable corrections checked on a last inner fold.
 
-Single-column groups rank large populations first ("State X: 74% of SSE" when it
-holds 84% of rows). Here a shallow tree over raw inputs and model/entity meta
-finds rule-defined slices, ranked by EXCESS loss (loss share minus row share).
-Each slice is then tested, cross-fitted over the OOF folds:
-
-* fixable    – a frozen correction (agent.slice_actions) improves the declared
-               metric on held-out folds; the remedy is ready to execute;
-* explainable – the slice residual is predictable from inputs (feature work);
-* noise      – neither: do not spend research on it.
-
-Inputs are fit-partition rows only (inner OOF); no selection/confirmation label
-is read. Parameters of a remedy are estimated on all OOF slice rows and frozen;
-the Evaluator later measures the corrected pipeline on selection rows.
+Rules and correction parameters use discovery folds. The diagnostic worker also
+excludes check labels from discovery model fits and entity discovery. A holdout
+win is conditional evidence; unresolved means this lab did not establish a
+remedy, not that the region is irreducible noise. Selection and final closed
+confirmation independently judge the delivered candidate.
 """
 from copy import deepcopy
 import hashlib
@@ -267,14 +259,6 @@ def simplify(conditions):
 
 # --------------------------------------------------------------------------- remedies
 
-def _fold_pairs(fold):
-    folds = np.asarray(fold)
-    values = np.unique(folds)
-    if len(values) < 2:
-        return []
-    return [(np.flatnonzero(folds != f), np.flatnonzero(folds == f)) for f in values]
-
-
 def _fit_regression(problem, action, rows, history_last):
     """Frozen params for ``action`` estimated on ``rows`` (slice rows of the estimation folds)."""
     fy = actions.forward(problem.y[rows], problem.scale)
@@ -403,7 +387,7 @@ def evaluate_remedy(problem, action, mask, discovery, check, history_last=None):
             'robust': bool(inside >= MIN_HOLDOUT_SLICE_ROWS and gain > 0 and relative >= MIN_RELATIVE_GAIN)}
 
 
-def explainability(problem, data, meta, mask, discovery, check, excluded, seed=42):
+def explainability(problem, data, meta, mask, discovery, check, excluded, seed=42, cpu_threads=1):
     """Slice residual (regression) or error (classification) predicted on the holdout fold from discovery rows."""
     import lightgbm as lgb
     train_rows, test_rows = discovery[mask[discovery]], check[mask[check]]
@@ -427,7 +411,7 @@ def explainability(problem, data, meta, mask, discovery, check, excluded, seed=4
     if not problem.regression and (len(set(target[train])) < 2 or len(set(target[~train])) < 2):
         return None
     options = dict(n_estimators=150, learning_rate=0.05, num_leaves=15, min_child_samples=max(10, len(train_rows)//50),
-                   subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=seed, n_jobs=2, verbose=-1)
+                   subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=seed, n_jobs=cpu_threads, verbose=-1)
     model = model_type(**options).fit(frame[train], target[train])
     predicted = model.predict(frame[~train]) if problem.regression else model.predict_proba(frame[~train])[:, 1]
     gains = model.booster_.feature_importance(importance_type='gain')
@@ -469,7 +453,7 @@ def _metric_text(value):
     return f'{value:.6g}'
 
 
-def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=None, seed=42, deadline=None):
+def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=None, seed=42, deadline=None, cpu_threads=1):
     """Mine slices on fit-only OOF and test remedies. Never raises for analysis problems."""
     started = time.monotonic()
     try:
@@ -532,7 +516,7 @@ def analyze(data, truth, prediction, fold, spec, *, meta_history=None, entity=No
                     remedies.append(result)
             remedies.sort(key=lambda r: (-r['robust'], -r['oof_gain']))
             try:
-                explain = explainability(problem, data, meta, mask, discovery, check, excluded, seed=seed)
+                explain = explainability(problem, data, meta, mask, discovery, check, excluded, seed=seed, cpu_threads=cpu_threads)
             except (ValueError, TypeError, MemoryError) as error:
                 explain = {'measure': 'unavailable', 'reason': str(error)[:200], 'explainable': False, 'top_features': []}
         best = remedies[0] if remedies and remedies[0]['robust'] else None

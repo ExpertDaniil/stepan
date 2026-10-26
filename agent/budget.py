@@ -145,10 +145,11 @@ class Budget:
         return max(0.0, self.deadline - time.monotonic())
 
     def reserve_seconds(self):
+        from agent.duration import refit_seconds
         with self.lock:
             floor = self.output_reserve()
             plans = ([self.final_plan] if self.final_plan else []) + [item["plan"] for item in self.leases.values() if item.get("plan")]
-            return floor + self.confirmation_seconds + max((self.duration.estimate(plan, "refit") for plan in plans), default=0)
+            return floor + self.confirmation_seconds + max((refit_seconds(self.duration, plan) for plan in plans), default=0)
 
     def output_reserve(self):
         floor = min(60, max(2, self.config.time_budget_seconds * .03))
@@ -159,7 +160,8 @@ class Budget:
             with self.lock:self.publication_durations.append(seconds)
 
     def candidate_reserve(self, plan):
-        return max(self.reserve_seconds(), self.output_reserve() + self.confirmation_seconds + self.duration.estimate(plan, "refit"))
+        from agent.duration import refit_seconds
+        return max(self.reserve_seconds(), self.output_reserve() + self.confirmation_seconds + refit_seconds(self.duration, plan))
 
     def can_train(self, plan):
         with self.lock:

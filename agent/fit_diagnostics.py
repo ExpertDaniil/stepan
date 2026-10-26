@@ -93,7 +93,15 @@ def inner_folds(frame, spec, proposal, seed):
         splits = StratifiedKFold(count, shuffle=True, random_state=seed).split(frame, y)
     else:
         splits = KFold(3, shuffle=True, random_state=seed).split(frame)
-    return [{'fit': list(map(int, a)), 'predict': list(map(int, b))} for a, b in splits]
+    result = [{'fit': list(map(int, a)), 'predict': list(map(int, b))} for a, b in splits]
+    # The last fold checks the slice lab, so its labels must not enter ANY
+    # discovery model, not just its own model. Keep the existing number of fits.
+    held = set(result[-1]['predict'])
+    for split in result[:-1]:
+        split['fit'] = [i for i in split['fit'] if i not in held]
+    if any(not split['fit'] for split in result):
+        raise ValueError('Too few independent discovery folds for a held-out slice diagnostic')
+    return result
 
 
 def execute_oof(module, task, params, fit_x, fit_y, job, guard, limits):
@@ -125,9 +133,54 @@ def execute_oof(module, task, params, fit_x, fit_y, job, guard, limits):
     if output['__row_index'].duplicated().any():
         raise ValueError('OOF rows must be predicted exactly once')
     output.to_csv(job['prediction_path'], index=False)
+    if job['diagnostic'].get('analyze'):
+        # The expensive slice lab shares this job's process, lease, CPU, RSS and
+        # hard timeout. The dispatcher only verifies and publishes the report.
+        deadline = started+job['timeout_seconds']-1
+        report = diagnostic_analysis(fit_x, fit_y, output, job['diagnostic']['folds'], task,
+                                     job.get('training_policy'), job['seed'], job['cpu_threads'], deadline)
+        Path(job['prediction_path']).with_name('diagnostics.json').write_text(
+            json.dumps(report, ensure_ascii=False, allow_nan=False), encoding='utf-8')
     return {'success': True, 'fit_seconds': time.monotonic()-started,
             'rows': len(output), 'diagnostic_only': True, 'folds': len(records),
             'sample_rows': len(fit_x), 'model_path': None}
+
+
+def diagnostic_analysis(X, y, output, folds, task, policy, seed, cpu_threads, deadline):
+    """Worker-owned lab. Both key discovery and history exclude check-fold labels."""
+    import numpy as np
+    from agent.predictions import targets, validation_columns
+    from agent.error_slices import analyze, plain
+    rows = output['__row_index'].tolist()
+    data, truth = X.loc[rows], y.loc[rows]
+    prediction = output[validation_columns(task)].to_numpy()
+    report = error_profile(data, truth, prediction, output['__fold'], task, deadline=deadline)
+    entity = history = None
+    discovery = sorted({i for split in folds for i in split['fit']})
+    check = set(folds[-1]['predict'])
+    if check.intersection(discovery):
+        raise ValueError('Diagnostic check labels entered a discovery fit')
+    try:
+        if task['task_kind'] == 'regression' and len(targets(task)) != 1:
+            slices = {'available': False, 'reason': 'multi_target_regression', 'slices': []}
+        else:
+            if (policy or {}).get('strategy') == 'temporal_holdout' and time.monotonic() < deadline:
+                from agent.strong import EntityHistory, discover_entity
+                fit_x, fit_y = X.iloc[discovery], y.iloc[discovery]
+                found = discover_entity(fit_x, np.asarray(fit_y, dtype=float).reshape(-1), policy['column'],
+                                        seconds=min(15, max(0, deadline-time.monotonic())))
+                if found:
+                    entity = {'columns': list(found['columns']), 'period_column': policy['column']}
+                    history = EntityHistory(**entity).fit(fit_x, np.asarray(fit_y).reshape(-1)).transform(data)
+                    history = history.reset_index(drop=True)
+            slices = analyze(data, truth, prediction, output['__fold'].to_numpy(), task,
+                             meta_history=history, entity=entity, seed=seed, deadline=deadline, cpu_threads=cpu_threads)
+    except (AgentError, ValueError, KeyError, TypeError, MemoryError) as error:
+        slices = {'available': False, 'reason': str(error)[:300], 'slices': []}
+    report.update(error_slices=slices, analysis_execution='leased_oof_worker',
+                  discovery_fit_row_ids=X.index.to_numpy()[discovery].tolist(),
+                  check_row_ids=X.index.to_numpy()[folds[-1]['predict']].tolist())
+    return plain(report)
 
 
 def error_values(truth, prediction, task):
@@ -291,7 +344,8 @@ class FitDiagnostics:
         progress = min(1., max(0., (time.monotonic()-c.budget.started)/c.config.time_budget_seconds))
         # Reserve half of the allowance for later representations.
         unlocked = total*(.5+.5*progress)
-        return min(unlocked-self.spent,
+        active = time.monotonic()-self.running['started'] if self.running else 0.
+        return min(unlocked-self.spent-active,
                    c.budget.remaining()-c.budget.reserve_seconds()-2, c.budget.phase_remaining()-2)
 
     def ensure(self, ids):
@@ -305,7 +359,7 @@ class FitDiagnostics:
                     and ev['primary_metric']['validation_id'] == c.validation['validation_id']):
                 m = ev['primary_metric']
                 candidates.append((m['value']*(1 if m['direction'] == 'minimize' else -1), eid))
-        if not candidates or self.remaining() < 5 or not c.budget.snapshot()['search_allowed']:return
+        if not candidates or not c.budget.snapshot()['search_allowed']:return
         eid = min(candidates)[1]
         if eid not in self.pending and (not self.running or self.running['eid'] != eid):
             reports = [r for r in self.records if r['experiment_id'] == eid]
@@ -363,7 +417,7 @@ class FitDiagnostics:
             unused = c.artifacts.write_json('diagnostics/'+owner+'.unused.json', [], 'diagnostic_unused_rows')
             job = c.runner.start_diagnostics({'lease': lease, 'lease_owner_id': owner,
                 'train_rows_artifact_id': fit['artifact_id'], 'valid_rows_artifact_id': unused['artifact_id'],
-                'diagnostic': {'folds': folds, 'scope': 'fit_only_inner_oof'}}, c.spec, c.store.get(eid))
+                'diagnostic': {'folds': folds, 'scope': 'fit_only_inner_oof', 'analyze': True}}, c.spec, c.store.get(eid))
             self.running = {'job': job, 'eid': eid, 'selected': selected, 'folds': folds, 'proposal': proposal,
                             'started': started, 'complete_rows': len(indices), 'owner': owner}
             self.pending.remove(eid);self.attempted.add(eid)
@@ -388,6 +442,8 @@ class FitDiagnostics:
         if c.runner.poll(job) is None:return
         # Clear before wait_jobs: that routine may itself service diagnostics.
         self.running = None
+        completed = time.monotonic()
+        self.spent += completed-state['started']
         try:
             event = c.wait_jobs([job])[job.job_id]
             if event['state'] != 'succeeded':raise ValueError('OOF worker ended '+event['state'])
@@ -396,7 +452,7 @@ class FitDiagnostics:
             self.postpone_failure(state['eid'], error)
             if state['eid'] not in self.pending:self.pending.append(state['eid'])
             c.log.event('diagnostics.oof_unavailable', experiment_id=state['eid'], reason=str(error)[:600], retryable=True)
-        finally:self.spent += time.monotonic()-state['started']
+        finally:self.spent += time.monotonic()-completed
         c.publish_research_updates()
 
     def complete(self, state, event):
@@ -410,12 +466,10 @@ class FitDiagnostics:
         rows = raw['__row_index'].tolist()
         expected = sorted(selected[i] for f in folds for i in f['predict'])
         if rows != expected or len(set(rows)) != len(rows):raise ValueError('OOF coverage differs from trusted fit folds')
-        data = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, rows=rows)
-        names = targets(c.spec);y = data[names if len(names) > 1 else names[0]]
-        pred = checked_matrix(raw[validation_columns(c.spec)].to_numpy(), len(rows), len(validation_columns(c.spec)),
+        checked_matrix(raw[validation_columns(c.spec)].to_numpy(), len(rows), len(validation_columns(c.spec)),
                               c.spec['metric']['prediction_kind'], labels=c.spec['allowed_labels'])
-        report = error_profile(data, y, pred, raw['__fold'], c.spec, deadline=time.monotonic()+10)
-        report['error_slices'] = self.error_slices(data, y, pred, raw['__fold'].to_numpy())
+        analysis_id = next(a for a in event['output_artifact_ids'] if c.artifacts.meta(a)['kind'] == 'fit_oof_analysis')
+        report = c.artifacts.read_json(analysis_id)
         prediction_id = next(a for a in event['output_artifact_ids'] if c.artifacts.meta(a)['kind'] == 'fit_oof_predictions')
         plan = c.store.get(eid)['plan']
         identity = {'experiment_id': eid, 'dataset_id': c.spec['dataset_id'], 'task_spec_id': c.spec['task_spec_id'],
@@ -424,6 +478,7 @@ class FitDiagnostics:
             'code_sha256': c.artifacts.meta(plan['code_artifact_id'])['sha256'],
             'parameters': deepcopy(plan['model']['hyperparameters']), 'seed': c.config.seed,
             'sample_rows': selected, 'predicted_row_ids': rows, 'folds': folds,
+            'analysis_artifact_id': analysis_id, 'analysis_sha256': c.artifacts.meta(analysis_id)['sha256'],
             'predictions_artifact_id': prediction_id, 'predictions_sha256': c.artifacts.meta(prediction_id)['sha256']}
         provenance = c.artifacts.write_json('diagnostics/'+state['owner']+'.identity.json', identity, 'fit_oof_identity')
         from agent.feature_schema import FACTORY_SOURCE
@@ -451,56 +506,6 @@ class FitDiagnostics:
         for item in report['error_slices'].get('slices', []):
             c.log.event('research.journal', kind='error_slice', experiment_id=eid, artifact_id=art['artifact_id'],
                         slice_id=item['slice_id'], verdict=item['verdict'], line=item['journal'])
-
-    def entity_history(self, data):
-        """Fit-partition entity and strictly earlier target history for the rows of ``data``.
-
-        The entity key is discovered once per run from fit rows (agent.strong); history
-        values come only from fit-partition labels of earlier periods.
-        """
-        c = self.c
-        proposal = c.evaluator.protocols[c.validation['validation_id']]['proposal']
-        if proposal['strategy'] != 'temporal_holdout':
-            return None, None
-        from agent.data_transport import transport
-        from agent.predictions import targets
-        from agent.strong import EntityHistory, discover_entity
-        names = targets(c.spec)
-        if len(names) != 1:
-            return None, None
-        period = proposal['parameters']['column']
-        if getattr(self, '_entity', None) is None:
-            self._entity = False
-            fit_rows = c.artifacts.read_json(c.validation['train_rows_artifact_id'])
-            table = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, rows=fit_rows)
-            features = table.drop(columns=[x for x in [*names, *c.spec['excluded_features']] if x in table.columns])
-            found = discover_entity(features, table[names[0]].to_numpy(dtype=float), period, seconds=15)
-            if found:
-                self._entity = {'columns': list(found['columns']), 'period_column': period}
-                keep = list(dict.fromkeys([*found['columns'], period]))
-                self._history_rows = (features[keep].copy(), table[names[0]].to_numpy(dtype=float))
-                c.log.event('diagnostics.entity_discovered', columns=found['columns'], period_column=period,
-                            multi_period=found['multi_period'], within_share=found['within_share'], keys=found['keys'])
-        if not self._entity:
-            return None, None
-        fit_x, fit_y = self._history_rows
-        history = EntityHistory(self._entity['columns'], period, prefix='__history_').fit(fit_x, fit_y)
-        return deepcopy(self._entity), history.transform(data[fit_x.columns]).reset_index(drop=True)
-
-    def error_slices(self, data, truth, prediction, fold):
-        """Rule slices of concentrated loss with cross-fitted remedies; never fails the diagnostic."""
-        from agent.error_slices import analyze
-        c = self.c
-        try:
-            from agent.predictions import targets
-            if c.spec['task_kind'] == 'regression' and len(targets(c.spec)) != 1:
-                return {'available': False, 'reason': 'multi_target_regression', 'slices': []}
-            entity, history = self.entity_history(data)
-            return analyze(data, truth, prediction, fold, c.spec, meta_history=history, entity=entity,
-                           seed=c.config.seed, deadline=time.monotonic()+20)
-        except (AgentError, ValueError, KeyError, TypeError, MemoryError) as error:
-            c.log.event('diagnostics.slices_unavailable', reason=str(error)[:500])
-            return {'available': False, 'reason': str(error)[:300], 'slices': []}
 
     def shutdown(self):
         self.pending.clear()

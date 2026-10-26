@@ -13,8 +13,10 @@ same four missing flags with jittered parameters.
 
 ## What replaces it
 
-`agent/error_slices.py`, run inside `FitDiagnostics.complete` on the leader's
-fit-only OOF predictions (no selection/confirmation label is read):
+`agent/error_slices.py` runs inside the leased OOF worker on fit-only predictions
+(no selection/confirmation label is read). `FitDiagnostics.complete` only verifies
+and publishes its artifact. The worker's CPU/RSS/timeout and finalization cancellation
+cover both OOF fits and the residual-model lab:
 
 1. **Loss per row** in the declared metric's own terms (`agent.metrics`):
    squared error (log1p scale for RMSLE-type metrics), absolute error for
@@ -35,6 +37,11 @@ fit-only OOF predictions (no selection/confirmation label is read):
    fitted on the other (discovery) folds only; the holdout fold, which played
    no part in choosing the rule or its parameters, decides robustness. Frozen
    parameters are the discovery-fitted ones that were checked.
+   Every discovery base fit also excludes this last fold, including under random,
+   stratified and group protocols. History key discovery and its target table use
+   only the union of those fit rows. Existing OOF fit count is preserved; random
+   discovery models consequently train on fewer rows. If too few folds remain,
+   the diagnostic reports unavailable rather than manufacturing independence.
 4. **Fixability lab**:
    - regression: `shift`, `shrink` toward the slice mean, `blend_history` with the
      entity's last value, all chosen by the declared metric's own row loss
@@ -50,9 +57,10 @@ fit-only OOF predictions (no selection/confirmation label is read):
    `tested_corrections_and_residual_model_found_nothing`). Unresolved is a
    statement about this lab, not proof of noise; researchers are told so.
 
-Remaining optimism: candidate rules are still a search over many splits, the
-holdout is one inner fold of a sample, and the base model is the leader picked
-on selection rows. Selection scoring and closed confirmation remain the guards.
+Remaining optimism: multiple proposed remedies are judged on the same inner
+holdout, it is one fold of a sample, and the base model was selected adaptively.
+Refit changes the base's training population. Selection scoring and closed
+confirmation remain the guards; diagnostic support is not a transfer guarantee.
 
 ## What Qwen sees and does
 

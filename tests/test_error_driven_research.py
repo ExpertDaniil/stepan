@@ -128,6 +128,15 @@ class DiagnosticIntegrationTests(unittest.TestCase):
         self.assertTrue(self.diag.records)
         return self.diag.records[-1]
 
+    def test_budget_wait_keeps_the_pending_diagnostic(self):
+        with patch.object(self.diag, 'remaining', return_value=3):
+            self.diag.ensure([self.eid])
+        self.assertEqual(self.diag.pending, [self.eid])
+        self.assertEqual(self.diag.attempted, set())
+        self.assertIsNone(self.diag.running)
+        record = self.complete()
+        self.assertEqual(record['report']['analysis_execution'], 'leased_oof_worker')
+
     def test_denied_resources_do_not_consume_attempts_then_start_amid_training(self):
         c = self.c
         for _ in range(3):
@@ -443,7 +452,7 @@ class FinalBudgetTests(unittest.TestCase):
             budget.set_final_plan(plan)
             budget.duration.estimate=lambda p,phase='train':150 if phase=='refit' else p.get('cost',100)
             budget.output_reserve=lambda:30
-            self.assertEqual(budget.reserve_seconds(),180)
+            self.assertEqual(budget.reserve_seconds(),181)  # refit lease + handoff + output
             self.assertTrue(budget.can_train({**plan,'cost':100})['allowed'])
             self.assertFalse(budget.can_train({**plan,'cost':125})['allowed'])
 

@@ -364,12 +364,13 @@ class Runner:
         if job.prediction_path and job.prediction_path.is_file():
             output_files.add(job.prediction_path)
         for path in sorted(output_files):
-            if path.suffix not in {".csv", ".log", ".joblib"} and path.name != "features.json":
+            if path.suffix not in {".csv", ".log", ".joblib"} and path.name not in {"features.json", "diagnostics.json"}:
                 continue
-            kind = ('feature_execution' if path.name == 'features.json' else
+            kind = ('fit_oof_analysis' if job.diagnostic and path.name == 'diagnostics.json' else
+                    'feature_execution' if path.name == 'features.json' else
                     ('fit_oof_predictions' if job.diagnostic else 'validation_predictions' if job.phase == 'train' else 'submission') if path == job.prediction_path else
                     'fitted_pipeline' if path.suffix == '.joblib' else 'execution_log')
-            media = 'application/json' if path.name == 'features.json' else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'
+            media = 'application/json' if path.name in {'features.json', 'diagnostics.json'} else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'
             art = self.artifacts.register(path, kind, media)
             outputs.append(art["artifact_id"])
         code = (result.get("error_type") if result.get("error_type") in {"JOB_TIMEOUT", "JOB_MEMORY_LIMIT"} else

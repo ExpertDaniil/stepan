@@ -24,8 +24,12 @@ same entity). Each slice has a verdict tested on held-out OOF folds:
 - unresolved: this lab's corrections and residual model found nothing (reason given);
   it is not proof of noise, so analyze it yourself when its loss share matters.
 candidate_results[].paired_verdict compares your candidate with its research base on
-the same selection rows: within_noise means a paired bootstrap cannot tell the
-gain from row noise (P(better) < 0.95); do not treat it as a discovery.
+the same selection rows. Bootstrap resamples declared groups/periods together;
+the win fraction is conditional on these data, not a probability of transfer.
+within_noise lacks the policy's support; unconfirmed_gain means too few independent
+units (e.g. one selection period) to estimate uncertainty. Neither is a discovery.
+The best solution and read_solution("best") are a stable utility reference; raw
+trials remain readable by exact ID. Small trial changes do not restart your question.
 It is advice; the evaluator decides. Overlapping slices do not have additive
 shares. Unknown units remain unknown; useful statistical ideas do not need a
 physical story. Never use true test targets or worst residual rank to define a

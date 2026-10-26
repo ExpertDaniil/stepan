@@ -155,8 +155,15 @@ class LabTests(unittest.TestCase):
         prediction = y+np.where((fold == 2) & (data.x > 1).to_numpy(), 20, 0)+rng.normal(size=n)*.1
         report = error_slices.analyze(data, y, prediction.reshape(-1, 1), fold, regression_spec())
         self.assertEqual(report['holdout_rows'], 1000)
-        self.assertFalse(any(c['column'] == 'x' and c['op'] == 'gt' for s in report['slices'] for c in s['conditions']),
-                         'a region visible only in the holdout fold must not be mined')
+        # Random discovery errors can themselves select an x threshold. The
+        # boundary is invariance to held targets/predictions, not absence of x.
+        changed_y, changed_prediction = y.copy(), prediction.copy()
+        changed_y[fold == 2] += 100
+        changed_prediction[fold == 2] -= 100
+        changed = error_slices.analyze(data, changed_y, changed_prediction.reshape(-1, 1), fold, regression_spec())
+        def rules(value):
+            return sorted(json.dumps(s['conditions'], sort_keys=True) for s in value['slices'])
+        self.assertEqual(rules(report), rules(changed))
 
     def test_label_remap_for_a_systematic_confusion(self):
         from agent import metrics
@@ -283,6 +290,8 @@ class DiagnosticSliceTests(unittest.TestCase):
         self.assertEqual(report['task_spec_id'], self.c.spec['task_spec_id'])
         stored = self.c.artifacts.read_json(record['artifact_id'])
         self.assertEqual(stored['error_slices'], report['error_slices'])
+        self.assertEqual(report['analysis_execution'], 'leased_oof_worker')
+        self.assertFalse(set(report['check_row_ids']) & set(report['discovery_fit_row_ids']))
         problems = list(self.c.error_research.problems.values())
         self.assertTrue(problems)
         if report['error_slices']['slices']:
@@ -303,11 +312,52 @@ class SliceEndToEndTests(unittest.TestCase):
         from scripts.make_demo import make_demo
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            task = make_demo(root/'task', 'regression', rows=1500)  # enough holdout-fold rows per slice
-            settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '150',
+            task = make_demo(root/'task', 'regression', rows=2400)
+            def target(frame):
+                x = pd.to_numeric(frame.x_numeric, errors='coerce').fillna(0)
+                return 2*x+3*frame.z_numeric+12*(x > 2.4)+.2*np.sin(frame.z_numeric)
+            train = pd.read_csv(task.parent/'train.csv', dtype={'id': str})
+            train['label'] = target(train)
+            train.to_csv(task.parent/'train.csv', index=False)
+            test = pd.read_csv(task.parent/'test.csv', dtype={'id': str})
+            truth = target(test).to_numpy()
+            # Controlled weak reference: the discontinuity produces a stable
+            # correctable bias. Scripted decisions exercise production tools;
+            # they do not invent metrics or force a remedy to pass validation.
+            from agent.llm.gateway import MockTransport
+            original = MockTransport.complete
+            issued = {'base': False, 'remedy': False}
+            def complete(transport, request, timeout, context):
+                if context['metadata']['schema_id'] != 'ResearchAction-v1':
+                    return original(transport, request, timeout, context)
+                user = json.loads(context['messages'][1]['content'])
+                advice = user.get('profile_summary', user).get('error_research') or {}
+                remedies = [r for r in (advice.get('observation') or {}).get('remedies', []) if r.get('robust')]
+                # A continuing dialogue receives diagnostics through feedback,
+                # not by mutating its frozen first user message.
+                for message in request['messages']:
+                    if message['role'] != 'user':continue
+                    try:updates = json.loads(message['content']).get('research_updates') or {}
+                    except (ValueError, TypeError):continue
+                    for record in updates.get('fit_diagnostics', []):
+                        for card in (record.get('report', {}).get('error_slices') or {}).get('slices', []):
+                            remedies.extend(r for r in card.get('remedies', []) if r.get('robust'))
+                value = {'action': 'research', 'next_step': 'wait', 'hypothesis': 'Wait for the measured diagnostic.'}
+                if not issued['base']:
+                    issued['base'] = True
+                    value = {'action': 'catalog', 'recipe_id': 'linear-regressor-v1', 'hyperparameters': {'alpha': 1.},
+                             'hypothesis': 'Measure a weak linear reference on a synthetic discontinuity.'}
+                elif remedies and not issued['remedy']:
+                    issued['remedy'] = True
+                    value = {'action': 'features', 'slice_remedies': [remedies[0]['remedy_ref']],
+                             'hypothesis': 'Execute the independently checked correction of the discontinuity.'}
+                return {'choices': [{'message': {'content': json.dumps(value)}, 'finish_reason': 'stop'}]}
+            settings = {'LLM_MODE': 'mock', 'RESEARCH_MODE': 'adaptive', 'TIME_BUDGET_SECONDS': '120',
+                        'RESEARCH_OOF_BUDGET_FRACTION': '.10', 'RESEARCH_OOF_ROWS': '2400',
+                        'FINAL_ENSEMBLE_SIZE': '0', 'LLM_MAX_CALLS': '0',
                         'DATA_RESEARCH_MIN_SECONDS': '0', 'CATALOG_WARMUP_EXPERIMENTS': '0', 'LOG_LEVEL': 'ERROR',
                         'MODEL_SNAPSHOT_MAX_BYTES': '0', 'GRAPH_MIN_FREE_DISK_BYTES': '0'}
-            with patch.dict(os.environ, settings), redirect_stderr(io.StringIO()) as stderr:
+            with patch.dict(os.environ, settings), patch.object(MockTransport, 'complete', complete), redirect_stderr(io.StringIO()) as stderr:
                 code = main([str(task), '--llm-mode', 'mock', '--work-dir', str(root/'runs')])
             self.assertEqual(code, 0, stderr.getvalue()[-5000:])
             events = [json.loads(line) for line in next((root/'runs').glob('run-*/events.jsonl')).read_text().splitlines()]
@@ -318,8 +368,21 @@ class SliceEndToEndTests(unittest.TestCase):
             self.assertTrue(bound)
             executed = [e for e in events if e['event'] == 'research.journal' and e['kind'] == 'candidate' and 'remedies' in e['line']]
             self.assertTrue(executed, 'a remedy candidate must be trained, evaluated and journalled')
-            self.assertIn(executed[0]['status'], {'overall_improved', 'within_noise', 'partial_group_improvement', 'no_gain'})
+            self.assertIn(executed[0]['status'], {'overall_improved', 'unconfirmed_gain', 'within_noise', 'partial_group_improvement', 'no_gain'})
             self.assertEqual(events[-1]['event'], 'run.finished')
+            from agent.ml import build_pipeline
+            from agent import metrics
+            spec = json.loads(next((root/'runs').glob('run-*/task/task-spec.json')).read_text())
+            reference = build_pipeline('linear-regressor-v1', spec, {'alpha': 1.})
+            features = [c for c in train if c not in {'id', 'label'}]
+            reference.fit(train[features], train.label)
+            baseline = metrics.score(spec, truth, reference.predict(test[features]))
+            delivered = pd.read_csv(task.parent/'submission.csv', dtype={'id': str})
+            self.assertEqual(delivered.id.tolist(), test.id.tolist())
+            final = metrics.score(spec, truth, delivered.label.to_numpy())
+            self.assertLess(final, baseline)
+            print('SYNTHETIC_SLICE_DELIVERY '+json.dumps({'baseline_rmse': baseline, 'delivered_rmse': final,
+                'scope': 'scripted decisions, real diagnostic/fit/selection/confirmation/refit; independent synthetic test'}), flush=True)
 
 
 class ActionSchemaTests(unittest.TestCase):

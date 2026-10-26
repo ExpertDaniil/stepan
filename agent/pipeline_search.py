@@ -535,6 +535,18 @@ class VersionSearch:
         c.log.event('research.journal', kind='ensemble', line=(f"controller: ensemble of {len(members)} ({combination}) "
                     f"precheck {c.spec['metric']['metric_id']} best member {best_member:.6g} -> average {ensemble:.6g}; queued"))
 
+    def research_generation(self, branch):
+        """Evidence that can wake research; raw parameter-trial churn is not one."""
+        c = self.c
+        candidates = tuple((v['version_id'], v['initial_experiment_id'], canonical(v['initial_metric']),
+                            v['paused'] if v['initial_metric'] is None else None)
+                           for v in self.versions.values()
+                           if v['ticket']['work_order']['branch_id'] == branch)
+        diagnostics = c.science.diagnostics.visible(c.graph.visible_history(branch)) if c.science else []
+        feedback = tuple(canonical(r) for r in getattr(c, 'research_feedback', []) if r['branch_id'] == branch)
+        return (getattr(c, 'research_leaders', {}).get(branch), candidates,
+                tuple(r['artifact_id'] for r in diagnostics), feedback)
+
     def fill(self):
         self.maybe_add_ensemble()
         now = time.monotonic()
@@ -597,7 +609,7 @@ def search(controller, root, accepted):
             if c.science:
                 c.science.diagnostics.ensure(c.graph.visible_history(root))
                 c.science.diagnostics.poll()
-            generation = (service.measurement_revision, len(c.science.diagnostics.records) if c.science else 0)
+            generation = service.research_generation(root)
             for future, ticket in list(pending.items()):
                 if not future.done():
                     continue

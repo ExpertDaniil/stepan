@@ -314,3 +314,12 @@ Per-turn feedback distinguishes submitted `candidate_results` from background
 trials. Pending background trial IDs do not alone change the research view;
 candidate outcomes remain visible when they leave the recent trial window.
 The full branch mailbox remains available through its scoped detail reference.
+
+Slice completion: `fit_oof_analysis` is produced inside the leased diagnostic
+worker and linked by hash from the diagnostic identity. It records discovery
+fit rows and check rows. The dispatcher performs no residual-model training.
+`research.utility_reference_changed` records a branch utility change; raw trial
+rankings remain in normal evaluation/search artifacts. `submission.noise_gate`
+and paired results include the resampling unit, unit count and an explicit
+unavailability reason. A bootstrap win fraction is conditional support;
+`unconfirmed_gain` preserves that distinction for single-period selection.

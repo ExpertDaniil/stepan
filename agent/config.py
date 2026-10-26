@@ -71,6 +71,8 @@ class Config:
     llm_bootstrap_output_tokens: int = 4096
     llm_max_output_tokens_limit: int = 32768
     llm_max_total_output_tokens: int | None = 262144
+    llm_repair_engineer_enabled: bool = False
+    llm_repair_engineer_timeout_seconds: int = 90
     llm_research_tool_turns: int = 8
     llm_research_tool_seconds: int = 90
     llm_research_dialogue_seconds: int = 900
@@ -160,6 +162,8 @@ class Config:
             llm_bootstrap_output_tokens=integer("LLM_BOOTSTRAP_OUTPUT_TOKENS", 4096, 128, 131072),
             llm_max_output_tokens_limit=integer("LLM_MAX_OUTPUT_TOKENS_LIMIT", 32768, 128, 131072),
             llm_max_total_output_tokens=optional_limit("LLM_MAX_TOTAL_OUTPUT_TOKENS", None if platform else 262144, 1024, 1000000000),
+            llm_repair_engineer_enabled=boolean('LLM_REPAIR_ENGINEER_ENABLED', platform),
+            llm_repair_engineer_timeout_seconds=integer('LLM_REPAIR_ENGINEER_TIMEOUT_SECONDS', 90, 1, 300),
             llm_research_tool_turns=integer('LLM_RESEARCH_TOOL_TURNS', 8, 0, 32),
             llm_research_tool_seconds=integer('LLM_RESEARCH_TOOL_SECONDS', 90, 0, 1800),
             llm_research_dialogue_seconds=integer('LLM_RESEARCH_DIALOGUE_SECONDS', 900, 30, 3600),

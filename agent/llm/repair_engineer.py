@@ -42,7 +42,7 @@ def prepare(content, error, schema, base=None):
         return None
     # These require a new scientific decision, not interface translation.
     if any(term in str(error) for term in ('INVALID_SLICE_REMEDY', 'INVALID_TUNING_SPACE',
-                                         'MEMORY_SCOPE', 'CONTEXT_TOO_LARGE')):
+                                         'MEMORY_SCOPE', 'CONTEXT_TOO_LARGE', 'Unavailable recipe')):
         return None
     allowed = {}
     for field, empty, replacement in (('code', (None, ''), None), ('tuning', (None, ''), None),

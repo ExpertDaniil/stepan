@@ -249,3 +249,11 @@ latest whole periods from every rolling fit and from adaptive metrics. The
 existing saved predictions are reused after the research barrier. This update
 passed 636 tests via `scripts/check.py --jobs 3`.
 
+
+
+## last_test interface repair
+
+The optional engineer repairs a narrow class of rejected executable research
+actions inside the existing Gateway repair loop. See
+[REPAIR-ENGINEER.md](REPAIR-ENGINEER.md). Candidate producer/consumer contracts and
+C00-C24 schemas are unchanged; the engineer envelope is private to the Gateway.

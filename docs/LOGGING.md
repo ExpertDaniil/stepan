@@ -323,3 +323,15 @@ rankings remain in normal evaluation/search artifacts. `submission.noise_gate`
 and paired results include the resampling unit, unit count and an explicit
 unavailability reason. A bootstrap win fraction is conditional support;
 `unconfirmed_gain` preserves that distinction for single-period selection.
+
+
+## Optional interface repair engineer
+
+`llm.repair_engineer_prepared` links the complete bounded original proposal and
+allowed exact edits to a retained `repair_engineer_packet`. `started` records the
+pinned base ID and permitted fields. Actual requests use purpose
+`research_engineering`; request/response snapshots and normal usage accounting
+are unchanged. `accepted` is emitted only after field preservation and the full
+ordinary candidate validation. `fallback` reports refusal, prohibited changes,
+invalid output or transport failure; the original researcher transcript remains
+available. No event claims model-quality improvement.

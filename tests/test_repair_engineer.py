@@ -70,3 +70,82 @@ class EngineerContractTests(unittest.TestCase):
         self.assertIsNone(accept(content, p, self.h.bus.schemas._check))
         with self.assertRaises(ValueError):
             accept(self.reply(self.original), p, self.h.bus.schemas._check)
+
+
+class EngineerGatewayTests(unittest.TestCase):
+    def run_case(self, mode='repair', enabled=True, calls=8):
+        from types import SimpleNamespace
+        from agent.context import output_schemas
+        from agent.errors import AgentError
+        from agent.llm.gateway import Gateway
+        from agent.researcher import Researcher
+        from tests.graph_helpers import GraphHarness
+        h = GraphHarness('regression', research_mode='adaptive', background_tuning_enabled=True,
+                         graph_hard_decisions=False, time_budget_seconds=10800, llm_max_calls=calls,
+                         llm_repair_engineer_enabled=enabled)
+        self.addCleanup(h.close)
+        h.result('researcher-1', {'alpha': 1}, 10)
+        g = h.g
+        bad = {'action': 'features', 'recipe_id': 'python-pipeline-v1', 'hyperparameters': {'alpha': 1},
+               'feature_program': [{'op': 'product', 'name': 'joint_signal', 'columns': ['x_numeric', 'z_numeric']}],
+               'code': None, 'tuning': None, 'feature_steps': [], 'evidence_ids': [],
+               'hypothesis': 'Measure the product feature on the chosen linear base.'}
+        class Transport:
+            def __init__(self): self.requests = []; self.timeouts = []
+            def complete(self, request, timeout, context):
+                self.requests.append(deepcopy(request)); self.timeouts.append(timeout)
+                if context['metadata']['schema_id'] == 'RepairEngineer-v1':
+                    if mode == 'timeout':
+                        raise AgentError('LLM_UNAVAILABLE', 'simulated engineer timeout', retryable=True)
+                    packet = json.loads(request['messages'][1]['content'])
+                    candidate = {**packet['original'], 'recipe_id': packet['allowed_edits']['recipe_id']}
+                    if mode == 'mutate': candidate['hyperparameters'] = {'alpha': 999}
+                    value = ({'status': 'needs_researcher', 'candidate': None, 'reason': 'Ambiguous'} if mode == 'decline'
+                             else {'status': 'repaired', 'candidate': candidate, 'reason': 'Use the pinned owned recipe'})
+                elif len(self.requests) == 1:
+                    value = ({**bad, 'recipe_id': 'linear-regressor-v1'} if mode == 'valid' else bad)
+                else:
+                    value = {'action': 'research', 'hypothesis': 'Continue with the saved observation.', 'evidence_ids': []}
+                return {'choices': [{'message': {'content': json.dumps(value)}, 'finish_reason': 'stop'}],
+                        'usage': {'prompt_tokens': 100, 'completion_tokens': 50}}
+        transport = Transport()
+        gateway = Gateway(g.config, g.budget, g.artifacts, g.bus, g.log, output_schemas(g.bus), transport)
+        gateway.analysis = SimpleNamespace()
+        researcher = Researcher(g.bus, gateway, g.artifacts, g.spec, g.catalog, g.config, g.log)
+        ticket = h.issue()
+        result = researcher.propose(ticket['researcher_request']['payload'])
+        events = [json.loads(line) for line in (h.h.run/'events.jsonl').read_text().splitlines()]
+        self.assertFalse(g.budget.llm_dialogues)
+        self.assertEqual(g.budget.token_snapshot()['output_reserved'], 0)
+        return result, transport, events, g, bad
+
+    def test_real_validator_accepts_repair_in_existing_reserved_attempt(self):
+        result, transport, events, g, bad = self.run_case(calls=2)
+        self.assertEqual(result['decision'], 'propose')
+        self.assertEqual(len(transport.requests), 2)
+        packet = json.loads(transport.requests[1]['messages'][1]['content'])
+        self.assertEqual(packet['original']['feature_program'], bad['feature_program'])
+        self.assertEqual(result['plan']['model']['hyperparameters']['feature_program'], bad['feature_program'])
+        self.assertEqual(g.budget.calls, 2)
+        self.assertNotIn('tools', transport.requests[1])
+        self.assertEqual(len(transport.requests[1]['messages']), 2)
+        self.assertLessEqual(transport.timeouts[1], 90)
+        self.assertIn('llm.repair_engineer_accepted', [e['event'] for e in events])
+
+    def test_refusal_mutation_and_transport_failure_resume_original_research(self):
+        for mode in ('decline', 'mutate', 'timeout'):
+            with self.subTest(mode=mode):
+                result, transport, events, g, _ = self.run_case(mode)
+                self.assertEqual(result['decision'], 'research')
+                self.assertEqual(len(transport.requests), 3)
+                self.assertEqual(g.budget.calls, 3)
+                self.assertIn('llm.repair_engineer_fallback', [e['event'] for e in events])
+                self.assertNotIn('llm.repair_engineer_accepted', [e['event'] for e in events])
+                self.assertGreater(len(transport.requests[2]['messages']), 2)
+
+    def test_valid_actions_and_disabled_feature_have_no_extra_engineer(self):
+        for mode, enabled in (('valid', True), ('repair', False)):
+            with self.subTest(mode=mode):
+                result, transport, events, _, _ = self.run_case(mode, enabled)
+                self.assertEqual(len(transport.requests), 1 if mode == 'valid' else 2)
+                self.assertNotIn('llm.repair_engineer_started', [e['event'] for e in events])

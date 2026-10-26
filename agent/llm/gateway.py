@@ -612,6 +612,7 @@ class Gateway:
         usage = {"input_tokens": None, "output_tokens": None}
         calls, last_error = [], None
         tool_cache, force_decision = {}, False
+        engineer_packet, engineer_used = None, False
         consecutive_errors = 0
         schema_by_name = {tool['function']['name']: tool['function']['parameters'] for tool in tools}
         completion_id = "completion-" + uuid.uuid4().hex[:12]
@@ -627,6 +628,7 @@ class Gateway:
                            final_seconds_reserved=round(final_seconds, 3),
                            tool_window_seconds=round(max(0, tool_deadline-now), 3))
         for attempt in range(1, payload["attempt_limit"] + 1):
+            active_engineer, engineer_packet = engineer_packet, None
             if self.cancelled.is_set():
                 raise AgentError('RESEARCH_CANCELLED', 'Research closed before another dialogue turn')
             self.check_availability()
@@ -683,8 +685,29 @@ class Gateway:
                 elif tools:
                     request.update(tools=tools, parallel_tool_calls=dialogue_id is not None)
                 request_deadline = tool_deadline if dialogue_id is not None and not terminal else deadline
-                response, call_no = self._request(request, context, payload, attempt, request_deadline, dialogue_id)
+                request_context, request_payload = context, payload
+                if active_engineer is not None:
+                    from agent.llm.repair_engineer import messages as repair_messages
+                    # Consume an existing repair attempt/reservation. No recursive
+                    # Gateway call, extra tools, mailbox reads or provider slot.
+                    request = {"model": request_model(self.config.llm_mode),
+                               "messages": repair_messages(active_engineer), "max_tokens": token_limit}
+                    request_context = {'metadata': {**deepcopy(context['metadata']), 'schema_id': 'RepairEngineer-v1'}}
+                    request_payload = {**payload, 'purpose': 'research_engineering'}
+                    request_deadline = min(deadline, time.monotonic()+self.config.llm_repair_engineer_timeout_seconds,
+                                           time.monotonic()+max(1., (deadline-time.monotonic())*.35))
+                    self.log.event('llm.repair_engineer_started', attempt=attempt, dialogue_id=dialogue_id,
+                                   base_experiment_id=active_engineer['base_experiment_id'],
+                                   allowed_fields=list(active_engineer['allowed_edits']))
+                response, call_no = self._request(request, request_context, request_payload, attempt, request_deadline, dialogue_id)
             except AgentError as exc:
+                if (active_engineer is not None and exc.code in {'LLM_UNAVAILABLE', 'LLM_RATE_LIMIT',
+                        'LLM_OPERATION_TIMEOUT', 'CONTEXT_TOO_LARGE'} and attempt < payload['attempt_limit']
+                        and deadline-time.monotonic() > 1):
+                    last_error = exc
+                    self.log.event('llm.repair_engineer_fallback', attempt=attempt, code=exc.code,
+                                   reason='Engineer unavailable; continue original research repair')
+                    continue
                 if (dialogue_id is not None and not terminal and time.monotonic() >= tool_deadline
                         and time.monotonic() < deadline and exc.code in {'LLM_OPERATION_TIMEOUT', 'LLM_UNAVAILABLE'}):
                     force_decision = True
@@ -902,7 +925,14 @@ class Gateway:
                     last_error = AgentError("INVALID_LLM_OUTPUT", "No final JSON after the tool call")
                     continue
                 try:
-                    parsed, recovered = parse_final_json(message.get('content'))
+                    if active_engineer is not None:
+                        from agent.llm.repair_engineer import accept
+                        parsed = accept(message.get('content'), active_engineer, self.bus.schemas._check)
+                        if parsed is None:
+                            raise ValueError('Engineer deferred the ambiguous repair to the researcher')
+                        recovered = False
+                    else:
+                        parsed, recovered = parse_final_json(message.get('content'))
                 except ValueError as exc:
                     content = message.get('content') or ''
                     # A provider length flag cannot turn duplicate keys, NaN or
@@ -958,6 +988,9 @@ class Gateway:
                 art = self.artifacts.write_json("llm/parsed-"+uuid.uuid4().hex[:12]+".json", parsed, "llm_output")
                 self.log.event("llm.output_validated", call_no=call_no, schema_id=payload["response_schema_id"],
                                attempts_used=attempt, output_artifact_id=art["artifact_id"])
+                if active_engineer is not None:
+                    self.log.event('llm.repair_engineer_accepted', call_no=call_no, attempt=attempt,
+                                   output_artifact_id=art['artifact_id'], intent_preserved=True)
                 return {"completion_id": completion_id, "output_artifact_id": art["artifact_id"],
                         "parsed_payload": parsed, "tool_calls": calls, "usage": usage, "attempts_used": attempt}
             except (ValueError, KeyError, TypeError, IndexError) as exc:
@@ -967,6 +1000,14 @@ class Gateway:
                 self.log.event("llm.output_truncated" if truncated else "llm.output_rejected", level="WARNING",
                                call_no=call_no, attempt=attempt, code=code, message=str(last_error), finish_reason=finish_reason,
                                max_output_tokens=token_limit)
+                if active_engineer is not None:
+                    self.log.event('llm.repair_engineer_fallback', call_no=call_no, attempt=attempt,
+                                   code=code, reason=str(exc)[:600])
+                    messages.append({'role': 'user', 'content':
+                        'Interface engineer could not preserve and repair the original proposal. '
+                        'Continue from the original rejected action and saved evidence. Error: '+str(exc)[:600]})
+                    force_decision = True
+                    continue
                 if executable and context['metadata'].get('detail_scope'):
                     content = (choice.get('message') or {}).get('content')
                     self._archive_transcript([*messages, {'role':'assistant','content':content}], context)
@@ -1013,6 +1054,22 @@ class Gateway:
                         messages.append(assistant)
                         self._bound_reasoning_history(messages)
                     messages.append({"role": "user", "content": "Return one valid JSON object matching the schema. Error: "+str(exc)[:600]})
+                if (not truncated and not engineer_used and executable and dialogue_id is not None
+                        and getattr(self.config, 'llm_repair_engineer_enabled', False)
+                        and attempt < payload['attempt_limit'] and deadline-time.monotonic() > 2):
+                    from agent.llm.repair_engineer import prepare
+                    source_user = json.loads(context['messages'][1]['content'])
+                    base = source_user.get('base_result')
+                    detail = context['metadata'].get('detail_artifact_id')
+                    if base is None and detail:
+                        base = self.artifacts.read_json(detail).get('sections', {}).get('base_result')
+                    engineer_packet = prepare(content, exc, expected, base)
+                    if engineer_packet is not None:
+                        engineer_used = True
+                        record = self.artifacts.write_json('llm/engineer-'+uuid.uuid4().hex[:12]+'.json',
+                                                           engineer_packet, 'repair_engineer_packet')
+                        self.log.event('llm.repair_engineer_prepared', call_no=call_no,
+                                       packet_artifact_id=record['artifact_id'], dialogue_id=dialogue_id)
                 if dialogue_id is not None:
                     force_decision = True
         raise last_error or AgentError("INVALID_LLM_OUTPUT", "No final JSON within the bounded tool/repair loop")

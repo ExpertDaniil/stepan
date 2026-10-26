@@ -397,7 +397,146 @@ class VersionSearch:
         if changed:
             c.publish_research_updates()
 
+    ENSEMBLE_INTERVAL = 900      # seconds between ensemble reconsiderations
+    ENSEMBLE_MAX = 3             # ensemble proposals per run
+    ENSEMBLE_MAX_GAP = .03       # members within 3% of the best selection score
+    ENSEMBLE_POOL = 30           # best measured configurations inspected for members
+    ENSEMBLE_DUPLICATE = .999    # prediction correlation/agreement treated as the same model
+
+    def ensemble_members(self, size):
+        """Best measured owned pipelines, near the best score and not near-duplicates of each other."""
+        import numpy as np
+        from agent.feature_schema import FACTORY_SOURCE
+        from agent.store import comparable
+        c = self.c
+        best = c.store.best()
+        if not best:
+            return []
+        reference = c.store.experiment_evaluation(best)['primary_metric']
+        pool = []
+        for row in c.store.db.execute("SELECT experiment_id FROM experiments WHERE run_id=? AND state='evaluated'", (c.store.run_id,)):
+            eid = row[0]
+            ev = c.store.experiment_evaluation(eid)
+            if eid in c.failed_refits or not ev or not ev['valid'] or ev['violations'] or not comparable(ev['primary_metric'], reference):
+                continue
+            plan = c.store.get(eid)['plan']
+            family = c.catalog.recipes.get(plan['recipe_id'], {}).get('family')
+            if family in {None, 'dummy'}:
+                continue
+            if family == 'custom':
+                source = c.artifacts.resolve(plan['code_artifact_id']).read_text(encoding='utf-8')
+                if source != FACTORY_SOURCE:  # custom code and earlier ensembles are not rebuilt as members
+                    continue
+                kind = 'features'
+            else:
+                kind = 'owned'
+            pool.append((self.quality(ev['primary_metric']), eid, kind, plan))
+        pool.sort(key=lambda item: item[0], reverse=True)
+        if not pool:
+            return []
+        top = pool[0][0]
+        scale = max(abs(top), 1e-12)
+        chosen, outputs = [], []
+        for quality, eid, kind, plan in pool[:self.ENSEMBLE_POOL]:
+            if (top-quality)/scale > self.ENSEMBLE_MAX_GAP:
+                break
+            try:
+                _, _, matrix = c.evaluator.selection_predictions(eid)
+            except AgentError:
+                continue
+            values = np.asarray(matrix)
+            duplicate = False
+            for other in outputs:
+                if values.dtype.kind in 'fc' and other.dtype.kind in 'fc':
+                    a, b = values.reshape(-1).astype(float), other.reshape(-1).astype(float)
+                    similar = 1.0 if np.std(a) == 0 or np.std(b) == 0 else float(np.corrcoef(a, b)[0, 1])
+                else:
+                    similar = float(np.mean(values.reshape(-1) == other.reshape(-1)))
+                duplicate |= similar >= self.ENSEMBLE_DUPLICATE
+            if duplicate:
+                continue
+            chosen.append({'kind': kind, 'recipe_id': plan['recipe_id'] if kind == 'owned' else plan['model']['hyperparameters']['base_recipe_id'],
+                           'hyperparameters': deepcopy(plan['model']['hyperparameters']), 'experiment_id': eid})
+            outputs.append(values)
+            if len(chosen) == size:
+                break
+        return chosen
+
+    def maybe_add_ensemble(self):
+        """Propose an equal-weight ensemble of the measured top configurations (docs/TOPK-ENSEMBLE.md).
+
+        Training is spent only when the average of the members' saved selection
+        predictions already beats the best member; the trained ensemble is then an
+        ordinary candidate for the Evaluator, the noise gate and closed confirmation.
+        """
+        c = self.c
+        size = getattr(c.config, 'final_ensemble_size', 0)
+        if (size < 2 or getattr(c, 'finalization_started', False) or not c.budget.snapshot()['search_allowed']
+                or time.monotonic() < getattr(self, 'ensemble_retry_at', 0)
+                or getattr(self, 'ensembles_added', 0) >= self.ENSEMBLE_MAX
+                or time.monotonic()-c.budget.started < c.config.time_budget_seconds*c.config.ensemble_start_fraction):
+            return
+        self.ensemble_retry_at = time.monotonic()+self.ENSEMBLE_INTERVAL
+        from agent.ensemble import ENSEMBLE_SOURCE, combine
+        from agent.metrics import score
+        members = self.ensemble_members(size)
+        signatures = getattr(self, 'ensemble_signatures', set())
+        self.ensemble_signatures = signatures
+        signature = canonical(sorted(m['experiment_id'] for m in members))
+        if len(members) < 2 or signature in signatures:
+            c.log.event('search.ensemble_skipped', reason='fewer_than_two_distinct_members' if len(members) < 2 else 'already_proposed',
+                        members=[m['experiment_id'] for m in members])
+            return
+        signatures.add(signature)
+        try:
+            outputs = [c.evaluator.selection_predictions(m['experiment_id']) for m in members]
+            truth = c.evaluator.selection_truth(outputs[0][1])
+            combined = combine(c.spec, [matrix for _, _, matrix in outputs])
+            values = [float(score(c.spec, truth, matrix)) for _, _, matrix in outputs]
+            ensemble = float(score(c.spec, truth, combined))
+        except (AgentError, ValueError, KeyError) as error:
+            c.log.event('search.ensemble_skipped', reason='precheck_unavailable: '+str(error)[:300])
+            return
+        direction = c.spec['metric']['direction']
+        best_member = min(values) if direction == 'minimize' else max(values)
+        better = ensemble < best_member if direction == 'minimize' else ensemble > best_member
+        if not better:
+            c.log.event('search.ensemble_skipped', reason='average_not_better_on_saved_selection_predictions',
+                        members=[m['experiment_id'] for m in members], member_scores=values, ensemble_score=ensemble)
+            return
+        leader = members[0]['experiment_id']
+        version = next((v for v in self.versions.values() if leader in {v['initial_experiment_id'], v['best_experiment_id']}
+                        and c.graph.branch(v['ticket']['work_order']['branch_id'])['state'] == 'active'), None)
+        version = version or next((v for v in self.versions.values()
+                                   if c.graph.branch(v['ticket']['work_order']['branch_id'])['state'] == 'active'), None)
+        if version is None:
+            c.log.event('search.ensemble_skipped', reason='no_active_branch_template')
+            return
+        from tools.code import write_code
+        args = {'researcher_id': 'controller-ensemble', 'filename': 'ensemble.py', 'content': ENSEMBLE_SOURCE,
+                'declared_entrypoint': 'make_pipeline'}
+        code = c.call('C11', args, lambda p: write_code(p, c.artifacts),
+                      key='code/'+hashlib.sha256(canonical(args).encode()).hexdigest())['artifact']
+        base = c.store.get(leader)['plan']
+        combination = 'mean' if c.spec['task_kind'] == 'regression' or c.spec['metric']['prediction_kind'] == 'probabilities' else 'plurality_vote'
+        plan = {**deepcopy(base), 'plan_id': 'ensemble-'+uuid.uuid4().hex[:12],
+                'researcher_id': version['anchor']['researcher_id'], 'parent_ids': deepcopy(version['anchor']['parent_ids']),
+                'recipe_id': 'python-pipeline-v1', 'code_artifact_id': code['artifact_id'],
+                'model': {'family': c.catalog.recipes['python-pipeline-v1']['family'], 'hyperparameters': {'members': members}},
+                'feature_steps': [{'step': 'equal_weight_ensemble', 'combination': combination,
+                                   'members': [m['experiment_id'] for m in members], 'fit_scope': 'each_member_on_fit_rows'}],
+                'hypothesis': (f'Equal-weight {combination} of {len(members)} measured configurations. Saved selection predictions: '
+                               f'best member {best_member:.6g}, average {ensemble:.6g}.'),
+                'expected_effect': 'Lower variance than any single configuration; judged by the Evaluator and closed confirmation.'}
+        self.add(plan, version['ticket'])
+        self.ensembles_added = getattr(self, 'ensembles_added', 0)+1
+        c.log.event('search.ensemble_proposed', members=[m['experiment_id'] for m in members], member_scores=values,
+                    ensemble_precheck=ensemble, combination=combination, plan_id=plan['plan_id'])
+        c.log.event('research.journal', kind='ensemble', line=(f"controller: ensemble of {len(members)} ({combination}) "
+                    f"precheck {c.spec['metric']['metric_id']} best member {best_member:.6g} -> average {ensemble:.6g}; queued"))
+
     def fill(self):
+        self.maybe_add_ensemble()
         now = time.monotonic()
         for version in self.versions.values():
             if version['paused'] and version['retryable_initial'] and version['retry_at'] <= now and not version['pending']:

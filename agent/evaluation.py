@@ -127,6 +127,17 @@ class Evaluator:
         return source['validation_id'], rows, checked_matrix(frame.set_index('__row_index').loc[rows, columns].to_numpy(),
                                                              len(rows), len(columns), kind, labels=self.spec['allowed_labels'])
 
+    def selection_truth(self, rows):
+        """Targets of the given (selection) rows, read once per row set."""
+        key = tuple(rows)
+        cached = getattr(self, '_selection_truth', None)
+        if cached is None or cached[0] != key:
+            names = targets(self.spec)
+            data = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec, columns=names, rows=list(rows))
+            cached = (key, data[names if len(names) > 1 else names[0]])
+            self._selection_truth = cached
+        return cached[1]
+
     def paired_significance(self, reference_id, candidate_id):
         """Paired bootstrap of candidate vs reference on the same selection rows; cached per pair."""
         key = (reference_id, candidate_id)
@@ -137,9 +148,7 @@ class Evaluator:
         other, other_rows, candidate = self.selection_predictions(candidate_id)
         if validation != other or rows != other_rows:
             raise AgentError('INCOMPARABLE_EVALUATIONS', 'Significance needs the same validation rows')
-        names = targets(self.spec)
-        data = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec, columns=names, rows=rows)
-        truth = data[names if len(names) > 1 else names[0]]
+        truth = self.selection_truth(rows)
         seed = int(hashlib.sha256((reference_id+'|'+candidate_id).encode()).hexdigest()[:8], 16)
         result = paired_bootstrap(self.spec, truth, reference, candidate, seed=seed)
         result.update(reference_experiment_id=reference_id, candidate_experiment_id=candidate_id, rows=len(rows))

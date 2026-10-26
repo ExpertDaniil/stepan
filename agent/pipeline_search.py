@@ -543,7 +543,9 @@ class VersionSearch:
                            for v in self.versions.values()
                            if v['ticket']['work_order']['branch_id'] == branch)
         diagnostics = c.science.diagnostics.visible(c.graph.visible_history(branch)) if c.science else []
-        feedback = tuple(canonical(r) for r in getattr(c, 'research_feedback', []) if r['branch_id'] == branch)
+        # A packing error is not new evidence that its own input can now fit.
+        feedback = tuple(canonical(r) for r in getattr(c, 'research_feedback', [])
+                         if r['branch_id'] == branch and r.get('code') != 'CONTEXT_TOO_LARGE')
         return (getattr(c, 'research_leaders', {}).get(branch), candidates,
                 tuple(r['artifact_id'] for r in diagnostics), feedback)
 
@@ -660,7 +662,7 @@ def search(controller, root, accepted):
                     c.record_research_feedback(peer, root, 'context_unavailable', str(error), code=error.code)
             service.fill()
             diagnostic_pending = bool(c.science and (c.science.diagnostics.running or c.science.diagnostics.pending))
-            renewable = any(state['kind'] != 'explicit_stop' for state in recovery.peers.values())
+            renewable = any(state['kind'] not in {'explicit_stop', 'context_pressure'} for state in recovery.peers.values())
             provider_reason = c.llm_unavailable_reason(len(pending))
             if provider_reason in {'llm_call_limit', 'llm_output_budget', 'llm_provider_credits_exhausted', 'llm_budget_exhausted'}:
                 renewable = False  # Internal quota is a pause; prepared work still executes.

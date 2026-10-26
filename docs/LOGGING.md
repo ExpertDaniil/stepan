@@ -324,6 +324,13 @@ and paired results include the resampling unit, unit count and an explicit
 unavailability reason. A bootstrap win fraction is conditional support;
 `unconfirmed_gain` preserves that distinction for single-period selection.
 
+Diagnostic context projections expose `discovery_fit_row_count` and
+`check_row_count`; exact IDs remain in the source report and scoped details.
+Initial `CONTEXT_TOO_LARGE` propagates to `research.peer_recovery` with
+`kind=context_pressure`, waiting for changed evidence. Its own error feedback
+does not trigger reissue. Post-tool pressure still saves a waiting checkpoint;
+the scientific question does not accumulate controller failure prose.
+
 
 ## Optional interface repair engineer
 

@@ -69,7 +69,7 @@ class PeerRecovery:
         state = self.peers.get(peer)
         if not state:return True
         if state['generation'] != generation:return True
-        return state['kind'] != 'explicit_stop' and self.clock() >= state['retry_at']
+        return state['kind'] not in {'explicit_stop', 'context_pressure'} and self.clock() >= state['retry_at']
 
     def defer(self, peer, kind, generation, signature='', reason=''):
         previous = self.peers.get(peer, {})
@@ -82,9 +82,10 @@ class PeerRecovery:
 
     def failure(self, peer, error, generation, input_signature=''):
         code = getattr(error, 'code', type(error).__name__)
-        kind = ('provider_pause' if code in {'LLM_UNAVAILABLE','LLM_RATE_LIMIT','LLM_COOLDOWN','LLM_BUDGET_EXHAUSTED',
+        kind = ('context_pressure' if code == 'CONTEXT_TOO_LARGE' else
+                'provider_pause' if code in {'LLM_UNAVAILABLE','LLM_RATE_LIMIT','LLM_COOLDOWN','LLM_BUDGET_EXHAUSTED',
                    'LLM_PROVIDER_CREDITS_EXHAUSTED'} else 'continuation' if code in {
-                   'LLM_OPERATION_TIMEOUT','CONTEXT_TOO_LARGE','LLM_OUTPUT_TRUNCATED','SEARCH_PHASE_BUDGET_EXHAUSTED'} else 'repair')
+                   'LLM_OPERATION_TIMEOUT','LLM_OUTPUT_TRUNCATED','SEARCH_PHASE_BUDGET_EXHAUSTED'} else 'repair')
         signature = hashlib.sha256(canonical([code, input_signature, str(error)[:600]]).encode()).hexdigest()
         return self.defer(peer, kind, generation, signature, str(error))
 

@@ -43,7 +43,15 @@ def compact_report(report, limit=4, source_artifact_id=None):
     When rule slices exist they replace single-column groups in the displayed view:
     a large population is not a hard region, and slices carry tested remedies.
     """
-    result = deepcopy({k:v for k,v in report.items() if k != 'diagnostic_groups'})
+    # Row identities audit the worker's isolation; they are not observations
+    # for the LLM. Never copy O(sample_rows) arrays into every context/mailbox.
+    row_fields = ('discovery_fit_row_ids', 'check_row_ids')
+    result = deepcopy({k:v for k,v in report.items() if k not in {'diagnostic_groups', *row_fields}})
+    for field in row_fields:
+        if field in report:
+            result[field.removesuffix('_ids')+'_count'] = len(report[field])
+    if any(field in report for field in row_fields):
+        result['row_identity_details'] = 'Exact row IDs remain in the immutable source diagnostic report.'
     slices = (result.pop('error_slices', None) or {})
     if slices.get('slices'):
         from agent.error_slices import compact_card

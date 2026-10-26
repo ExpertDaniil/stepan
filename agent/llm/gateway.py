@@ -598,6 +598,10 @@ class Gateway:
                                retry_after_seconds=max(0, until-time.monotonic()))
             if executable and error.code in {'CONTEXT_TOO_LARGE','LLM_OUTPUT_TRUNCATED','INVALID_LLM_OUTPUT',
                     'LLM_OPERATION_TIMEOUT','SEARCH_PHASE_BUDGET_EXHAUSTED'} and not self.cancelled.is_set():
+                # No provider/tool work exists to checkpoint when initial packing
+                # fails. Let the dispatcher quarantine this unchanged input.
+                if error.code == 'CONTEXT_TOO_LARGE' and not any(m.get('role') == 'assistant' for m in messages):
+                    raise
                 return self._research_checkpoint(context, messages, error, payload['attempt_limit'])
             raise
         finally:
@@ -1096,10 +1100,11 @@ class Gateway:
             user = json.loads(context['messages'][1]['content'])
             question = user.get('profile_summary', user).get('error_research', {}).get('recommendation', {}).get(
                 'question', 'Continue the unresolved question from saved reports and drafts.')
-        checkpoint = normalize_action({'action': 'research', 'next_step': 'continue',
+        checkpoint = normalize_action({'action': 'research', 'next_step': 'wait' if error.code == 'CONTEXT_TOO_LARGE' else 'continue',
             'evidence_ids': [],
-            'hypothesis': str(question)[:650]+' Continue from the archived results and last rejected proposal; repair it rather than '
-                'restarting the investigation. Last failure: '+error.code+': '+str(error)[:300]})
+            # Preserve the scientific question. Failure/recovery prose belongs
+            # in telemetry, not recursively inside the next question.
+            'hypothesis': str(question)[:650]})
         art = self.artifacts.write_json('research/controller-checkpoint-'+uuid.uuid4().hex[:12]+'.json',
                                        checkpoint, 'controller_research_checkpoint')
         self.log.event('research.context_checkpoint', artifact_id=art['artifact_id'], reason=error.code,

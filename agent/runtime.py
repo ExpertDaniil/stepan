@@ -82,7 +82,7 @@ def bootstrap(config, started, task_path, run_id, root, log):
                                           "adapter_id": interpretation["data"]["draft"]["task_kind"] + "-v1",
                                           "metric_implementation_id": "sklearn-metrics-v2"})["data"]
         spec = spec_result["task_spec"]
-        catalog = Catalog(spec["task_kind"], config)
+        catalog = Catalog(spec["task_kind"], config, spec)
         bus.call("C06", {"task_spec_id": spec["task_spec_id"], "adapter_id": spec_result["adapter_id"], "cpu_only": True},
                  lambda p: catalog.select(p, artifacts, bus.schemas))
         evaluator = Evaluator(spec, artifacts, store, log)

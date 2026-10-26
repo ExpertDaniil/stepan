@@ -26,9 +26,16 @@ def metric_text(text):
     return '\n'.join(result)
 
 
+# Keys are agent.metrics registry ids. Patterns must not match each other's names:
+# "balanced accuracy" is not accuracy, "sMAPE" is not MAPE, "RMSLE" is not RMSE.
 METRIC_PATTERNS = {'rmse': r'\brmse\b', 'mae': r'\bmae\b', 'r2': r'\br2\b|\br\^?2\b|\br-squared\b',
     'f1_macro': r'macro[ _-]*f1|f1[ _-]*macro|average\s*=\s*["\']macro', 'f1_weighted': r'weighted[ _-]*f1|f1[ _-]*weighted',
-    'accuracy': r'\baccuracy\b', 'log_loss': r'log[ _-]*loss', 'roc_auc': r'roc[ _-]*auc'}
+    'accuracy': r'(?<!balanced )(?<!balanced-)\baccuracy\b', 'log_loss': r'log[ _-]*loss', 'roc_auc': r'roc[ _-]*auc',
+    'mse': r'\bmse\b', 'rmsle': r'\brmsle\b|root[ _-]*mean[ _-]*squared[ _-]*log', 'msle': r'\bmsle\b',
+    'mape': r'\bmape\b', 'smape': r'\bs-?mape\b|symmetric[ _-]*mean[ _-]*absolute[ _-]*percentage',
+    'medae': r'\bmedae\b|median[ _-]*absolute[ _-]*error', 'balanced_accuracy': r'balanced[ _-]*accuracy',
+    'mcc': r'\bmcc\b|matthews', 'qwk': r'\bqwk\b|quadratic[ _-]*(?:weighted[ _-]*)?kappa',
+    'pr_auc': r'\bpr[ _-]*auc\b|average[ _-]*precision'}
 
 
 def _mentioned(text):

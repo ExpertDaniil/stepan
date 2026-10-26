@@ -69,6 +69,46 @@
         "parameters": {
           "type": "object",
           "additionalProperties": true
+        },
+        "declared": {
+          "type": "object",
+          "description": "What the task declared when it differs from the implemented metric_id: alias, monotone equivalent, cardinality adaptation or explicit proxy. Scores always belong to metric_id.",
+          "properties": {
+            "metric_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "enum": [
+                "exact",
+                "alias",
+                "equivalent",
+                "adapted",
+                "proxy"
+              ]
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "metric_id",
+            "status",
+            "notes"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

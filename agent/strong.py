@@ -11,8 +11,8 @@ check (built from the fit rows alone) supports it:
   later periods: it cannot tell new keys from recurring ones.)
 * Seed bagging of the final fit: deployment periods are new, so prediction
   variance across seeds is a first-order error term.
-* Class decisions: optional class weighting and, for F1 metrics, per-class log
-  offsets tuned on one inner half and confirmed on the other.
+* Class decisions: class weighting for class-balanced metrics and per-class log
+  offsets tuned for the declared label metric on one inner half, confirmed on the other.
 
 No dataset, column or label name is referenced. Held-out labels never enter fit.
 """
@@ -30,7 +30,7 @@ ENTITY_MAX_DUPLICATE = 0.1       # A key is almost unique inside one period.
 ENTITY_MAX_COLUMNS = 5
 ENTITY_SECONDS = 30.0
 HISTORY_MIN_GAIN = 0.01          # Relative inner loss reduction needed to use history.
-DECISION_MIN_GAIN = 0.002        # Confirmed inner F1 gain needed to keep offsets.
+DECISION_MIN_GAIN = 0.002        # Confirmed inner gain of the declared label metric needed to keep offsets.
 OFFSET_GRID = (-2.0, -1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0, 2.0)
 
 
@@ -230,8 +230,10 @@ def _fit_lgbm(regression, options, X, y, weight=None, eval_set=None, eval_weight
     return model, max(1, int(model.best_iteration_ or options['n_estimators']))
 
 
-def _loss(metric_id, truth, prediction):
-    if metric_id == 'mae':
+def _loss(objective, truth, prediction):
+    """Inner selection loss on the scale the learner was given (log scale under a log transform)."""
+    from agent.metrics import ABSOLUTE
+    if objective == ABSOLUTE:
         return float(np.mean(np.abs(truth-prediction)))
     return float(np.sqrt(np.mean((truth-prediction)**2)))
 
@@ -270,13 +272,12 @@ def _inner_split(X, y, policy, regression, seed):
     return np.asarray(fit), np.asarray(valid)
 
 
-def _tune_offsets(probabilities, truth, classes, average):
-    """Coordinate search of per-class log offsets maximizing an F1 average."""
-    from sklearn.metrics import f1_score
+def _tune_offsets(probabilities, truth, classes, scorer):
+    """Coordinate search of per-class log offsets maximizing scorer(truth, labels)."""
     logp = np.log(np.clip(probabilities, 1e-12, 1))
     offsets = np.zeros(len(classes))
     def score(values):
-        return float(f1_score(truth, classes[(logp+values).argmax(axis=1)], labels=classes, average=average, zero_division=0))
+        return float(scorer(truth, classes[(logp+values).argmax(axis=1)]))
     best = score(offsets)
     for _ in range(3):
         changed = False
@@ -333,9 +334,10 @@ class StrongTabularModel(BaseEstimator):
         return pd.concat([encoded, history.transform(X)], axis=1)
 
     def _fit_regression(self, X, y, params):
-        metric = self.task_spec.get('metric', {}).get('metric_id', 'rmse')
+        from agent.metrics import ABSOLUTE, regression_objective
+        metric = regression_objective(self.task_spec)
         options = _lgbm_parameters(params, True, self.cpu_threads, self.seed)
-        if metric == 'mae':
+        if metric == ABSOLUTE:
             options['objective'] = 'l1'
         encoded = self.encoder_.transform(X)
         fit, valid = _inner_split(X, y, self.validation_policy, True, self.seed)
@@ -380,33 +382,36 @@ class StrongTabularModel(BaseEstimator):
         return pd.Series(labels).map(weights).to_numpy(dtype=float)
 
     def _fit_classification(self, X, labels, params):
-        metric = self.task_spec.get('metric', {}).get('metric_id', 'accuracy')
+        from agent.metrics import class_balanced, label_score, tunes_decisions
         self.classes_ = np.asarray(sorted(set(labels)), dtype=str)
         options = _lgbm_parameters(params, False, self.cpu_threads, self.seed)
         encoded = self.encoder_.transform(X)
-        power = float(params['class_weight_power']) if metric in {'f1_macro', 'f1_weighted'} else 0.0
+        power = float(params['class_weight_power']) if class_balanced(self.task_spec) else 0.0
         weight = self._weights(labels, power)
         fit, valid = _inner_split(X, labels, self.validation_policy, False, self.seed)
         model, rounds = _fit_lgbm(False, options, encoded.iloc[fit], labels[fit], weight=weight[fit],
                                   eval_set=(encoded.iloc[valid], labels[valid]), eval_weight=weight[valid])
         self.offsets_ = np.zeros(len(self.classes_))
         self.report_.update(inner_fit_rows=len(fit), inner_valid_rows=len(valid), rounds=rounds, class_weight_power=power)
-        average = {'f1_macro': 'macro', 'f1_weighted': 'weighted'}.get(metric)
-        if average and len(valid) >= 40:
+        if tunes_decisions(self.task_spec) and len(valid) >= 40:
+            # Decisions are tuned for the declared label metric on one inner half and
+            # kept only when they also improve it on the other half.
+            metric = self.task_spec['metric']
+            vocabulary = [str(label) for label in (self.task_spec.get('allowed_labels') or self.classes_)]
+            def scorer(truth, predicted):
+                return label_score(metric, vocabulary, truth, predicted)
             probabilities = self._aligned(model, encoded.iloc[valid])
             truth = labels[valid]
             half = np.random.RandomState(self.seed).rand(len(valid)) < 0.5
-            offsets, tuned, _ = _tune_offsets(probabilities[half], truth[half], self.classes_, average)
-            from sklearn.metrics import f1_score
+            offsets, tuned, _ = _tune_offsets(probabilities[half], truth[half], self.classes_, scorer)
             logp = np.log(np.clip(probabilities[~half], 1e-12, 1))
             def confirm(values):
-                return float(f1_score(truth[~half], self.classes_[(logp+values).argmax(axis=1)], labels=self.classes_,
-                                      average=average, zero_division=0))
+                return scorer(truth[~half], self.classes_[(logp+values).argmax(axis=1)])
             before, after = confirm(np.zeros(len(self.classes_))), confirm(offsets)
             accepted = after >= before+DECISION_MIN_GAIN
             if accepted:
-                self.offsets_, _, _ = _tune_offsets(probabilities, truth, self.classes_, average)
-            self.report_['decision'] = {'average': average, 'tuning_half_score': tuned, 'confirm_before': before,
+                self.offsets_, _, _ = _tune_offsets(probabilities, truth, self.classes_, scorer)
+            self.report_['decision'] = {'metric_id': metric['metric_id'], 'tuning_half_score': tuned, 'confirm_before': before,
                                         'confirm_after': after, 'accepted': bool(accepted), 'offsets': self.offsets_.tolist()}
         self.bag_models_ = self._bagged(options, encoded, labels, round(rounds*1.1), weight=weight)
         self.report_['bags'] = len(self.bag_models_)

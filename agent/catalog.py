@@ -8,11 +8,20 @@ from agent.preprocessing import preprocessing_policy
 
 
 class Catalog:
-    def __init__(self, kind, config):
+    def __init__(self, kind, config, spec=None):
         self.kind, self.config = kind, config
         all_recipes = json.loads((ROOT / "recipes" / "catalog.json").read_text(encoding="utf-8"))
         self.recipes = {r["id"]: r for r in all_recipes if (kind == "regression") == (r["task_kind"] == "regression")
                         and (r.get("requires") is None or importlib.util.find_spec(r["requires"]))}
+        if spec is not None:
+            # The declared metric chooses the default training target space
+            # (log1p for RMSLE/MAPE-like metrics); explicit values still win.
+            from agent.metrics import default_target_transform
+            default = default_target_transform(spec)
+            for recipe in self.recipes.values():
+                domain = recipe.get('parameters', {}).get('target_transform')
+                if domain and default in domain.get('enum', [default]):
+                    domain['default'] = default
         if config.research_mode == 'adaptive':
             from agent.research_actions import CUSTOM_RECIPE
             self.recipes[CUSTOM_RECIPE] = {'id': CUSTOM_RECIPE, 'task_kind': kind, 'family': 'custom',

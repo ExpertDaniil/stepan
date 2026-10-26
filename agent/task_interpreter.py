@@ -17,7 +17,7 @@ def recover_contract(task, profile, artifacts):
     """
     import pandas as pd
     from tools.data import read_table
-    from agent.task import METRICS
+    from agent import metrics as registry
     full = artifacts.read_json(profile['profile_artifact_id'])
     train_cols, test_cols = full['train_columns'], full['test_columns']
     missing = set(train_cols)-set(test_cols)
@@ -53,8 +53,9 @@ def recover_contract(task, profile, artifacts):
         return None
     from agent.task_rules import infer_metric
     metric_id = infer_metric(text)
-    regression = bool(re.search(r'регресси|\bregression\b', text, re.I)) or metric_id in {'rmse', 'mae', 'r2'}
-    classification = bool(re.search(r'классификац|\bclassification\b', text, re.I)) or metric_id in {'f1_macro', 'f1_weighted', 'accuracy'}
+    declared = registry.get(metric_id) if metric_id else None
+    regression = bool(re.search(r'регресси|\bregression\b', text, re.I)) or bool(declared and declared.prediction_kind == 'values')
+    classification = bool(re.search(r'классификац|\bclassification\b', text, re.I)) or bool(declared and declared.prediction_kind == 'labels')
     if regression == classification or re.search(r'probabilit|вероятност', '\n'.join(line for line in text.splitlines() if target in line), re.I):
         return None
     y = read_table(artifacts.resolve(profile['train_artifact_id']), dtype={target: str} if classification else None)[target]
@@ -71,13 +72,71 @@ def recover_contract(task, profile, artifacts):
             'target_column': target, 'target_columns': [target], 'allowed_labels': labels, 'output': output,
             'excluded_features': ids, **{k: profile[k] for k in ('train_artifact_id', 'test_artifact_id', 'dictionary_artifact_id', 'sample_submission_artifact_id')}}
     draft = None
-    if metric_id and METRICS[metric_id][1] == output['prediction_kind']:
-        direction, kind = METRICS[metric_id]
+    if declared and declared.prediction_kind == output['prediction_kind'] and spec['task_kind'] in declared.task_kinds:
         draft = {'task_kind': spec['task_kind'], 'target_column': target,
-                 'metric': {'metric_id': metric_id, 'direction': direction, 'prediction_kind': kind, 'parameters': {}}, 'output': output}
+                 'metric': {'metric_id': metric_id, 'direction': declared.direction, 'prediction_kind': declared.prediction_kind,
+                            'parameters': {}}, 'output': output}
     return {'spec': spec, 'draft': draft, 'target': y,
             'provenance': {'task_artifact_id': task['task_text_artifact_id'], 'profile_artifact_id': profile['profile_artifact_id'],
                            'sample_artifact_id': profile['sample_submission_artifact_id'], 'rule': 'schema_sample_dictionary_task_consensus'}}
+
+
+REGRESSION_MIN_DISTINCT = 20   # Fewer distinct integer values read as classes.
+
+
+def supervised_reduction(task, profile, artifacts, recovered=None, reason=''):
+    """A supervised draft for a task the interpreter did not map to an adapter.
+
+    A constant emergency output scores zero against any learned baseline, so a
+    task with exactly one train-only column that the sample asks to predict is
+    reduced to regression/classification with an explicit metric proxy instead
+    of being abandoned. The reduction and its reason are recorded in
+    metric.declared; nothing here invents a mapping the files do not show.
+    Returns None when the files do not determine one supervised target.
+    """
+    import pandas as pd
+    from tools.data import read_table
+    from agent.task_rules import infer_metric
+    text = task['task_text']
+    declared_metric = infer_metric(text)
+    if recovered and recovered.get('spec'):
+        spec = recovered['spec']
+        kind, target, output = spec['task_kind'], spec['target_column'], dict(spec['output'])
+        basis = 'consensus contract (schema, sample, dictionary and task text agree)'
+    else:
+        full = artifacts.read_json(profile['profile_artifact_id'])
+        missing = [c for c in full['train_columns'] if c not in set(full['test_columns'])]
+        if len(missing) != 1 or not profile.get('sample_submission_artifact_id'):
+            return None
+        target = missing[0]
+        sample = pd.read_csv(artifacts.resolve(profile['sample_submission_artifact_id']), dtype=str, keep_default_na=False, nrows=5)
+        ids = [c for c in sample if c in full['test_columns']]
+        if [c for c in sample if c not in full['test_columns']] != [target] or not ids:
+            return None
+        values = read_table(artifacts.resolve(profile['train_artifact_id']), dtype={target: str})[target]
+        if values.isna().any() or values.eq('').any():
+            return None
+        numbers = pd.to_numeric(values, errors='coerce')
+        integral = numbers.notna().all() and bool((numbers == numbers.round()).all())
+        distinct = values.nunique()
+        if numbers.notna().all() and (not integral or distinct > REGRESSION_MIN_DISTINCT):
+            kind = 'regression'
+        elif distinct >= 2:
+            kind = 'binary_classification' if distinct == 2 else 'multiclass_classification'
+        else:
+            return None
+        inputs = {Path(path).name for path in task['candidate_paths'].values()}
+        paths = sorted({path for path in re.findall(r'[\w./-]+\.csv', text) if Path(path).name not in inputs})
+        output = {'path': paths[0] if len(paths) == 1 else 'submission.csv', 'columns': list(sample.columns), 'id_columns': ids,
+                  'prediction_columns': [target], 'prediction_kind': 'values' if kind == 'regression' else 'labels',
+                  'row_order': 'test', 'encoding': 'utf-8', 'separator': ',', 'write_index': False}
+        basis = 'single train-only column requested by the sample submission; kind from its values'
+    note = f'Interpreter result unsupported ({reason or "no reason given"}); reduced to {kind} from the {basis}.'
+    prediction = 'values' if kind == 'regression' else 'labels'
+    metric = {'metric_id': declared_metric or 'unspecified', 'direction': 'minimize' if kind == 'regression' else 'maximize',
+              'prediction_kind': prediction, 'parameters': {},
+              'declared': {'metric_id': declared_metric, 'status': 'proxy', 'notes': [note]}}
+    return {'task_kind': kind, 'target_column': target, 'metric': metric, 'output': output}
 
 
 class TaskInterpreter:
@@ -105,10 +164,22 @@ class TaskInterpreter:
                           "semantic_source_rules": "task quotes reference this exact Markdown with record=null; dictionary quotes reference zero-based rows of profile.data_dictionary. Omitted metadata remains unknown."})
         except Exception as error:
             recovered = getattr(self, 'recovered', None)
-            if not recovered or not recovered['draft']:
-                raise
-            self.gateway.log.event('task.interpretation_recovered', code=getattr(error, 'code', type(error).__name__), provenance=recovered['provenance'])
-            draft = recovered['draft']
+            draft = recovered['draft'] if recovered else None
+            if draft is None:
+                draft = supervised_reduction(self.task, self.profile, self.artifacts, recovered,
+                                             'provider failure: '+getattr(error, 'code', type(error).__name__))
+                if draft is None:
+                    raise
+            self.gateway.log.event('task.interpretation_recovered', code=getattr(error, 'code', type(error).__name__),
+                                   provenance=recovered['provenance'] if recovered else None, task_kind=draft['task_kind'])
+        if 'target_column' not in draft:
+            # ranking/unsupervised/unsupported: a learned supervised proxy beats a constant.
+            reduced = supervised_reduction(self.task, self.profile, self.artifacts, getattr(self, 'recovered', None),
+                                           draft.get('reason', ''))
+            if reduced is not None:
+                self.gateway.log.event('task.unsupported_reduced', level='WARNING', declared_task_kind=draft['task_kind'],
+                                       reason=draft.get('reason'), task_kind=reduced['task_kind'], target_column=reduced['target_column'])
+                draft = reduced
         return {"draft": draft, "evidence": ["Source task artifact: " + self.task["task_text_artifact_id"]], "unresolved_fields": []}
 
     def deployment_facts(self, spec):

@@ -62,8 +62,14 @@ def predict(model, frame, spec, phase):
     import numpy as np
     kind = prediction_kind(spec, phase)
     if kind != 'probabilities':
-        return checked_matrix(model.predict(frame), len(frame), len(targets(spec)), kind,
-                              labels=spec['allowed_labels'])
+        array = checked_matrix(model.predict(frame), len(frame), len(targets(spec)), kind,
+                               labels=spec['allowed_labels'])
+        if kind == 'values':
+            # Metric domain (e.g. RMSLE needs nonnegative values), identical for
+            # validation and submission so the scored values are the delivered ones.
+            from agent.metrics import apply_output_domain
+            array = apply_output_domain(spec, array)
+        return array
     if not callable(getattr(model, 'predict_proba', None)):
         raise AgentError('UNSUPPORTED_PREDICTION_INTERFACE', 'This task requires predict_proba')
     classes = getattr(model, 'classes_', None)

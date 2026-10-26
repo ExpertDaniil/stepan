@@ -210,11 +210,23 @@ def build_pipeline(recipe_id, task_spec, params):
     threads = int(params.pop("_cpu_threads", 1))
     seed = int(params.pop("_seed", 42))
     regression = task_spec["task_kind"] == "regression"
-    transform = params.pop("target_transform", "identity")
+    from agent.metrics import ABSOLUTE, default_target_transform, regression_objective
+    # Without an explicit choice the declared metric selects the train-only target
+    # space: log-scale metrics (RMSLE, MSLE, MAPE, SMAPE) train on log1p targets.
+    transform = params.pop("target_transform", None) or default_target_transform(task_spec)
     if transform not in {"identity", "shifted_log1p"} or (not regression and transform != "identity"):
         raise ValueError("Unsupported target transform")
     if transform == "shifted_log1p":
-        return ShiftedLogTargetModel(build_pipeline(recipe_id, task_spec, {**params, "_cpu_threads": threads, "_seed": seed}))
+        return ShiftedLogTargetModel(build_pipeline(recipe_id, task_spec, {**params, "target_transform": "identity",
+                                                                           "_cpu_threads": threads, "_seed": seed}))
+    if regression and regression_objective(task_spec) == ABSOLUTE:
+        # Absolute-error metrics: the learner's own L1 loss unless a recipe set one.
+        if recipe_id.startswith('lightgbm-'):
+            params.setdefault('objective', 'l1')
+        elif recipe_id.startswith(('hist-native-', 'hist-gradient-')):
+            params.setdefault('loss', 'absolute_error')
+        elif recipe_id.startswith('catboost-'):
+            params.setdefault('loss_function', 'MAE')
     interactions = params.pop("numeric_interactions", False)
     if not isinstance(interactions, bool):
         raise ValueError("numeric_interactions must be boolean")

@@ -6,10 +6,19 @@ optional target_columns (ordered, starts with target_column; multiple numeric ta
 metric {metric_id, direction, prediction_kind, parameters}, output {path, columns, id_columns,
 prediction_columns, row_order:"test", encoding:"utf-8", separator:",", write_index:false}.
 
-Supported metrics: rmse/mae (minimize, values), r2 (maximize, values),
-f1_macro/f1_weighted/accuracy (maximize, labels), log_loss (minimize, probabilities),
-roc_auc (maximize, probabilities; binary only, metric.parameters.positive_label explicitly names the positive class).
-Keep other metric parameters {}: the registry fills the observed class vocabulary for F1.
+Implemented metric_id values (direction, prediction_kind):
+regression, values: rmse, mse, mae, medae, rmsle, msle, mape, smape (minimize); r2 (maximize).
+classification, labels (maximize): accuracy, balanced_accuracy, mcc, cohen_kappa, qwk,
+f1_macro/f1_weighted/f1_micro, precision_macro/precision_weighted/precision_micro,
+recall_macro/recall_weighted/recall_micro; binary only: f1, precision, recall.
+classification, probabilities: log_loss (minimize); roc_auc and pr_auc (maximize, binary);
+roc_auc_ovr (maximize, macro one-vs-rest, multiclass).
+Binary f1/precision/recall/roc_auc/pr_auc take metric.parameters.positive_label when the task names
+the positive class; qwk takes metric.parameters.label_order (ordered class names) when the task
+gives an order. Otherwise keep parameters {}: the registry derives them and records how.
+If the task's metric is not listed, still return the supervised task: set metric_id to the closest
+listed metric of the same prediction kind and metric.declared to
+{"metric_id": "<the task's metric name>", "status": "proxy", "notes": ["<why this proxy>"]}.
 For multiple regression targets RMSE is sqrt(mean squared error over rows and targets), MAE is the mean absolute error, R2 uses uniform target averaging. Reject a different required aggregation.
 Output.prediction_kind may be values, labels or probabilities independently of the metric input.
 Numeric prediction_columns correspond to target_columns in order. Class probabilities require
@@ -17,9 +26,14 @@ output.class_labels in prediction_columns order, or one binary column with outpu
 Derive class/column mappings from the condition and sample; never guess an ambiguous mapping.
 Output.columns preserves the exact sample column order; identifier columns need not come first.
 Resolve output path from the task directory, usually submission.csv. Never overwrite input files.
-For ranking, unsupervised tasks, multi-target classification, unknown metrics or output protocols,
-return {"task_kind":"unsupported", "reason":"the precise unsupported requirement from the task"}
-(ranking/unsupervised may use those task_kind values). Never silently replace the task or metric.
+A constant fallback scores zero, so prefer the nearest supported supervised formulation whenever
+one target column is to be predicted for each test row: a ranking by relevance is regression on the
+relevance target; a forecast from tabular features is regression. Record such a reduction in
+metric.declared notes. Only when no single supervised target exists (unsupervised tasks,
+multi-target classification, outputs that are not one row per test id) return
+{"task_kind":"unsupported", "reason":"the precise unsupported requirement from the task"}
+(ranking/unsupervised may use those task_kind values). Never silently replace the task or metric:
+every replacement is stated in metric.declared.
 No internet, extra data, pretrained models, package installation or external APIs are allowed.
 
 Also return task_model in this SAME response. This is a compact model of the problem,

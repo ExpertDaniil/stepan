@@ -10,24 +10,9 @@ from agent.data_transport import transport
 
 
 def score_predictions(spec, truth, prediction):
-    import numpy as np
-    from sklearn.metrics import (accuracy_score, f1_score, log_loss, mean_absolute_error,
-                                 mean_squared_error, r2_score, roc_auc_score)
-    key = spec['metric']['metric_id']
-    if spec['task_kind'] == 'regression':
-        y = np.asarray(truth, dtype=float)
-        p = prediction.reshape(-1) if y.ndim == 1 else prediction
-        return {'rmse': lambda: math.sqrt(mean_squared_error(y, p)),
-                'mae': lambda: mean_absolute_error(y, p), 'r2': lambda: r2_score(y, p)}[key]()
-    y = np.asarray(truth, dtype=str)
-    if spec['metric']['prediction_kind'] == 'probabilities':
-        if key == 'log_loss':
-            return log_loss(y, prediction, labels=spec['allowed_labels'])
-        positive = spec['metric']['parameters']['positive_label']
-        return roc_auc_score(y == positive, prediction[:, spec['allowed_labels'].index(positive)])
-    p = prediction.reshape(-1).astype(str)
-    return (accuracy_score(y, p) if key == 'accuracy' else f1_score(y, p,
-        average='macro' if key == 'f1_macro' else 'weighted', labels=spec['allowed_labels'], zero_division=0))
+    """The spec's metric on original-scale predictions; semantics live in agent.metrics."""
+    from agent.metrics import score
+    return score(spec, truth, prediction)
 
 
 def error_diagnostics(data, task, fit_indices, valid_indices, y, prediction, columns=None, *, max_groups=4):

@@ -3,15 +3,40 @@ import hashlib
 
 from agent.contracts import canonical
 from agent.errors import AgentError
+from agent import metrics as metric_registry
 from tools.data import read_table
 from agent.predictions import read_training, targets
 from agent.data_transport import transport
 
-METRICS = {
-    "rmse": ("minimize", "values"), "mae": ("minimize", "values"), "r2": ("maximize", "values"),
-    "f1_macro": ("maximize", "labels"), "f1_weighted": ("maximize", "labels"), "accuracy": ("maximize", "labels"),
-    'log_loss': ('minimize', 'probabilities'), 'roc_auc': ('maximize', 'probabilities'),
-}
+
+def _default_output_kind(kind, metric, output, labels, profile, artifacts):
+    """Submission format when the interpretation omitted it.
+
+    The metric's prediction kind is a scoring input, not the file format: an AUC
+    task may still ask for class names. Probabilities are chosen only when the
+    columns map one-to-one to classes, a binary column names its positive class,
+    or the sample's single column holds probabilities rather than class names;
+    such a binary column is then bound to the metric's positive label (in place).
+    """
+    import pandas as pd
+    if kind == 'regression':
+        return 'values'
+    columns = output.get('prediction_columns') or []
+    if metric['prediction_kind'] != 'probabilities':
+        return 'labels'
+    if len(columns) == len(labels) > 1 or (len(columns) == 1 and output.get('positive_label') in labels):
+        return 'probabilities'
+    if len(columns) == 1 and profile.get('sample_submission_artifact_id'):
+        sample = pd.read_csv(artifacts.resolve(profile['sample_submission_artifact_id']), usecols=columns,
+                             dtype=str, keep_default_na=False)[columns[0]]
+        numbers = pd.to_numeric(sample, errors='coerce')
+        if len(sample) and numbers.notna().all() and numbers.between(0, 1).all() and not set(sample) <= set(labels):
+            if len(labels) != 2:
+                return 'labels'
+            output['positive_label'] = (metric['parameters'].get('positive_label')
+                                        or metric_registry.default_positive_label(labels)[0])
+            return 'probabilities'
+    return 'labels'
 
 
 def resolve_spec(draft, profile, task_root, artifacts, schemas, *, task_text=''):
@@ -30,14 +55,6 @@ def resolve_spec(draft, profile, task_root, artifacts, schemas, *, task_text='')
     test = transport(artifacts).read(profile['test_artifact_id'])
     if any(c not in train for c in target_columns) or train[target_columns].isna().any().any():
         raise AgentError("TASK_SPEC_CONFLICT", "Target must exist and have no missing training values")
-    metric = dict(draft["metric"])
-    if metric["metric_id"] not in METRICS:
-        raise AgentError("UNSUPPORTED_METRIC", metric["metric_id"])
-    direction, prediction = METRICS[metric["metric_id"]]
-    if metric["direction"] != direction or metric["prediction_kind"] != prediction:
-        raise AgentError("TASK_SPEC_CONFLICT", "Metric direction or prediction kind is inconsistent")
-    if (kind == "regression") != (prediction == "values"):
-        raise AgentError("TASK_SPEC_CONFLICT", "Metric is incompatible with task kind")
     if kind == "regression":
         try:
             y = train[target_columns].apply(pd.to_numeric, errors="raise")
@@ -50,16 +67,14 @@ def resolve_spec(draft, profile, task_root, artifacts, schemas, *, task_text='')
         labels = sorted(train[target].astype(str).unique().tolist())
         if len(labels) < 2 or (kind == "binary_classification" and len(labels) != 2):
             raise AgentError("TASK_SPEC_CONFLICT", "Classification kind does not match observed classes")
-        if metric["metric_id"].startswith("f1_"):
-            metric["parameters"] = {"labels": labels, "zero_division": 0}
-        elif metric['metric_id'] == 'roc_auc':
-            positive = metric['parameters'].get('positive_label')
-            if len(labels) != 2 or positive not in labels or set(metric['parameters']) != {'positive_label'}:
-                raise AgentError('TASK_SPEC_CONFLICT', 'roc_auc adapter requires two classes and an explicit positive_label')
-        elif metric["parameters"]:
-            raise AgentError("TASK_SPEC_CONFLICT", "This metric implementation takes no parameters")
-    if kind == "regression" and metric["parameters"]:
-        raise AgentError("TASK_SPEC_CONFLICT", "This regression metric implementation takes no parameters")
+    # The registry never aborts on an unknown metric name: it resolves an alias or
+    # records an explicit proxy in metric.declared (agent/metrics.py).
+    metric = metric_registry.resolve(draft["metric"], kind, labels,
+                                     truth=train[target_columns] if kind == 'regression' else train[target].astype(str))
+    if metric.get('declared'):
+        artifacts.log.event('task.metric_resolved', level='WARNING' if metric['declared']['status'] == 'proxy' else 'INFO',
+                            metric_id=metric['metric_id'], declared=metric['declared'])
+    prediction = metric['prediction_kind']
     output = dict(draft["output"])
     if len(output["columns"]) != len(set(output["columns"])):
         raise AgentError("TASK_SPEC_CONFLICT", "Output column names must be unique")
@@ -76,7 +91,9 @@ def resolve_spec(draft, profile, task_root, artifacts, schemas, *, task_text='')
             len(set(output['id_columns'] + output['prediction_columns'])) != len(output['columns']) or
             set(output['columns']) != set(output['id_columns'] + output['prediction_columns'])):
         raise AgentError('TASK_SPEC_CONFLICT', 'Output must partition columns into distinct identifiers and predictions')
-    output_kind = output.setdefault('prediction_kind', prediction)
+    if 'prediction_kind' not in output:
+        output['prediction_kind'] = _default_output_kind(kind, metric, output, labels, profile, artifacts)
+    output_kind = output['prediction_kind']
     if (kind == 'regression') != (output_kind == 'values'):
         raise AgentError('TASK_SPEC_CONFLICT', 'Output prediction kind is incompatible with task kind')
     if output_kind not in {'values', 'labels', 'probabilities'}:

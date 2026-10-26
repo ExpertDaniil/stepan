@@ -164,3 +164,55 @@ class ReadyOutputTests(unittest.TestCase):
             h.artifacts.resolve(old_art['artifact_id']).write_text('changed')
             self.assertIsNone(submission.ready_candidate(old['experiment_id']))
         finally:h.close()
+
+
+class EnvironmentFailureRecoveryTests(unittest.TestCase):
+    """An environment refusal leaves the candidate unmeasured and resubmittable."""
+
+    def setUp(self):
+        self.h=GraphHarness(graph_hard_decisions=False,research_mode='adaptive',data_research_min_seconds=0)
+        self.c=self.h.controller;self.c.graph=self.h.g
+        self.c.update_final_reserve=lambda:None
+        self.feedback=[]
+        self.c.record_research_feedback=lambda *a,**k:self.feedback.append((a,k))
+
+    def tearDown(self):self.h.close()
+
+    def failed_candidate(self, code):
+        import json
+        ticket,_,payload,_=self.h.result('researcher-1',{'alpha':1},10)
+        service=VersionSearch(self.c)
+        from agent.pipeline_candidates import execution_ticket
+        failing=self.h.proposal(execution_ticket(self.c,ticket),{'alpha':3.0,'target_transform':'shifted_log1p'})
+        plan=deepcopy(failing['proposal']['plan'])
+        version=service.add(plan,ticket)
+        # The first attempt reached the worker and was refused there.
+        reply=self.h.g.invoke('G04',failing,key='first-attempt')
+        event=self.h.train_event(reply,state='failed')
+        event['error']={'code':code,'message':'Generated pipeline blocked audit event ctypes.dlopen','retryable':False,
+                        'retry_after_seconds':None,'details':{'guard_origin':'owned_runtime'}}
+        self.c.store.apply_event(event,'train')
+        eid=reply['lead_submission']['experiment_id']
+        service.queue.remove(version)
+        version.update(paused='initial_execution_failed',environment_failure=code=='GUARD_ENVIRONMENT_BLOCKED',retry_at=0)
+        return service,version,plan,ticket,eid
+
+    def test_resubmitted_environment_failure_requeues_the_same_candidate(self):
+        service,version,plan,ticket,eid=self.failed_candidate('GUARD_ENVIRONMENT_BLOCKED')
+        self.assertEqual(self.c.store.get(eid)['state'],'failed')
+        self.assertIs(service.add(deepcopy(plan),ticket),version)
+        self.assertIsNone(version['paused'])
+        self.assertIn(version,service.queue)
+        admitted=[]
+        self.c.admit_training=lambda p,e:admitted.append((e,self.c.store.get(e)['state'])) or False
+        self.assertFalse(service.start(version,initial=True))
+        # The identical fingerprint re-entered admission as a queued attempt, not a cached failure.
+        self.assertEqual(admitted,[(eid,'queued')])
+
+    def test_candidate_code_refusal_stays_a_terminal_failure(self):
+        service,version,plan,ticket,eid=self.failed_candidate('GUARD_POLICY_BLOCKED')
+        service.add(deepcopy(plan),ticket)
+        self.assertEqual(version['paused'],'initial_execution_failed')
+        self.c.admit_training=lambda p,e:self.fail('a candidate-code failure must not be rerun unchanged')
+        self.assertFalse(service.start(version,initial=True))
+        self.assertEqual(self.c.store.get(eid)['state'],'failed')

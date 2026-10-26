@@ -107,6 +107,20 @@ class Store:
             self.db.execute("INSERT INTO experiment_parents VALUES(?,?)", (ident, parent))
         return {"experiment_id": ident, "fingerprint": fingerprint, "disposition": "created", "state": "queued", "existing_experiment_id": None}
 
+    def requeue(self, ident):
+        """Dispatcher retry of a stopped attempt whose failure says nothing about the candidate."""
+        from agent.errors import failure_scope
+        self._writer()
+        with self.transaction():
+            exp = self.get(ident)
+            if not (exp['state'] in {'timed_out', 'cancelled'} or
+                    (exp['state'] == 'failed' and failure_scope(exp['error']) == 'execution_environment')):
+                raise AgentError('INVALID_STATE_TRANSITION', 'Only stopped transient or environment-failed attempts may be requeued')
+            self.db.execute("UPDATE experiments SET state='queued',lease_id=NULL,fencing_token=NULL,duration=NULL,error=NULL WHERE experiment_id=?",
+                            (ident,))
+        self.log.event('experiment.requeued', experiment_id=ident, previous_state=exp['state'],
+                       previous_error=exp['error'], completed_attempts=exp['attempt_no'], plan_preserved=True)
+
     def start(self, ident, lease):
         self._writer()
         exp = self.get(ident)

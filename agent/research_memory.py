@@ -7,6 +7,7 @@ from copy import deepcopy
 import hashlib
 
 from agent.contracts import canonical
+from agent.errors import failure_scope
 
 
 def idea_id(question, mechanism):
@@ -32,6 +33,7 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
                            'code_sha256': artifacts.meta(plan['code_artifact_id'])['sha256'],
                            'configuration_sha256': hashlib.sha256(canonical(core).encode()).hexdigest()},
                        'fit_seconds': exp.get('duration'),
+                       'failure_scope': failure_scope(exp['error']) if exp['state'] in {'failed', 'invalid', 'timed_out', 'cancelled'} else None,
                        'limitation': 'One complete configuration under this protocol; no universal method verdict.'}
         configurations.setdefault(canonical(core), []).append(observation)
         observations_by_id[ident] = observation
@@ -125,6 +127,7 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
             item['status'] = ('measured' if item['tested_experiment_ids'] else
                               'running' if any(o['state'] in {'queued', 'running', 'trained'} for o in observations) or
                               any(s['status'] == 'running' for s in tuning_series) else
+                              'environment_blocked' if observations and all(o.get('failure_scope') == 'execution_environment' for o in observations) else
                               'failed' if observations and all(o['state'] in {'failed', 'invalid', 'timed_out', 'cancelled'} for o in observations) else 'proposed')
         for candidate in notes['alternatives']:
             key = candidate.get('idea_id') or idea_id(candidate['question'], candidate['mechanism'])
@@ -154,6 +157,7 @@ def build_research_memory(store, artifacts, experiment_ids, *, work_order_ids=No
         'instruction': 'Ideas persist across decisions. Open means unresolved, not a requirement to test every idea. '
             'Observations come from the controller; interpretations and priority reasons come from the model. '
             'A failed combined pipeline does not refute each component or exhaust a model family. '
+            'environment_blocked ideas were never measured: the sealed worker refused an owned dependency, so they remain untested. '
             'Tuning_series links the actual Optuna candidates and outcomes to the question. Reaching a trial/time budget does not prove a ceiling. '
             'Reuse idea_id when continuing an existing question. No semantic deduplication or causal attribution is claimed.'}
 

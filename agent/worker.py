@@ -118,7 +118,7 @@ def execute(job, trusted_thread=None):
     guard = None
     if job.get('guard_generated'):
         from tools.runtime_guard import PipelineGuard, prepare_pipeline_imports
-        prepare_pipeline_imports(job['code_path'], job['hyperparameters'].get('base_recipe_id'))
+        prepare_pipeline_imports(job['code_path'], job['hyperparameters'])
         guard = PipelineGuard(job['code_path'], trusted_thread=trusted_thread)
     limits = ExitStack()
     limits.enter_context(threadpool_limits(limits=job['cpu_threads']))
@@ -276,6 +276,8 @@ def main():
     except BaseException as exc:
         traceback.print_exc()
         result = {"success": False, "error": str(exc), "error_type": type(exc).__name__}
+        if getattr(exc, "origin", None):
+            result["guard_origin"] = exc.origin
         exit_code = 1
     finally:
         done.set()

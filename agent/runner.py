@@ -12,7 +12,7 @@ import time
 import uuid
 
 from agent.config import ROOT
-from agent.errors import AgentError
+from agent.errors import AgentError, failure_scope
 from agent.contracts import canonical
 from agent.artifacts import file_sha256
 
@@ -372,7 +372,13 @@ class Runner:
             media = 'application/json' if path.name == 'features.json' else 'text/csv' if path.suffix == '.csv' else 'application/octet-stream'
             art = self.artifacts.register(path, kind, media)
             outputs.append(art["artifact_id"])
-        err = None if state == "succeeded" else job.forced_error or AgentError(result.get("error_type") if result.get("error_type") in {"JOB_TIMEOUT", "JOB_MEMORY_LIMIT"} else "WORKER_FAILED", result.get("error", "Worker exited without a successful result"), details={"exit_code": job.process.returncode}).as_dict()
+        code = (result.get("error_type") if result.get("error_type") in {"JOB_TIMEOUT", "JOB_MEMORY_LIMIT"} else
+                "GUARD_ENVIRONMENT_BLOCKED" if result.get("guard_origin") in {"owned_runtime", "installed_library"} else
+                "GUARD_POLICY_BLOCKED" if result.get("guard_origin") else "WORKER_FAILED")
+        details = {"exit_code": job.process.returncode}
+        if result.get("guard_origin"):
+            details.update(guard_origin=result["guard_origin"], failure_scope=failure_scope(code))
+        err = None if state == "succeeded" else job.forced_error or AgentError(code, result.get("error", "Worker exited without a successful result"), details=details).as_dict()
         event = {"event_id": "evt-" + job.job_id + "-terminal", "job_id": job.job_id,
                  "experiment_id": job.experiment_id, "attempt_no": job.attempt_no,
                  "lease_id": job.lease["lease_id"], "fencing_token": job.lease["fencing_token"], "state": state,

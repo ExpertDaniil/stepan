@@ -8,7 +8,7 @@ import time
 import uuid
 
 from agent.contracts import canonical
-from agent.errors import AgentError
+from agent.errors import AgentError, failure_scope
 from agent.pipeline_candidates import automatic_space, execution_ticket, version_id
 
 
@@ -62,8 +62,10 @@ class VersionSearch:
         if ident in self.versions:
             version = self.versions[ident]
             changed = canonical(plan['model']['hyperparameters']) != canonical(version['anchor']['model']['hyperparameters'])
+            # An environment refusal is not a candidate verdict: an explicit
+            # resubmission may run again after the existing quarantine backoff.
             if version['paused'] and (version['paused'].startswith('superseded_by_initial:') or
-                    (not version['initial_metric'] and changed)):
+                    (not version['initial_metric'] and (changed or version.get('environment_failure')))):
                 version.update(paused=None, retry_at=0)
                 if not version['initial_metric']:
                     version['anchor'], version['ticket'] = plan, ticket
@@ -222,6 +224,18 @@ class VersionSearch:
                     self.study(version).tell(trial, state=self.library.trial.TrialState.PRUNED)
                 return False
             ticket = execution_ticket(c, version['ticket'], None if initial else version['initial_experiment_id'])
+            # C12 deduplicates candidate identity across attempts. Reopen only a
+            # stopped attempt that measured nothing about the candidate, after
+            # its process is gone; its plan and earlier job events stay immutable.
+            from agent.store import Store
+            fingerprint = hashlib.sha256(canonical(Store.fingerprint_core(plan,
+                c.artifacts.meta(plan['code_artifact_id'])['sha256'])).encode()).hexdigest()
+            previous = c.store.db.execute('SELECT experiment_id,state,error FROM experiments WHERE run_id=? AND fingerprint=?',
+                (c.store.run_id, fingerprint)).fetchone()
+            if previous and (previous['state'] in {'timed_out', 'cancelled'} or (previous['state'] == 'failed'
+                    and failure_scope(previous['error']) == 'execution_environment')):
+                if not any(job.experiment_id == previous['experiment_id'] for job in c.runner.active()):
+                    c.store.requeue(previous['experiment_id'])
             from agent.graph.controller import lineage_for
             reply = c.graph.invoke('G04', {'work_order_id': ticket['work_order']['work_order_id'],
                 'proposal': {'proposal_id': 'execution-'+uuid.uuid4().hex[:16], 'researcher_id': plan['researcher_id'],
@@ -358,14 +372,23 @@ class VersionSearch:
                     c.log.exception('pipeline.evaluation_failed', error, experiment_id=job.experiment_id)
             if trial is not None:
                 self.study(version).tell(trial, state=self.library.trial.TrialState.FAIL)
+            scope = failure_scope(event.get('error'))
+            version['environment_failure'] = scope == 'execution_environment'
             if event['state'] != 'cancelled':
                 version['errors'] += 1
                 signature, failure = self.recovery.quarantine(version['anchor']['code_artifact_id'],
                     c.store.get(job.experiment_id)['plan']['model']['hyperparameters'], event.get('error'))
                 version['retry_at'] = failure['retry_at']
                 version['blocked_inputs'][hashlib.sha256(canonical(c.store.get(job.experiment_id)['plan']['model']['hyperparameters']).encode()).hexdigest()] = failure['retry_at']
-                c.record_research_feedback(version['anchor']['researcher_id'], version['ticket']['work_order']['branch_id'],
-                    'pipeline_execution_failed', canonical(event.get('error')), code='PIPELINE_EXECUTION_FAILED')
+                if scope == 'execution_environment':
+                    # The candidate was never measured; keep the idea open.
+                    c.record_research_feedback(version['anchor']['researcher_id'], version['ticket']['work_order']['branch_id'],
+                        'execution_environment_failed', 'Not a measurement of this candidate or its hypothesis: the sealed '
+                        'worker refused an owned dependency. Keep the idea; resubmitting the same candidate is allowed. '
+                        +canonical(event.get('error')), code=(event.get('error') or {}).get('code'))
+                else:
+                    c.record_research_feedback(version['anchor']['researcher_id'], version['ticket']['work_order']['branch_id'],
+                        'pipeline_execution_failed', canonical(event.get('error')), code='PIPELINE_EXECUTION_FAILED')
             if initial:
                 version['paused'] = 'initial_execution_failed'
                 version['retryable_initial'] = event['state'] in {'timed_out', 'cancelled'} or (event.get('error') or {}).get('code') in {

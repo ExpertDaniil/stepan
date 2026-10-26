@@ -304,7 +304,7 @@ class SliceEndToEndTests(unittest.TestCase):
             self.assertTrue(bound)
             executed = [e for e in events if e['event'] == 'research.journal' and e['kind'] == 'candidate' and 'remedies' in e['line']]
             self.assertTrue(executed, 'a remedy candidate must be trained, evaluated and journalled')
-            self.assertIn(executed[0]['status'], {'overall_improved', 'partial_group_improvement', 'no_gain'})
+            self.assertIn(executed[0]['status'], {'overall_improved', 'within_noise', 'partial_group_improvement', 'no_gain'})
             self.assertEqual(events[-1]['event'], 'run.finished')
 
 

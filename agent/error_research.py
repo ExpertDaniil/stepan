@@ -28,7 +28,7 @@ def group_mask(data, truth, definition):
     raise ValueError('Unknown frozen group definition')
 
 
-def paired_result(task, truth, base, candidate, mask):
+def paired_result(task, truth, base, candidate, mask, significance=True):
     import numpy as np
     from agent.evaluation import score_predictions
     y, a, b = np.asarray(truth), np.asarray(base), np.asarray(candidate)
@@ -48,8 +48,17 @@ def paired_result(task, truth, base, candidate, mask):
             ya = y[selected];pa = a[selected].reshape(ya.shape);pb = b[selected].reshape(ya.shape)
             result['sse_reduction'] = float(((ya-pa)**2).sum()-((ya-pb)**2).sum())
         return result
-    return {'scope': 'paired_selection_rows', 'overall': part(np.ones(len(y), dtype=bool)),
-            'inside_group': part(mask), 'outside_group': part(~mask),
+    overall = part(np.ones(len(y), dtype=bool))
+    verdict = {'significant': False, 'probability_better': None, 'skipped': 'no overall improvement'}
+    if significance and (overall['improvement'] or 0) > 0:
+        # Bootstrap only an apparent improvement; a loss needs no noise test.
+        from agent.significance import paired_bootstrap
+        try:
+            verdict = paired_bootstrap(task, y, a, b)
+        except (ValueError, KeyError, TypeError) as error:
+            verdict = {'significant': False, 'probability_better': None, 'unavailable': str(error)[:200]}
+    return {'scope': 'paired_selection_rows', 'overall': overall,
+            'inside_group': part(mask), 'outside_group': part(~mask), 'significance': verdict,
             'group_scores_additive': False,
             'limitations': 'Complete package on the unchanged selection rows. F1/subset scores are not additive; '
                 'no component causality, attainable gain or independent confirmation is inferred.'}
@@ -331,18 +340,23 @@ class ErrorResearch:
                 mask = group_mask(data, truth, definition) if definition else np.zeros(len(rows), dtype=bool)
             result = paired_result(c.spec, truth, matrices[0], matrices[1], mask)
             result['versus_current_leader'] = (
-                {'experiment_id': leader, **paired_result(c.spec, truth, matrices[2], matrices[1], mask)['overall']}
+                {'experiment_id': leader, **paired_result(c.spec, truth, matrices[2], matrices[1], mask, significance=False)['overall']}
                 if versus_leader else {'experiment_id': leader, 'same_as': 'candidate' if leader == eid else 'research_base'})
             result.update(candidate_experiment_id=eid, proposal_base_experiment_id=base,
                 current_leader_experiment_id=leader, definition=definition,
                 group_fixed_before_evaluation=True, prediction_artifact_ids=sources,
                 work_order_id=binding.get('work_order_id'), source_artifact_id=binding.get('source_artifact_id'))
-            result['status'] = ('overall_improved' if result['overall']['improvement'] > 0 else
+            # Row noise is part of the verdict: a gain the paired bootstrap cannot
+            # distinguish from zero is reported as such, never as a discovery.
+            improvement = result['overall']['improvement'] or 0
+            result['status'] = ('overall_improved' if improvement > 0 and result['significance'].get('significant') else
+                'within_noise' if improvement > 0 else
                 'partial_group_improvement' if (result['inside_group']['improvement'] or 0) > 0 else 'no_gain')
             art = c.artifacts.write_json('research/paired-'+eid+'.json', result, 'paired_research_result')
             summary = {'artifact_id': art['artifact_id'], **{k:deepcopy(result[k]) for k in (
                 'candidate_experiment_id','proposal_base_experiment_id','status','overall','inside_group','outside_group',
                 'versus_current_leader')},
+                'probability_better': result['significance'].get('probability_better'),
                 'scope': self.publication(eid, binding.get('branch_id')),
                 'source_artifact_id': binding.get('source_artifact_id')}
             self.results.append(summary)
@@ -393,6 +407,8 @@ def candidate_line(c, eid, peer, definition, result):
         where = ' on '+canonical(definition)[:120]
     leader = result.get('versus_current_leader', {})
     versus = (f"; vs leader {leader.get('improvement'):+.6g}" if isinstance(leader.get('improvement'), (int, float)) else '')
+    probability = result.get('significance', {}).get('probability_better')
+    noise = f", P(better)={probability:.2f}" if isinstance(probability, float) else ''
     return (f"{peer}: {'; '.join(changes)}{where}: slice {metric} {pair(result['inside_group'])}, "
-            f"overall {pair(result['overall'])}{versus} => {result['status']}")
+            f"overall {pair(result['overall'])}{noise}{versus} => {result['status']}")
 

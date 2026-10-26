@@ -79,6 +79,7 @@ class Config:
     feature_seed_timeout_seconds: int = 120
     scientific_research_enabled: bool = True
     research_oof_enabled: bool = True
+    noise_aware_publication: bool = True  # Publish a new best only if significantly better than the champion.
     research_oof_jobs: int = 2  # Legacy simultaneous ceiling; 0 still disables OOF.
     research_oof_rows: int = 10000
     research_oof_timeout_seconds: int = 90
@@ -165,6 +166,7 @@ class Config:
             feature_seed_timeout_seconds=integer('FEATURE_SEED_TIMEOUT_SECONDS', 120, 1, 600),
             scientific_research_enabled=boolean('SCIENTIFIC_RESEARCH_ENABLED', True),
             research_oof_enabled=boolean('RESEARCH_OOF_ENABLED', True),
+            noise_aware_publication=boolean('NOISE_AWARE_PUBLICATION', True),
             research_oof_jobs=integer('RESEARCH_OOF_JOBS', 2, 0, 4),
             research_oof_rows=integer('RESEARCH_OOF_ROWS', 10000, 100, 50000),
             research_oof_timeout_seconds=integer('RESEARCH_OOF_TIMEOUT_SECONDS', 90, 5, 300),

@@ -179,6 +179,15 @@ class Orchestrator:
             candidate_results = [{k:r[k] for k in ('experiment_id', 'evaluation_id', 'primary_metric',
                 'diagnostics_artifact_id', 'plan_id', 'recipe_id', 'execution_kind')}
                 for r in measured if r['execution_kind'] == 'candidate'][-4:]
+            research = getattr(self, 'error_research', None)
+            verdicts = {r['candidate_experiment_id']: r for r in (research.results if research else [])}
+            for row in candidate_results:
+                verdict = verdicts.get(row['experiment_id'])
+                if verdict:
+                    # Row-noise verdict of the paired comparison with the research base.
+                    row['paired_verdict'] = {'status': verdict['status'], 'base_experiment_id': verdict['proposal_base_experiment_id'],
+                                             'improvement': verdict['overall'].get('improvement'),
+                                             'probability_better': verdict.get('probability_better')}
             incumbent = max(measured, key=lambda v: v['primary_metric']['value']*(
                 1 if v['primary_metric']['direction'] == 'maximize' else -1), default=None)
             if incumbent and incumbent not in latest:
@@ -371,7 +380,7 @@ class Orchestrator:
             return self.affordable_final_candidate()
         best = self.store.best()
         if not best or best not in self.failed_refits:
-            return best
+            return self.noise_gate(best)
         from agent.store import comparable, is_better
         reference = self.store.experiment_evaluation(best)['primary_metric']
         chosen, metric = None, None
@@ -386,6 +395,34 @@ class Orchestrator:
             if comparable(candidate, reference) and (metric is None or is_better(candidate, metric)):
                 chosen, metric = eid, candidate
         return chosen
+
+    def noise_gate(self, best):
+        """Keep the published champion while a newer best is within selection-row noise.
+
+        Applies only during search: closed confirmation and finalization choose among
+        finalists on their own rows. A raw-best that is not significantly better than
+        the champion (paired bootstrap, agent.significance) would cost a refit and
+        replace a measured output by a statistically indistinguishable one.
+        """
+        champion = self.store.champion()
+        if (not best or not champion or champion['experiment_id'] == best or champion['experiment_id'] in self.failed_refits
+                or getattr(self, 'finalization_started', False) or not getattr(self.config, 'noise_aware_publication', True)):
+            return best
+        incumbent = champion['experiment_id']
+        try:
+            verdict = self.evaluator.paired_significance(incumbent, best)
+        except (AgentError, ValueError, KeyError) as error:
+            self.log.event('submission.noise_gate_unavailable', experiment_id=best, champion_experiment_id=incumbent,
+                           reason=str(error)[:300])
+            return best
+        logged = getattr(self, 'noise_gate_logged', set())
+        self.noise_gate_logged = logged
+        if (incumbent, best) not in logged:
+            logged.add((incumbent, best))
+            self.log.event('submission.noise_gate', experiment_id=best, champion_experiment_id=incumbent,
+                           significant=verdict['significant'], gain=verdict['gain'], probability_better=verdict['probability_better'],
+                           interval=verdict['interval'], method=verdict['method'], rule=verdict.get('rule'))
+        return best if verdict['significant'] else incumbent
 
     def affordable_final_candidate(self):
         """Choose an entire deliverable, including refit/predict/validation cost."""

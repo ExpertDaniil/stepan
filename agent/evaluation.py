@@ -104,8 +104,47 @@ class Evaluator:
         self.protocols = {}
         self.baseline_value = None
         self.diagnostic_sources = {}
+        self.significance_cache = {}
         import threading
         self.diagnostic_lock = threading.RLock()
+
+    def selection_predictions(self, experiment_id):
+        """Hash-checked saved predictions of one evaluated experiment on the selection rows."""
+        import pandas as pd
+        from agent.artifacts import file_sha256
+        with self.diagnostic_lock:
+            source = dict(self.diagnostic_sources.get(experiment_id) or {})
+        if not source:
+            raise AgentError('NO_SAVED_PREDICTIONS', 'No trusted saved predictions for '+experiment_id)
+        protocol = self.protocols[source['validation_id']]
+        path = self.artifacts.resolve(source['predictions_artifact_id'])
+        if file_sha256(path) != source['predictions_sha256']:
+            raise AgentError('INVALID_PREDICTIONS', 'Trusted saved predictions changed after evaluation')
+        columns = validation_columns(self.spec)
+        kind = self.spec['metric']['prediction_kind']
+        frame = pd.read_csv(path, dtype={c: str for c in columns} if kind == 'labels' else None, keep_default_na=False)
+        rows = protocol.get('selection_indices', protocol['valid_indices'])
+        return source['validation_id'], rows, checked_matrix(frame.set_index('__row_index').loc[rows, columns].to_numpy(),
+                                                             len(rows), len(columns), kind, labels=self.spec['allowed_labels'])
+
+    def paired_significance(self, reference_id, candidate_id):
+        """Paired bootstrap of candidate vs reference on the same selection rows; cached per pair."""
+        key = (reference_id, candidate_id)
+        if key in self.significance_cache:
+            return self.significance_cache[key]
+        from agent.significance import paired_bootstrap
+        validation, rows, reference = self.selection_predictions(reference_id)
+        other, other_rows, candidate = self.selection_predictions(candidate_id)
+        if validation != other or rows != other_rows:
+            raise AgentError('INCOMPARABLE_EVALUATIONS', 'Significance needs the same validation rows')
+        names = targets(self.spec)
+        data = transport(self.artifacts).read(self.spec['train_artifact_id'], self.spec, columns=names, rows=rows)
+        truth = data[names if len(names) > 1 else names[0]]
+        seed = int(hashlib.sha256((reference_id+'|'+candidate_id).encode()).hexdigest()[:8], 16)
+        result = paired_bootstrap(self.spec, truth, reference, candidate, seed=seed)
+        result.update(reference_experiment_id=reference_id, candidate_experiment_id=candidate_id, rows=len(rows))
+        self.significance_cache[key] = result
+        return result
 
     def create_protocol(self, payload):
         import numpy as np

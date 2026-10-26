@@ -22,6 +22,9 @@ same entity). Each slice has a verdict tested on held-out OOF folds:
 - explainable: the residual is predictable from top_features; give the model
   that signal with a feature_program or a pipeline.
 - noise: no tested correction or input explains it; spend research elsewhere.
+candidate_results[].paired_verdict compares your candidate with its research base on
+the same selection rows: within_noise means a paired bootstrap cannot tell the
+gain from row noise (P(better) < 0.95); do not treat it as a discovery.
 It is advice; the evaluator decides. Overlapping slices do not have additive
 shares. Unknown units remain unknown; useful statistical ideas do not need a
 physical story. Never use true test targets or worst residual rank to define a

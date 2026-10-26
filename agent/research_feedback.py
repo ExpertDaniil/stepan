@@ -127,3 +127,55 @@ def compact_updates(value):
             result[field].pop(0)
             result['details_omitted'] = True
     return result
+
+
+def frame_updates(view, context):
+    """Hold one dialogue's question and research base fixed while updates arrive.
+
+    Background trials that change neither the best solution nor this branch's
+    controller feedback leave the previous per-turn view unchanged; they stay
+    readable through ``details``. Two references are named separately: the
+    research base (effect of the change) and the current best (utility).
+    """
+    import json
+    frame = context.get('_research_frame')
+    if frame is None:
+        user = json.loads(context['messages'][1]['content'])
+        projection = user.get('profile_summary', user)
+        advice = projection.get('error_research') or {}
+        recommendation = advice.get('recommendation') or {}
+        leader = advice.get('leader') or {}
+        base = recommendation.get('base_experiment_id') or (user.get('base_result') or {}).get('experiment_id')
+        frame = {'question': recommendation.get('question'), 'research_base_experiment_id': base,
+                 'research_base_metric': (leader.get('metric') if leader.get('experiment_id') == base else
+                                          (user.get('base_result') or {}).get('metric'))}
+        context['_research_frame'] = frame
+    best = view.get('best_solution') or {}
+    relevant = canonical([best.get('experiment_id'), best.get('metric'), view.get('admission_feedback', []),
+                          view.get('pending_experiments', []), [r.get('artifact_id') for r in view.get('fit_diagnostics', [])],
+                          [{k: s.get(k) for k in ('series_id', 'status', 'best_experiment_id')} for s in view.get('series', [])]])
+    previous = context.get('_feedback_turn')
+    if previous and previous['relevant'] == relevant:
+        result = deepcopy(previous['view'])
+        result['changed_since_previous_turn'] = False
+        result['changes'] = []
+        return result
+    changes = []
+    if previous:
+        old = previous['best']
+        if old.get('experiment_id') != best.get('experiment_id'):
+            changes.append({'kind': 'best_solution', 'from': {k: old.get(k) for k in ('experiment_id', 'metric')},
+                            'to': {k: best.get(k) for k in ('experiment_id', 'metric')}})
+        seen = {canonical(r) for r in previous['view'].get('admission_feedback', [])}
+        changes.extend({'kind': 'controller_feedback', 'status': r.get('status'), 'code': r.get('code')}
+                       for r in view.get('admission_feedback', []) if canonical(r) not in seen)
+    result = deepcopy(view)
+    result['research_frame'] = {**frame,
+        'utility_reference': {k: best.get(k) for k in ('experiment_id', 'recipe_id', 'metric')} if best else None,
+        'instruction': 'Your question and research base stay fixed for this dialogue. Judge a change by its effect against '
+            'the research base and its utility against the current best. A better tuned best changes only the utility '
+            'reference; change direction only when new measurements contradict your hypothesis.'}
+    result['changed_since_previous_turn'] = True
+    result['changes'] = changes
+    context['_feedback_turn'] = {'relevant': relevant, 'view': deepcopy(result), 'best': deepcopy(best)}
+    return result

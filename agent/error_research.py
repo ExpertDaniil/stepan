@@ -228,8 +228,12 @@ class ErrorResearch:
             protocol = c.evaluator.protocols[c.validation['validation_id']]
             rows = protocol.get('selection_indices', protocol['valid_indices'])
             columns = validation_columns(c.spec);kind = c.spec['metric']['prediction_kind']
+            leader = c.store.best()
+            # Effect is measured against the research base; utility against the
+            # current leader, when that is a different measured solution.
+            versus_leader = leader not in {None, base, eid} and compare(c.store, c.artifacts, leader, eid)['comparable']
             matrices, sources = [], []
-            for ident in (base, eid):
+            for ident in (base, eid, *([leader] if versus_leader else [])):
                 source = c.evaluator.diagnostic_sources.get(ident)
                 if not source:raise ValueError('No trusted saved predictions for '+ident)
                 path = c.artifacts.resolve(source['predictions_artifact_id'])
@@ -246,16 +250,20 @@ class ErrorResearch:
             data = transport(c.artifacts).read(c.spec['train_artifact_id'], c.spec, columns=list(dict.fromkeys(wanted)), rows=rows)
             truth = data[names if len(names) > 1 else names[0]]
             mask = group_mask(data, truth, definition) if definition else np.zeros(len(rows), dtype=bool)
-            result = paired_result(c.spec, truth, *matrices, mask)
+            result = paired_result(c.spec, truth, matrices[0], matrices[1], mask)
+            result['versus_current_leader'] = (
+                {'experiment_id': leader, **paired_result(c.spec, truth, matrices[2], matrices[1], mask)['overall']}
+                if versus_leader else {'experiment_id': leader, 'same_as': 'candidate' if leader == eid else 'research_base'})
             result.update(candidate_experiment_id=eid, proposal_base_experiment_id=base,
-                current_leader_experiment_id=c.store.best(), definition=definition,
+                current_leader_experiment_id=leader, definition=definition,
                 group_fixed_before_evaluation=True, prediction_artifact_ids=sources,
                 work_order_id=binding.get('work_order_id'), source_artifact_id=binding.get('source_artifact_id'))
             result['status'] = ('overall_improved' if result['overall']['improvement'] > 0 else
                 'partial_group_improvement' if (result['inside_group']['improvement'] or 0) > 0 else 'no_gain')
             art = c.artifacts.write_json('research/paired-'+eid+'.json', result, 'paired_research_result')
             summary = {'artifact_id': art['artifact_id'], **{k:deepcopy(result[k]) for k in (
-                'candidate_experiment_id','proposal_base_experiment_id','status','overall','inside_group','outside_group')},
+                'candidate_experiment_id','proposal_base_experiment_id','status','overall','inside_group','outside_group',
+                'versus_current_leader')},
                 'scope': self.publication(eid, binding.get('branch_id')),
                 'source_artifact_id': binding.get('source_artifact_id')}
             self.results.append(summary)
@@ -271,6 +279,7 @@ class ErrorResearch:
                 self.assignments[assignment_key]['status'] = 'evaluated'
             self.save()
             c.log.event('research.paired_comparison', artifact_id=art['artifact_id'], experiment_id=eid,
-                        base_experiment_id=base, status=result['status'])
+                        base_experiment_id=base, status=result['status'], leader_experiment_id=leader,
+                        improvement_vs_leader=result['versus_current_leader'].get('improvement'))
         except (AgentError, ValueError, OSError, KeyError) as error:
             c.log.event('research.paired_unavailable', experiment_id=eid, base_experiment_id=base, reason=str(error)[:500])

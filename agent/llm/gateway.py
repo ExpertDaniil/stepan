@@ -227,8 +227,8 @@ class Gateway:
                         or delivered.get('validation_id') != frozen_scope.get('validation_id'))):
                     raise AgentError('MEMORY_SCOPE_DENIED', 'Feedback identity differs from issued task/validation')
                 context['metadata'].setdefault('authorized_feedback_ids', []).append(delivered['artifact_id'])
-                from agent.research_feedback import compact_updates
-                delivered = compact_updates(delivered)
+                from agent.research_feedback import compact_updates, frame_updates
+                delivered = frame_updates(compact_updates(delivered), context)
                 context['metadata'].setdefault('delivered_experiment_ids', []).extend(r['experiment_id'] for r in delivered['results'])
             if delivered:
                 feedback_message = {'role': 'user', 'content': json.dumps(
@@ -767,6 +767,12 @@ class Gateway:
                     for item in prepared:
                         call, args, key = item['call'], item['args'], item['key']
                         name = call['function']['name']
+                        delivered_best = (context.get('_feedback_turn') or {}).get('best', {}).get('experiment_id')
+                        if name == 'read_solution' and item['error'] is None and args.get('experiment_id') == 'best' and delivered_best:
+                            # "best" names the delivered incumbent: equal reads reuse, a new best reads afresh.
+                            from agent.contracts import canonical
+                            args = {**args, 'experiment_id': delivered_best}
+                            key = (name, canonical(args))
                         if key in tool_cache:
                             previous, original_id = tool_cache[key]
                             result = {'reused': True, 'original_tool_call_id': original_id,

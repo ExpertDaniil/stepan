@@ -236,3 +236,80 @@ class RollingDispatcherTests(unittest.TestCase):
             self.assertTrue(release.is_set())
         finally:
             release.set();h.close()
+
+
+class FramedUpdatesTests(unittest.TestCase):
+    """Background tuning updates reach the dialogue without resetting its question or base."""
+
+    def setUp(self):
+        self.h = GraphHarness('regression', research_mode='adaptive', time_budget_seconds=10800,
+                              llm_max_calls=None, llm_max_total_output_tokens=None)
+
+    def tearDown(self):
+        self.h.close()
+
+    def publish(self, gateway, branch, scope, measured, best):
+        from agent.context_details import solution_record
+        g = self.h.g
+        results = [{'experiment_id': eid, 'primary_metric': g.store.experiment_evaluation(eid)['primary_metric'],
+                    'evaluation_id': g.store.experiment_evaluation(eid)['evaluation_id'], 'recipe_id': 'linear-regressor-v1',
+                    'diagnostics_artifact_id': g.store.experiment_evaluation(eid)['diagnostics_artifact_id']}
+                   for eid in measured]
+        gateway.feedback.publish(branch, {'branch_id': branch, **{k: scope[k] for k in ('dataset_id', 'task_spec_id', 'validation_id')},
+            'results': results, 'admission_feedback': [], 'pending_experiments': [], 'series': [], 'fit_diagnostics': [],
+            'solution_catalog': {eid: solution_record(g.store, g.artifacts, eid) for eid in measured},
+            'best_solution': {'experiment_id': best, 'recipe_id': 'linear-regressor-v1',
+                              'metric': g.store.experiment_evaluation(best)['primary_metric']}})
+
+    def test_irrelevant_trials_keep_the_view_and_a_new_best_is_read_afresh(self):
+        g, outer = self.h.g, self
+        _, base_reply, _, _ = self.h.result('researcher-1', {'alpha': 1}, 10)
+        _, noise_reply, _, _ = self.h.result('researcher-2', {'alpha': 2}, 14)
+        _, best_reply, _, _ = self.h.result('researcher-2', {'alpha': 3}, 7)
+        base, noise, best = (r['lead_submission']['experiment_id'] for r in (base_reply, noise_reply, best_reply))
+        read_best = {'name': 'read_solution', 'arguments': json.dumps({'experiment_id': 'best', 'view': 'result'})}
+        class Transport:
+            def __init__(self):
+                self.requests = []
+            def complete(self, request, timeout, context):
+                self.requests.append(deepcopy(request));n = len(self.requests)
+                scope = context['metadata']['detail_scope']
+                if n == 1:   # a worse background trial arrives
+                    outer.publish(self.gateway, self.branch, scope, [base, noise], base)
+                elif n == 2:  # background tuning finds a better solution
+                    outer.publish(self.gateway, self.branch, scope, [base, noise, best], best)
+                if n <= 3:
+                    calls = [{'id': 'read-'+str(n), 'type': 'function', 'function': read_best}]
+                    if n == 2:  # an unanswered question keeps the dialogue moving
+                        calls.append({'id': 'code-2', 'type': 'function', 'function': {'name': 'read_solution',
+                            'arguments': json.dumps({'experiment_id': base, 'view': 'code'})}})
+                    message = {'content': None, 'tool_calls': calls}
+                else:
+                    message = {'content': json.dumps(action('catalog'))}
+                return {'choices': [{'message': message, 'finish_reason': 'stop'}], 'usage': {'completion_tokens': 100}}
+        transport = Transport()
+        gateway = Gateway(g.config, g.budget, g.artifacts, g.bus, g.log, output_schemas(g.bus), transport)
+        gateway.feedback = FeedbackMailbox(g.artifacts)
+        transport.gateway = gateway
+        ticket = self.h.issue()
+        transport.branch = ticket['work_order']['branch_id']
+        scope = g.artifacts.read_json(ticket['work_order']['context_id'])['metadata']['detail_scope']
+        self.publish(gateway, transport.branch, scope, [base], base)
+        result = gateway.complete({'purpose': 'research_proposal', 'context_artifact_id': ticket['work_order']['context_id'],
+            'response_schema_id': 'ResearchAction-v1', 'tool_schema_ids': ['read_solution'], 'max_output_tokens': 1024,
+            'deadline_seconds': 300, 'attempt_limit': 9})
+        updates = [next(json.loads(m['content'])['research_updates'] for m in r['messages']
+                        if m['role'] == 'user' and m['content'].startswith('{"research_updates"')) for r in transport.requests]
+        frames = [u['research_frame'] for u in updates]
+        # One stable question/base; only the utility reference moves with background tuning.
+        self.assertEqual(len({json.dumps({k: f[k] for k in ('question', 'research_base_experiment_id')}) for f in frames}), 1)
+        self.assertEqual([f['utility_reference']['experiment_id'] for f in frames], [base, base, best, best])
+        self.assertEqual([u['changed_since_previous_turn'] for u in updates], [True, False, True, False])
+        self.assertEqual(updates[1]['results'], updates[0]['results'])
+        self.assertEqual(updates[2]['changes'][0]['to']['experiment_id'], best)
+        # "best" names the delivered incumbent: the first read is reused, the new best is read afresh.
+        tool_texts = [json.loads(m['content']) for m in transport.requests[-1]['messages'] if m['role'] == 'tool']
+        self.assertEqual([t['experiment_id'] for t in tool_texts], [base, base, base, best])
+        self.assertEqual([bool(t.get('reused')) for t in tool_texts], [False, True, False, False])
+        self.assertEqual(result['parsed_payload']['action'], 'catalog')
+        self.assertEqual(result['attempts_used'], 4)

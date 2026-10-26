@@ -219,9 +219,10 @@ class Orchestrator:
                     if incumbent else None),
                 'fit_diagnostics': fit_diagnostics,
                 'series': summaries, 'omitted_series_count': max(0, len(series)-len(summaries)),
-                'instruction': 'New controller measurements available at request dispatch. Compare only compatible protocols. '
-                    'The assignment base is graph lineage, not necessarily the best solution. '
-                    'Use read_solution(experiment_id="best") for the strongest visible executable version.'})
+                'instruction': 'Controller measurements at request dispatch. Compare only compatible protocols. '
+                    'Metrics here are exact; a result read repeats them. The assignment base is graph lineage, not '
+                    'necessarily the best solution; read_solution(experiment_id="best") returns the strongest visible '
+                    'version when its code or parameters matter to your question.'})
 
     def local_plan(self, peer, branch="legacy", base=None, constraints=None, assignment=None):
         if self.budget.data_research_snapshot()['active']:

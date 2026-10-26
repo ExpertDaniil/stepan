@@ -24,6 +24,11 @@ def normalize_tool_arguments(name, args):
             value.update(query=' '.join(value.get('query', '').casefold().split()), ids=[],
                          tags=sorted(set(value.get('tags', []))), max_results=limit)
         value.setdefault('offset', 0)
+    elif name == 'read_solution':
+        # Equal reads share one transcript result; defaults mirror read_solution.
+        value.setdefault('view', 'pipeline')
+        value.setdefault('offset', 0)
+        value.setdefault('limit_bytes', 6000)
     elif name == 'read_memory':
         value.setdefault('offset', 0)
         value.setdefault('limit_bytes', 4000)

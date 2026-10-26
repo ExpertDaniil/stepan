@@ -458,3 +458,49 @@ class FinalBudgetTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class EffectAndUtilityTests(unittest.TestCase):
+    """A candidate is compared with its research base (effect) and with the current leader (utility)."""
+
+    def setUp(self):
+        self.h = GraphHarness('regression', graph_hard_decisions=False, research_mode='adaptive')
+        self.c = self.h.controller
+        self.c.graph = self.h.g
+        self.c.error_research = ErrorResearch(self.c)
+
+    def tearDown(self):
+        self.h.close()
+
+    def measured(self, alpha, offset):
+        import pandas as pd
+        from agent.predictions import targets, validation_columns
+        c, h = self.c, self.h
+        ticket = h.issue()
+        reply, _ = h.submit(ticket, {'alpha': alpha})
+        eid = reply['lead_submission']['experiment_id']
+        c.store.apply_event(h.train_event(reply), 'train')
+        rows = c.evaluator.protocols[c.validation['validation_id']]['valid_indices']
+        truth = pd.read_csv(c.artifacts.resolve(c.spec['train_artifact_id'])).loc[rows, targets(c.spec)[0]].to_numpy(float)
+        path = c.artifacts.safe_path('predictions/'+eid+'.csv')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({'__row_index': rows, validation_columns(c.spec)[0]: truth+offset}).to_csv(path, index=False)
+        art = c.artifacts.register(path, 'validation_predictions', 'text/csv')
+        ev = c.evaluator.evaluate({'experiment_id': eid, 'task_spec_id': c.spec['task_spec_id'], 'dataset_id': c.spec['dataset_id'],
+            'validation_id': c.validation['validation_id'], 'predictions_artifact_id': art['artifact_id'], 'fidelity': 'full'})['evaluation']
+        h.g.invoke('G05', {'experiment_id': eid, 'evaluation_id': ev['evaluation_id'],
+                           'selection_policy_id': 'same-protocol-primary-v1'}, key='eval-'+eid)
+        return eid
+
+    def test_effect_against_base_and_utility_against_a_newer_leader(self):
+        base = self.measured(1.0, 3.0)
+        leader = self.measured(2.0, 1.0)  # background tuning found a better solution meanwhile
+        candidate = self.measured(3.0, 2.0)
+        self.assertEqual(self.c.store.best(), leader)
+        self.c.error_research.compare(candidate, {'base_experiment_id': base, 'researcher_id': 'researcher-1'})
+        summary = self.c.error_research.results[-1]
+        self.assertEqual(summary['proposal_base_experiment_id'], base)
+        self.assertEqual(summary['status'], 'overall_improved')
+        self.assertAlmostEqual(summary['overall']['improvement'], 1.0, places=6)
+        self.assertEqual(summary['versus_current_leader']['experiment_id'], leader)
+        self.assertAlmostEqual(summary['versus_current_leader']['improvement'], -1.0, places=6)
